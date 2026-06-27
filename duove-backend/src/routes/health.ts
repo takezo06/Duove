@@ -2,12 +2,9 @@ import { Router, Request, Response } from 'express';
 
 const router = Router();
 
-/**
- * GET /health
- * Returns basic health status for monitoring and zero‑downtime deployments.
- */
-router.get('/health', (req: Request, res: Response) => {
-  const uptime = process.uptime(); // seconds since process start
+// GET /health – full path will be /health (since mounted at /health)
+router.get('/', (req: Request, res: Response) => {
+  const uptime = process.uptime();
   res.status(200).json({
     status: 'ok',
     uptime: Math.floor(uptime),
