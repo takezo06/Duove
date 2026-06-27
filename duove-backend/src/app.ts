@@ -1,0 +1,44 @@
+import express, { Express, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import { config } from './config/env';
+import { logger } from './config/logger';
+import healthRouter from './routes/health';
+
+export const createApp = (): Express => {
+  const app = express();
+
+  // Security
+  app.use(helmet());
+  app.use(cors({
+    origin: config.nodeEnv === 'production' ? 'https://your-frontend.vercel.app' : '*',
+    credentials: true,
+  }));
+
+  // Logging
+  app.use(morgan('combined', {
+    stream: {
+      write: (message: string) => logger.http(message.trim()),
+    },
+  }));
+
+  // Body parsing
+  app.use(express.json({ limit: '10mb' }));
+
+  // Routes
+  app.use('/health', healthRouter);
+
+  // Error handler
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    logger.error('Unhandled error', {
+      error: err.message,
+      stack: err.stack,
+      path: req.path,
+      method: req.method,
+    });
+    res.status(500).json({ error: 'Something went wrong' });
+  });
+
+  return app;
+};
