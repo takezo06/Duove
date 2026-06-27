@@ -9,8 +9,8 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET || '',
+  databaseUrl: process.env.DATABASE_URL || '', // <-- NEW
 };
-
 // Optional: validate that critical variables are set
 if (!config.supabaseUrl || !config.supabaseJwtSecret) {
   console.warn('⚠️  Missing SUPABASE_URL or SUPABASE_JWT_SECRET in .env');
