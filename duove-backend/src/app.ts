@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { config } from './config/env';
 import { logger } from './config/logger';
 import healthRouter from './routes/health';
+import cravingsRouter from './routes/cravings';
 
 export const createApp = (): Express => {
   const app = express();
@@ -28,6 +29,8 @@ export const createApp = (): Express => {
 
   // Routes
   app.use('/health', healthRouter);
+
+  app.use('/api/cravings', cravingsRouter);
 
   // Error handler
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {

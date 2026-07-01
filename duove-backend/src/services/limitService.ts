@@ -13,6 +13,7 @@ export interface LimitCheckResult {
 const MAX_LIMITS = {
   letter: 5,
   qa: 5,
+  craving: 5,
 };
 
 /**
