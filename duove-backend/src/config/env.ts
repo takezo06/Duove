@@ -9,7 +9,8 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET || '',
-  databaseUrl: process.env.DATABASE_URL || '', // <-- NEW
+  databaseUrl: process.env.DATABASE_URL || '',
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
 };
 // Optional: validate that critical variables are set
 if (!config.supabaseUrl || !config.supabaseJwtSecret) {

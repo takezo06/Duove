@@ -7,6 +7,7 @@ import { logger } from './config/logger';
 import healthRouter from './routes/health';
 import cravingsRouter from './routes/cravings';
 import lettersRouter from './routes/letters';
+import qaRouter from './routes/qa';
 
 export const createApp = (): Express => {
   const app = express();
@@ -33,7 +34,7 @@ export const createApp = (): Express => {
 
   app.use('/api/cravings', cravingsRouter);
   app.use('/api/letters', lettersRouter);
-
+  app.use('/api/qa', qaRouter);
 
   // Error handler
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
