@@ -87,7 +87,7 @@ router.post(
  */
 router.patch('/:id/toggle', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cravingId = req.params.id;
+    const cravingId = req.params.id as string;
     const userId = req.user!.id;
 
     const supabase = createUserClient(req.token!);
@@ -105,7 +105,7 @@ router.patch('/:id/toggle', async (req: Request, res: Response, next: NextFuncti
  */
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cravingId = req.params.id;
+    const cravingId = req.params.id as string;
     const userId = req.user!.id;
 
     const supabase = createUserClient(req.token!);
