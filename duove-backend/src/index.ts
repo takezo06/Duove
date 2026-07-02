@@ -3,37 +3,42 @@ import { logger } from './config/logger';
 import { createApp } from './app';
 import { startScheduler } from './services/scheduler';
 
-const app = createApp();
-const PORT = config.port;
+(async () => {
+  try {
+    const app = createApp();
+    const PORT = config.port;
 
-const server = app.listen(PORT, () => {
-  logger.info(`🚀 Duove backend running on port ${PORT} in ${config.nodeEnv} mode`);
-  logger.info(`📅 Health check available at http://localhost:${PORT}/health`);
-});
+    const server = app.listen(PORT, () => {
+      logger.info(`🚀 Duove backend running on port ${PORT} in ${config.nodeEnv} mode`);
+      logger.info(`📅 Health check available at http://localhost:${PORT}/health`);
+    });
 
-// Start scheduler
-startScheduler();
+    startScheduler();
 
-// Graceful shutdown
-const shutdown = () => {
-  logger.info('Shutting down gracefully...');
-  server.close(() => {
-    logger.info('Server closed.');
-    process.exit(0);
-  });
-  setTimeout(() => {
-    logger.error('Forced shutdown after timeout');
+    const shutdown = () => {
+      logger.info('Shutting down gracefully...');
+      server.close(() => {
+        logger.info('Server closed.');
+        process.exit(0);
+      });
+      setTimeout(() => {
+        logger.error('Forced shutdown after timeout');
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught exception', { error: error.message, stack: error.stack });
+    });
+
+    process.on('unhandledRejection', (reason) => {
+      logger.error('Unhandled rejection', { reason });
+    });
+  } catch (err) {
+    console.error('Fatal error during startup:', err);
     process.exit(1);
-  }, 10000);
-};
-
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught exception', { error: error.message, stack: error.stack });
-});
-
-process.on('unhandledRejection', (reason) => {
-  logger.error('Unhandled rejection', { reason });
-});
+  }
+})();

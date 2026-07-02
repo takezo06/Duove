@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../config/logger';
 
-export type LimitType = 'letter' | 'qa';
+export type LimitType = 'letter' | 'craving' | 'qa';
 
 export interface LimitCheckResult {
   allowed: boolean;
@@ -48,7 +48,12 @@ export async function checkDailyLimit(
     throw new Error('Failed to check daily limit');
   }
 
-  const current = data ? (data[`${type}_count`] as number) : 0;
+  // Helper to safely extract count
+  function getCount(data: any, type: LimitType): number {
+    return data ? data[`${type}_count`] || 0 : 0;
+  }
+
+  const current = getCount(data, type);
   const allowed = current < limit;
 
   // Reset at midnight UTC
@@ -92,7 +97,7 @@ export async function incrementDailyUsage(
     // Record exists – increment
     const { error: updateError } = await supabase
       .from('daily_usage')
-      .update({ [column]: existing[column] + 1 })
+      .update({ [column]: (existing as any)[column] + 1 })
       .eq('user_id', userId)
       .eq('date', today);
 

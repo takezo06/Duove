@@ -69,7 +69,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const letterId = req.params.id;
+    const letterId = req.params.id as string;
     const supabase = createUserClient(req.token!);
 
     const letter = await getLetterById(supabase, letterId);
