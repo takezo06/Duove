@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Home,
   CalendarDays,
@@ -10,9 +10,10 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
-  Menu,
-  X,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const navItems = [
   { icon: Home, label: 'Dashboard', path: '/' },
@@ -24,95 +25,232 @@ const navItems = [
   { icon: User, label: 'Profile', path: '/profile' },
 ];
 
-interface SidebarProps {
-  isMobileOpen: boolean;
-  setIsMobileOpen: (open: boolean) => void;
-}
+const MIN_WIDTH = 64;
+const MAX_WIDTH = 400;
+const DEFAULT_WIDTH = 256;
 
-export function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+export function Sidebar() {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const [width, setWidth] = useState(() => {
+    const saved = localStorage.getItem('sidebar-width');
+    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+  });
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar-collapsed') === 'true';
+  });
+
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipText, setTooltipText] = useState('');
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+
+  const lastExpandedWidth = useRef<number>(width);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    localStorage.setItem('sidebar-width', String(width));
+  }, [width]);
+
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(isCollapsed));
+  }, [isCollapsed]);
+
+  useEffect(() => {
+    if (!isCollapsed) {
+      lastExpandedWidth.current = width;
+    }
+  }, [width, isCollapsed]);
+
+  const currentWidth = isCollapsed ? MIN_WIDTH : width;
+  const showText = currentWidth >= 120;
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = isCollapsed ? MIN_WIDTH : width;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (ev: MouseEvent) => {
+    if (!isDragging.current) return;
+    let newWidth = startWidth.current + (ev.clientX - startX.current);
+    newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth));
+    if (isCollapsed && newWidth > MIN_WIDTH) {
+      setIsCollapsed(false);
+    }
+    setWidth(newWidth);
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  const toggleCollapse = () => {
+    if (isCollapsed) {
+      setIsCollapsed(false);
+      setWidth(lastExpandedWidth.current >= 120 ? lastExpandedWidth.current : DEFAULT_WIDTH);
+    } else {
+      lastExpandedWidth.current = width;
+      setIsCollapsed(true);
+      setWidth(MIN_WIDTH);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  const handleMouseEnter = useCallback((label: string, e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipText(label);
+    setTooltipPosition({
+      top: rect.top + rect.height / 2,
+      left: rect.right + 10,
+    });
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = setTimeout(() => {
+      setTooltipVisible(true);
+    }, 150);
   }, []);
 
-  const sidebarClass = `
-    sidebar 
-    ${isCollapsed && !isMobile ? 'sidebar-collapsed' : ''} 
-    ${isMobile ? 'sidebar-mobile' : ''} 
-    ${isMobile && isMobileOpen ? 'open' : ''}
-  `;
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+      hoverTimeout.current = null;
+    }
+    setTooltipVisible(false);
+  }, []);
+
+  const shouldShowTooltips = isCollapsed || !showText;
 
   return (
-    <>
-      {isMobile && isMobileOpen && (
+    <div className="relative flex-shrink-0 h-screen">
+      {tooltipVisible && shouldShowTooltips && (
         <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsMobileOpen(false)}
-        />
+          className="fixed px-3 py-1.5 bg-neutral-800 text-sm text-neutral-100 rounded-lg shadow-xl border border-neutral-700/70 pointer-events-none z-[200] whitespace-nowrap transition-opacity duration-200"
+          style={{
+            top: tooltipPosition.top,
+            left: tooltipPosition.left,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          {tooltipText}
+        </div>
       )}
-      <aside className={sidebarClass}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon">
+
+      <aside
+        className="flex flex-col h-full bg-neutral-900 border-r border-neutral-800 overflow-x-visible overflow-y-auto"
+        style={{ width: currentWidth }}
+      >
+        {/* Logo */}
+        <div className="flex items-center h-16 px-5 border-b border-neutral-800/50 flex-shrink-0 overflow-x-hidden">
+          <div className={`flex items-center gap-3 w-full ${!showText ? 'justify-center' : ''}`}>
+            <div className="w-9 h-9 rounded-lg bg-rose-400/10 flex items-center justify-center border border-rose-400/20 flex-shrink-0">
               <Heart className="w-5 h-5 text-rose-400 fill-rose-400/20" />
             </div>
-            <span className="sidebar-logo-text">Duove</span>
+            {showText && (
+              <span className="text-xl font-semibold text-white whitespace-nowrap">
+                Duove
+              </span>
+            )}
           </div>
-          {isMobile && (
-            <button onClick={() => setIsMobileOpen(false)} className="text-neutral-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-          )}
         </div>
 
-        <nav className="sidebar-nav">
+        {/* Navigation */}
+        <nav className="flex-1 px-2 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden">
           {navItems.map(({ icon: Icon, label, path }) => (
             <a
               key={label}
               href={path}
-              className={`sidebar-nav-link ${window.location.pathname === path ? 'active' : ''}`}
+              onMouseEnter={(e) => {
+                if (shouldShowTooltips) handleMouseEnter(label, e);
+              }}
+              onMouseLeave={handleMouseLeave}
+              className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-lg 
+                text-sm font-medium transition-all duration-200 
+                text-neutral-400 hover:text-white hover:bg-neutral-700/50
+                ${!showText ? 'justify-center' : ''}
+              `}
             >
-              <Icon className="icon" />
-              <span className="label">{label}</span>
-              <span className="tooltip">{label}</span>
+              <Icon className="w-5 h-5 flex-shrink-0" />
+              {showText && <span>{label}</span>}
             </a>
           ))}
         </nav>
 
-        <div className="sidebar-footer">
-          {(!isCollapsed || isMobile) && (
-            <div className="sidebar-user">
-              <div className="avatar">J</div>
-              <div className="info">
-                <div className="name">Jed</div>
-                <div className="email">jed@duove.app</div>
-              </div>
+        {/* Footer */}
+        <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-3 overflow-x-hidden">
+          <div className={`
+            flex items-center gap-3 px-3 py-2.5 rounded-lg 
+            transition-all duration-200
+            hover:bg-neutral-700/50
+            ${!showText ? 'justify-center' : ''}
+          `}>
+            <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0">
+              {user?.email?.charAt(0).toUpperCase() || 'U'}
             </div>
-          )}
-          {!isMobile && (
-            <button
-              className="sidebar-toggle"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="w-4 h-4" />
-              ) : (
-                <>
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Collapse</span>
-                </>
-              )}
-            </button>
-          )}
+            {showText && (
+              <div className="overflow-hidden min-w-0">
+                <p className="text-sm text-white font-medium truncate">
+                  {user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'}
+                </p>
+                <p className="text-xs text-neutral-500 truncate">{user?.email}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            onMouseEnter={(e) => {
+              if (shouldShowTooltips) handleMouseEnter('Logout', e);
+            }}
+            onMouseLeave={handleMouseLeave}
+            className={`
+              flex items-center gap-3 px-3 py-2.5 rounded-lg 
+              text-sm font-medium transition-all duration-200
+              text-neutral-400 hover:text-white hover:bg-neutral-700/50
+              ${!showText ? 'justify-center' : ''}
+            `}
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {showText && <span>Logout</span>}
+          </button>
+
+          {/* Collapse button */}
+          <button
+            onClick={toggleCollapse}
+            className="
+              flex items-center justify-center
+              w-9 h-9 rounded-lg 
+              text-neutral-400 hover:text-white hover:bg-neutral-700/50
+              transition-all duration-200
+            "
+          >
+            {isCollapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronLeft className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </aside>
-    </>
+
+      {/* Drag handle */}
+      <div
+        className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-rose-400/30 transition-colors"
+        onMouseDown={handleMouseDown}
+      />
+    </div>
   );
 }
