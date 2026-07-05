@@ -40,7 +40,6 @@ export function Sidebar() {
     return localStorage.getItem('sidebar-collapsed') === 'true';
   });
 
-  // User state
   const [userName, setUserName] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userAvatar, setUserAvatar] = useState<string>('?');
@@ -54,10 +53,13 @@ export function Sidebar() {
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
-  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const widthRef = useRef(width);
+
   const navigate = useNavigate();
 
-  // Fetch user info
+  // Fetch user info (unchanged)
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -68,7 +70,6 @@ export function Sidebar() {
           return;
         }
         if (user) {
-          // Determine display name
           const metadata = user.user_metadata || {};
           let displayName = 
             metadata.full_name || 
@@ -77,26 +78,17 @@ export function Sidebar() {
             user.email?.split('@')[0] || 
             'User';
           
-          // Capitalize first letter of each word for nice display
           displayName = displayName
             .split(' ')
             .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
             .join(' ');
-
-
+          
           setUserName(displayName);
           setUserEmail(user.email || '');
           setUserAvatar(displayName.charAt(0).toUpperCase());
-        } else {
-          setUserName('User');
-          setUserEmail('user@example.com');
-          setUserAvatar('U');
         }
       } catch (err) {
         console.error('Failed to fetch user:', err);
-        setUserName('User');
-        setUserEmail('user@example.com');
-        setUserAvatar('U');
       } finally {
         setLoadingUser(false);
       }
@@ -105,7 +97,7 @@ export function Sidebar() {
     fetchUser();
   }, []);
 
-  // Persist width and collapse state
+  // Persist width
   useEffect(() => {
     localStorage.setItem('sidebar-width', String(width));
   }, [width]);
@@ -120,42 +112,84 @@ export function Sidebar() {
     }
   }, [width, isCollapsed]);
 
+  // Update widthRef on state change
+  useEffect(() => {
+    widthRef.current = width;
+  }, [width]);
+
   const currentWidth = isCollapsed ? MIN_WIDTH : width;
   const showText = currentWidth >= 120;
 
+  // ---- Drag handlers with direct DOM manipulation ----
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
     startX.current = e.clientX;
-    startWidth.current = isCollapsed ? MIN_WIDTH : width;
+    startWidth.current = widthRef.current;
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    if (sidebarRef.current) {
+      // Disable transition for instant feedback
+      sidebarRef.current.style.transition = 'none';
+      sidebarRef.current.style.willChange = 'width';
+    }
   };
 
   const handleMouseMove = (ev: MouseEvent) => {
     if (!isDragging.current) return;
     let newWidth = startWidth.current + (ev.clientX - startX.current);
     newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth));
-    if (isCollapsed && newWidth > MIN_WIDTH) {
+    // Directly update the DOM
+    if (sidebarRef.current) {
+      sidebarRef.current.style.width = `${newWidth}px`;
+    }
+    // Update ref
+    widthRef.current = newWidth;
+    // If it expands beyond MIN_WIDTH, uncollapse
+    if (newWidth > MIN_WIDTH && isCollapsed) {
       setIsCollapsed(false);
     }
-    setWidth(newWidth);
+    // If it reaches MIN_WIDTH, collapse
+    if (newWidth === MIN_WIDTH && !isCollapsed) {
+      setIsCollapsed(true);
+    }
   };
 
   const handleMouseUp = () => {
     isDragging.current = false;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (sidebarRef.current) {
+      // Re-enable transition
+      sidebarRef.current.style.transition = '';
+      sidebarRef.current.style.willChange = '';
+    }
+    // Sync react state with final width
+    const finalWidth = widthRef.current;
+    setWidth(finalWidth);
+    // Ensure collapse state matches
+    if (finalWidth === MIN_WIDTH) {
+      setIsCollapsed(true);
+    } else if (finalWidth > MIN_WIDTH) {
+      setIsCollapsed(false);
+    }
   };
 
   const toggleCollapse = () => {
     if (isCollapsed) {
+      const target = lastExpandedWidth.current >= 120 ? lastExpandedWidth.current : DEFAULT_WIDTH;
       setIsCollapsed(false);
-      setWidth(lastExpandedWidth.current >= 120 ? lastExpandedWidth.current : DEFAULT_WIDTH);
+      setWidth(target);
+      widthRef.current = target;
     } else {
       lastExpandedWidth.current = width;
       setIsCollapsed(true);
       setWidth(MIN_WIDTH);
+      widthRef.current = MIN_WIDTH;
     }
   };
 
@@ -164,6 +198,7 @@ export function Sidebar() {
     navigate('/login');
   };
 
+  // Tooltip handlers
   const handleMouseEnter = useCallback((label: string, e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltipText(label);
@@ -204,20 +239,23 @@ export function Sidebar() {
       )}
 
       <aside
-        className="flex flex-col h-full bg-neutral-900 border-r border-neutral-800 overflow-x-visible overflow-y-auto"
+        ref={sidebarRef}
+        className="flex flex-col h-full bg-neutral-900 border-r border-neutral-800 overflow-x-visible overflow-y-auto transition-all duration-300 ease-in-out"
         style={{ width: currentWidth }}
       >
         {/* Logo */}
         <div className="flex items-center h-16 px-5 border-b border-neutral-800/50 flex-shrink-0 overflow-x-hidden">
           <div className={`flex items-center gap-3 w-full ${!showText ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 rounded-lg bg-rose-400/10 flex items-center justify-center border border-rose-400/20 flex-shrink-0">
-              <Heart className="w-5 h-5 text-rose-400 fill-rose-400/20" />
+            <div className="w-9 h-9 rounded-lg bg-rose-400/10 flex items-center justify-center border border-rose-400/20 flex-shrink-0 transition-transform duration-300 ease-in-out hover:scale-105">
+              <Heart className="w-5 h-5 text-rose-400 fill-rose-400/20 transition-transform duration-300" />
             </div>
-            {showText && (
-              <span className="text-xl font-semibold text-white whitespace-nowrap">
-                Duove
-              </span>
-            )}
+            <span
+              className={`text-xl font-semibold text-white whitespace-nowrap transition-all duration-300 ease-in-out ${
+                showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
+              }`}
+            >
+              Duove
+            </span>
           </div>
         </div>
 
@@ -236,15 +274,22 @@ export function Sidebar() {
                 text-sm font-medium transition-all duration-200 
                 text-neutral-400 hover:text-white hover:bg-neutral-700/50
                 ${!showText ? 'justify-center' : ''}
+                group relative
               `}
             >
-              <Icon className="w-5 h-5 flex-shrink-0" />
-              {showText && <span>{label}</span>}
+              <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110`} />
+              <span
+                className={`whitespace-nowrap transition-all duration-300 ease-in-out ${
+                  showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
+                }`}
+              >
+                {label}
+              </span>
             </a>
           ))}
         </nav>
 
-        {/* Footer – dynamic user info */}
+        {/* Footer */}
         <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-3 overflow-x-hidden">
           <div className={`
             flex items-center gap-3 px-3 py-2.5 rounded-lg 
@@ -252,20 +297,19 @@ export function Sidebar() {
             hover:bg-neutral-700/50
             ${!showText ? 'justify-center' : ''}
           `}>
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0 transition-transform duration-300 hover:scale-105">
               {loadingUser ? '...' : userAvatar}
             </div>
-            {showText && (
-              <div className="overflow-hidden min-w-0">
-                <p className="text-sm text-white font-medium truncate">
-                  {loadingUser ? 'Loading...' : userName || 'User'}
-                </p>
-                <p className="text-xs text-neutral-500 truncate">
-                  {loadingUser ? '' : userEmail}
-                </p>
-              </div>
-            )}
+            <div className={`overflow-hidden min-w-0 transition-all duration-300 ease-in-out ${
+              showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
+            }`}>
+              <p className="text-sm text-white font-medium truncate">
+                {loadingUser ? 'Loading...' : userName || 'User'}
+              </p>
+              <p className="text-xs text-neutral-500 truncate">
+                {loadingUser ? '' : userEmail}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -281,9 +325,9 @@ export function Sidebar() {
               `}
             >
               {isCollapsed ? (
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4 transition-transform duration-300 hover:translate-x-0.5" />
               ) : (
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-4 h-4 transition-transform duration-300 hover:-translate-x-0.5" />
               )}
             </button>
 
@@ -302,7 +346,7 @@ export function Sidebar() {
                 ${!showText ? 'flex-1' : ''}
               `}
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 transition-transform duration-200 hover:scale-110" />
             </button>
           </div>
         </div>
@@ -310,9 +354,14 @@ export function Sidebar() {
 
       {/* Drag handle */}
       <div
-        className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-rose-400/30 transition-colors"
+        className="absolute top-0 right-0 w-2 h-full cursor-col-resize group transition-colors duration-200"
         onMouseDown={handleMouseDown}
-      />
+      >
+        <div className="w-full h-full bg-transparent group-hover:bg-rose-400/30 group-active:bg-rose-400/40 transition-colors duration-200 rounded-r-sm" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="w-0.5 h-8 bg-rose-400/40 rounded-full shadow-lg shadow-rose-400/20" />
+        </div>
+      </div>
     </div>
   );
 }

@@ -78,9 +78,9 @@ export function Cravings() {
           `${import.meta.env.VITE_BACKEND_URL}/api/relationships/me`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        if (res.data) {
-          setRelationshipId(res.data.id);
-          setPartnerId(res.data.partner_id);
+        if (res.data && res.data.relationship) {
+          setRelationshipId(res.data.relationship.id);
+          setPartnerId(res.data.relationship.partner_id);
         } else {
           setError('No active relationship found.');
         }
@@ -88,6 +88,7 @@ export function Cravings() {
         if (err.response?.status === 404) {
           setError('No active relationship found.');
         } else {
+          console.error('Error fetching relationship:', err);
           setError('Could not fetch relationship details.');
         }
       } finally {
@@ -256,7 +257,6 @@ export function Cravings() {
         </div>
       </div>
 
-      {/* Add form */}
       <form onSubmit={handleAddCraving} className="flex flex-col sm:flex-row gap-3 mb-8">
         <div className="flex-1 flex gap-2">
           <input
@@ -270,15 +270,27 @@ export function Cravings() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full bg-neutral-800/50 text-sm text-white px-4 py-3 pr-10 rounded-xl border border-neutral-700 appearance-none focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition cursor-pointer hover:bg-neutral-700/30"
+              className="
+                w-full bg-neutral-800/50 text-sm text-white 
+                px-4 py-3 pr-10 rounded-xl 
+                border border-neutral-700 
+                appearance-none cursor-pointer
+                hover:bg-neutral-700/30 
+                focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent
+                transition-all duration-200
+              "
             >
               {CATEGORIES.map((cat) => (
-                <option key={cat.value} value={cat.value} className="bg-neutral-900 text-white hover:bg-neutral-700">
+                <option 
+                  key={cat.value} 
+                  value={cat.value} 
+                  className="bg-neutral-900 text-white hover:bg-rose-500/20 hover:text-rose-300"
+                >
                   {cat.label}
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none transition-transform duration-200" />
           </div>
         </div>
         <button
@@ -322,7 +334,7 @@ export function Cravings() {
         </div>
       )}
 
-      {/* List */}
+      {/* List – shows ALL cravings from both partners */}
       {filteredCravings.length === 0 ? (
         <div className="text-center text-neutral-500 py-16 bg-neutral-900/50 rounded-2xl border border-neutral-800/50">
           <Sparkles className="w-10 h-10 mx-auto mb-3 text-neutral-600" />
@@ -367,6 +379,7 @@ export function Cravings() {
                 <span className="text-xs text-neutral-500">
                   {new Date(craving.created_at).toLocaleDateString()}
                 </span>
+                {/* Only show delete button if the current user created it */}
                 {craving.user_id === userId && (
                   <button
                     onClick={() => handleDelete(craving.id)}
