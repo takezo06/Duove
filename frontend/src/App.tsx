@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Notifications } from './pages/Notifications';
 import { Partner } from './pages/Partner';
 import { Cravings } from './pages/Cravings';
+import { Profile } from './pages/Profile';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/partner" element={<Partner />} />
           <Route path="/cravings" element={<Cravings />} />
+          <Route path="/profile" element={<Profile />} />
           {/* add other protected routes here */}
         </Route>
       </Routes>
