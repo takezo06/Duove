@@ -6,6 +6,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Notifications } from './pages/Notifications';
+import { Cravings } from './pages/Cravings';
+import { Partner } from './pages/Partner';
 
 function App() {
   return (
@@ -17,6 +19,8 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/cravings" element={<Cravings />} />
+            <Route path="/partner" element={<Partner />} />
           </Route>
         </Routes>
         <Toaster />

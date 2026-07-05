@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load .env from the project root
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 export const config = {
@@ -11,8 +10,5 @@ export const config = {
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET || '',
   databaseUrl: process.env.DATABASE_URL || '',
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '', // Must be set in .env
 };
-// Optional: validate that critical variables are set
-if (!config.supabaseUrl || !config.supabaseJwtSecret) {
-  console.warn('⚠️  Missing SUPABASE_URL or SUPABASE_JWT_SECRET in .env');
-}

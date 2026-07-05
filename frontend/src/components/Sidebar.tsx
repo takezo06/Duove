@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import {
   Home,
   CalendarDays,
@@ -11,18 +13,18 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  UserPlus,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 const navItems = [
   { icon: Home, label: 'Dashboard', path: '/' },
   { icon: Bell, label: 'Notifications', path: '/notifications' },
   { icon: CalendarDays, label: 'Cycle Tracker', path: '/cycle' },
-  { icon: ListTodo, label: 'Remarks', path: '/remarks' },
+  { icon: ListTodo, label: 'Cravings', path: '/cravings' },
   { icon: Mail, label: 'Love Letters', path: '/letters' },
   { icon: MessageCircleQuestion, label: 'Daily Q&A', path: '/qa' },
   { icon: User, label: 'Profile', path: '/profile' },
+  { icon: UserPlus, label: 'Partner', path: '/partner' },
 ];
 
 const MIN_WIDTH = 64;
@@ -30,9 +32,6 @@ const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 256;
 
 export function Sidebar() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('sidebar-width');
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -50,6 +49,8 @@ export function Sidebar() {
   const startX = useRef(0);
   const startWidth = useRef(0);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     localStorage.setItem('sidebar-width', String(width));
@@ -105,7 +106,7 @@ export function Sidebar() {
   };
 
   const handleLogout = async () => {
-    await signOut();
+    await supabase.auth.signOut();
     navigate('/login');
   };
 
@@ -134,6 +135,7 @@ export function Sidebar() {
 
   return (
     <div className="relative flex-shrink-0 h-screen">
+      {/* Tooltip */}
       {tooltipVisible && shouldShowTooltips && (
         <div
           className="fixed px-3 py-1.5 bg-neutral-800 text-sm text-neutral-100 rounded-lg shadow-xl border border-neutral-700/70 pointer-events-none z-[200] whitespace-nowrap transition-opacity duration-200"
@@ -197,52 +199,53 @@ export function Sidebar() {
             ${!showText ? 'justify-center' : ''}
           `}>
             <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
+              J
             </div>
             {showText && (
               <div className="overflow-hidden min-w-0">
-                <p className="text-sm text-white font-medium truncate">
-                  {user?.user_metadata?.username || user?.email?.split('@')[0] || 'User'}
-                </p>
-                <p className="text-xs text-neutral-500 truncate">{user?.email}</p>
+                <p className="text-sm text-white font-medium truncate">Jed</p>
+                <p className="text-xs text-neutral-500 truncate">jed@duove.app</p>
               </div>
             )}
           </div>
 
-          {/* Logout button */}
-          <button
-            onClick={handleLogout}
-            onMouseEnter={(e) => {
-              if (shouldShowTooltips) handleMouseEnter('Logout', e);
-            }}
-            onMouseLeave={handleMouseLeave}
-            className={`
-              flex items-center gap-3 px-3 py-2.5 rounded-lg 
-              text-sm font-medium transition-all duration-200
-              text-neutral-400 hover:text-white hover:bg-neutral-700/50
-              ${!showText ? 'justify-center' : ''}
-            `}
-          >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
-            {showText && <span>Logout</span>}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Collapse button */}
+            <button
+              onClick={toggleCollapse}
+              className={`
+                flex items-center justify-center
+                w-9 h-9 rounded-lg 
+                text-neutral-400 hover:text-white hover:bg-neutral-700/50
+                transition-all duration-200
+                ${!showText ? 'flex-1' : ''}
+              `}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <ChevronLeft className="w-4 h-4" />
+              )}
+            </button>
 
-          {/* Collapse button */}
-          <button
-            onClick={toggleCollapse}
-            className="
-              flex items-center justify-center
-              w-9 h-9 rounded-lg 
-              text-neutral-400 hover:text-white hover:bg-neutral-700/50
-              transition-all duration-200
-            "
-          >
-            {isCollapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <ChevronLeft className="w-4 h-4" />
-            )}
-          </button>
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              onMouseEnter={(e) => {
+                if (shouldShowTooltips) handleMouseEnter('Logout', e);
+              }}
+              onMouseLeave={handleMouseLeave}
+              className={`
+                flex items-center justify-center
+                w-9 h-9 rounded-lg 
+                text-neutral-400 hover:text-white hover:bg-neutral-700/50
+                transition-all duration-200
+                ${!showText ? 'flex-1' : ''}
+              `}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </aside>
 

@@ -1,18 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { createClient } from '@supabase/supabase-js';
 import { config } from '../config/env';
 import { logger } from '../config/logger';
 
-// Extend Express Request
 declare global {
   namespace Express {
     interface Request {
-      user?: {
-        id: string;
-        email?: string;
-        [key: string]: any;
-      };
-      token?: string; // <-- NEW: store raw JWT for reuse
+      user?: any;
+      token?: string;
     }
   }
 }
@@ -31,33 +26,43 @@ export const authMiddleware = async (
 
     const token = authHeader.split(' ')[1];
 
-    const secret = config.supabaseJwtSecret;
-    if (!secret) {
-      logger.error('SUPABASE_JWT_SECRET is not set');
+    if (!config.supabaseUrl || !config.supabaseAnonKey) {
+      logger.error('Supabase URL or Anon Key missing');
       res.status(500).json({ error: 'Server configuration error' });
       return;
     }
 
-    const decoded = jwt.verify(token, secret) as { sub: string; email?: string; [key: string]: any };
+    // Use the anon key to verify the token
+    const supabase = createClient(
+      config.supabaseUrl,
+      config.supabaseAnonKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
 
-    const userId = decoded.sub || decoded.id || decoded.user_id;
-    if (!userId) {
-      logger.warn('JWT missing user ID', { decoded });
-      res.status(401).json({ error: 'Invalid token payload' });
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      logger.warn('Token verification failed', { error: error?.message });
+      res.status(401).json({ error: 'Invalid or expired token' });
       return;
     }
 
-    // Attach user info AND the raw token
-    req.user = {
-      id: userId,
-      email: decoded.email,
-      ...decoded,
-    };
-    req.token = token; // <-- NEW
+    req.user = user;
+    req.token = token;
 
     next();
   } catch (error) {
-    logger.warn('JWT verification failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error('Auth middleware error', { error });
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
