@@ -1,28 +1,19 @@
 import cron from 'node-cron';
 import { logger } from '../config/logger';
-import { createClient } from '@supabase/supabase-js';
-import { config } from '../config/env';
-
-// Create an admin client for scheduled jobs (use service role key for internal tasks)
-const supabaseAdmin = createClient(
-  config.supabaseUrl,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+import { createServiceClient } from '../config/supabaseAdmin';
 
 /**
  * Assign a new weekly prompt every Monday at 00:00 UTC.
- * (Currently placeholder – you'll need to seed prompts manually or from a list.)
  */
 async function assignWeeklyPrompt() {
   try {
-    // Get next Monday's date
+    const supabaseAdmin = createServiceClient();
     const now = new Date();
     const daysUntilMonday = (1 - now.getUTCDay() + 7) % 7 || 7;
     const nextMonday = new Date(now);
     nextMonday.setUTCDate(now.getUTCDate() + daysUntilMonday);
     const assignedDate = nextMonday.toISOString().split('T')[0];
 
-    // Check if a prompt is already assigned for that date
     const { data: existing } = await supabaseAdmin
       .from('qa_prompts')
       .select('id')
@@ -34,8 +25,6 @@ async function assignWeeklyPrompt() {
       return;
     }
 
-    // For now, we use a placeholder – in production, you'd fetch from a curated list
-    // or generate via AI. Let's hardcode an example prompt.
     const samplePrompts = [
       { text: "What's one thing your partner did this week that made you feel loved?", category: 'relationship' },
       { text: "What's a dream you've been thinking about lately?", category: 'relationship' },
@@ -44,7 +33,6 @@ async function assignWeeklyPrompt() {
       { text: "What's something new you'd like to try together?", category: 'relationship' },
     ];
 
-    // Pick a random prompt (you could rotate or use AI later)
     const randomIndex = Math.floor(Math.random() * samplePrompts.length);
     const prompt = samplePrompts[randomIndex];
 
@@ -67,15 +55,11 @@ async function assignWeeklyPrompt() {
 }
 
 /**
- * Check for answers that should be revealed (24h after both answered).
- * Runs every hour.
+ * Reveal answers 24h after both partners have answered.
  */
 async function revealPendingAnswers() {
   try {
-    // Get all answers where:
-    // - both partners have answered
-    // - revealed_at is null
-    // - submitted_at is older than 24 hours
+    const supabaseAdmin = createServiceClient();
     const { data: pendingAnswers, error } = await supabaseAdmin
       .from('qa_answers')
       .select(`
@@ -93,7 +77,6 @@ async function revealPendingAnswers() {
       return;
     }
 
-    // Group by prompt_id + relationship_id
     const groups: Record<string, { promptId: string; relationshipId: string; userIds: string[] }> = {};
     for (const answer of pendingAnswers || []) {
       const key = `${answer.prompt_id}-${answer.relationship_id}`;
@@ -107,21 +90,18 @@ async function revealPendingAnswers() {
       groups[key].userIds.push(answer.user_id);
     }
 
-    // For each group, check if both partners have answered
-    for (const [key, group] of Object.entries(groups)) {
-      const { promptId, relationshipId, userIds } = group;
-      if (userIds.length >= 2) {
-        // Both have answered – reveal!
+    for (const [, group] of Object.entries(groups)) {
+      if (group.userIds.length >= 2) {
         const { error: revealError } = await supabaseAdmin
           .from('qa_answers')
           .update({ revealed_at: new Date().toISOString() })
-          .eq('prompt_id', promptId)
-          .eq('relationship_id', relationshipId);
+          .eq('prompt_id', group.promptId)
+          .eq('relationship_id', group.relationshipId);
 
         if (revealError) {
-          logger.error('Error revealing answers', { promptId, relationshipId, error: revealError });
+          logger.error('Error revealing answers', { promptId: group.promptId, relationshipId: group.relationshipId, error: revealError });
         } else {
-          logger.info('Answers revealed for', { promptId, relationshipId });
+          logger.info('Answers revealed for', { promptId: group.promptId, relationshipId: group.relationshipId });
         }
       }
     }
@@ -131,10 +111,33 @@ async function revealPendingAnswers() {
 }
 
 /**
+ * Archive fulfilled cravings older than 24 hours.
+ */
+async function archiveFulfilledCravings() {
+  try {
+    const supabaseAdmin = createServiceClient();
+    const { error } = await supabaseAdmin
+      .from('cravings')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('fulfilled', true)
+      .lt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .is('archived_at', null);
+
+    if (error) {
+      logger.error('Error archiving fulfilled cravings', { error });
+    } else {
+      logger.info('Archived fulfilled cravings older than 24 hours');
+    }
+  } catch (error) {
+    logger.error('Error in archiveFulfilledCravings', { error });
+  }
+}
+
+/**
  * Starts all schedulers.
  */
 export function startScheduler(): void {
-  // Daily reminder (already existing)
+  // Daily reminder
   cron.schedule('0 8 * * *', () => {
     const message = '🌅 Daily reminder: Take a moment to connect with your partner today!';
     logger.info(message);
@@ -149,6 +152,11 @@ export function startScheduler(): void {
   // Reveal pending answers every hour
   cron.schedule('0 * * * *', () => {
     revealPendingAnswers();
+  });
+
+  // Archive fulfilled cravings every hour
+  cron.schedule('0 * * * *', () => {
+    archiveFulfilledCravings();
   });
 
   logger.info('All schedulers started');
