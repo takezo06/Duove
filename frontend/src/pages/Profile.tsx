@@ -23,6 +23,7 @@ export function Profile() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [email, setEmail] = useState<string>('');
   const [displayName, setDisplayName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -40,6 +41,7 @@ export function Profile() {
           navigate('/login');
           return;
         }
+        setEmail(user.email || '');
 
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         const res = await axios.get(
@@ -49,6 +51,7 @@ export function Profile() {
 
         setProfile(res.data);
         setDisplayName(res.data.display_name || '');
+        setAvatarPreview(res.data.avatar_url || null);
       } catch (err) {
         console.error('Error fetching profile:', err);
         setError('Failed to load profile.');
@@ -88,9 +91,6 @@ export function Profile() {
         return null;
       }
 
-      // Get public URL (since bucket is private, we need a signed URL or make it public)
-      // We'll make the bucket public for simplicity (or use signed URL)
-      // For now, let's use public URL (we can also generate signed URL)
       const { data: publicUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
@@ -115,7 +115,6 @@ export function Profile() {
         updateData.display_name = displayName;
       }
 
-      // Upload avatar if changed
       let avatarUrl = profile?.avatar_url;
       if (avatarFile) {
         const uploadedUrl = await uploadAvatar();
@@ -127,14 +126,10 @@ export function Profile() {
         }
       }
 
-      // If only name changed, no need to send avatar_url
-      if (updateData.avatar_url === undefined && !avatarFile) {
-        // Only update name if changed
-        if (updateData.display_name === undefined) {
-          setSuccess('No changes to save.');
-          setUpdating(false);
-          return;
-        }
+      if (Object.keys(updateData).length === 0) {
+        setSuccess('No changes to save.');
+        setUpdating(false);
+        return;
       }
 
       const res = await axios.patch(
@@ -143,15 +138,28 @@ export function Profile() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      // Update local profile state with the new data
       setProfile(res.data);
-      setSuccess('Profile updated successfully!');
-      // Clear file input
-      if (avatarFile) {
-        setAvatarFile(null);
+      setDisplayName(res.data.display_name || '');
+      // Update avatar preview to the new URL
+      if (res.data.avatar_url) {
+        setAvatarPreview(res.data.avatar_url);
+      } else {
         setAvatarPreview(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
       }
+      setSuccess('Profile updated successfully!');
+      setAvatarFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setIsEditingName(false);
+      
+      // Force sidebar to refresh (by dispatching a custom event or using a global state)
+      // We'll use a simple method: reload user info in sidebar by triggering a re-fetch
+      // This will be handled by the sidebar's own useEffect that listens to auth changes
+      // but we can also manually trigger a re-fetch by calling the sidebar's fetch function.
+      // For simplicity, we'll just reload the page? No, better to use a global state context.
+      // We'll create a simple event listener: window.dispatchEvent(new Event('profile-updated'));
+      window.dispatchEvent(new Event('profile-updated'));
+      
     } catch (err: any) {
       setError(err.message || 'Failed to update profile.');
     } finally {
@@ -163,7 +171,7 @@ export function Profile() {
     setDisplayName(profile?.display_name || '');
     setIsEditingName(false);
     setAvatarFile(null);
-    setAvatarPreview(null);
+    setAvatarPreview(profile?.avatar_url || null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -239,9 +247,7 @@ export function Profile() {
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-neutral-800 border-2 border-neutral-700 overflow-hidden flex items-center justify-center">
               {avatarPreview ? (
-                <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
-              ) : profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-3xl font-medium text-neutral-500">
                   {profile?.display_name?.charAt(0).toUpperCase() || 'U'}
@@ -302,7 +308,7 @@ export function Profile() {
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-3 text-neutral-400">
             <Mail className="w-4 h-4 text-neutral-500" />
-            <span>{supabase.auth.getUser()?.then(({ data }) => data.user?.email) || 'email@example.com'}</span>
+            <span>{email || 'email@example.com'}</span>
           </div>
           <div className="flex items-center gap-3 text-neutral-400">
             <Calendar className="w-4 h-4 text-neutral-500" />
