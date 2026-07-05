@@ -3,10 +3,6 @@ import { config } from './env';
 
 let adminClient: SupabaseClient | null = null;
 
-/**
- * Returns a Supabase client authenticated with the service_role key.
- * This bypasses RLS – use only for internal operations like joining relationships.
- */
 export function createServiceClient(): SupabaseClient {
   if (!adminClient) {
     if (!config.supabaseUrl || !config.supabaseServiceRoleKey) {

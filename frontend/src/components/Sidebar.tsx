@@ -40,6 +40,12 @@ export function Sidebar() {
     return localStorage.getItem('sidebar-collapsed') === 'true';
   });
 
+  // User state
+  const [userName, setUserName] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [userAvatar, setUserAvatar] = useState<string>('?');
+  const [loadingUser, setLoadingUser] = useState(true);
+
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipText, setTooltipText] = useState('');
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
@@ -52,6 +58,54 @@ export function Sidebar() {
 
   const navigate = useNavigate();
 
+  // Fetch user info
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+          console.error('Error fetching user:', error);
+          setLoadingUser(false);
+          return;
+        }
+        if (user) {
+          // Determine display name
+          const metadata = user.user_metadata || {};
+          let displayName = 
+            metadata.full_name || 
+            metadata.name || 
+            metadata.username || 
+            user.email?.split('@')[0] || 
+            'User';
+          
+          // Capitalize first letter of each word for nice display
+          displayName = displayName
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+          
+          setUserName(displayName);
+          setUserEmail(user.email || '');
+          setUserAvatar(displayName.charAt(0).toUpperCase());
+        } else {
+          setUserName('User');
+          setUserEmail('user@example.com');
+          setUserAvatar('U');
+        }
+      } catch (err) {
+        console.error('Failed to fetch user:', err);
+        setUserName('User');
+        setUserEmail('user@example.com');
+        setUserAvatar('U');
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  // Persist width and collapse state
   useEffect(() => {
     localStorage.setItem('sidebar-width', String(width));
   }, [width]);
@@ -190,7 +244,7 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* Footer */}
+        {/* Footer – dynamic user info */}
         <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-3 overflow-x-hidden">
           <div className={`
             flex items-center gap-3 px-3 py-2.5 rounded-lg 
@@ -198,13 +252,18 @@ export function Sidebar() {
             hover:bg-neutral-700/50
             ${!showText ? 'justify-center' : ''}
           `}>
+            {/* Avatar */}
             <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0">
-              J
+              {loadingUser ? '...' : userAvatar}
             </div>
             {showText && (
               <div className="overflow-hidden min-w-0">
-                <p className="text-sm text-white font-medium truncate">Jed</p>
-                <p className="text-xs text-neutral-500 truncate">jed@duove.app</p>
+                <p className="text-sm text-white font-medium truncate">
+                  {loadingUser ? 'Loading...' : userName || 'User'}
+                </p>
+                <p className="text-xs text-neutral-500 truncate">
+                  {loadingUser ? '' : userEmail}
+                </p>
               </div>
             )}
           </div>

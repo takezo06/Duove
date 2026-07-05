@@ -7,13 +7,13 @@ export interface Craving {
   user_id: string;
   partner_id: string;
   content: string;
+  category: string;
   fulfilled: boolean;
   created_at: string;
+  updated_at: string;
+  archived_at: string | null;
 }
 
-/**
- * Fetch all cravings for a given relationship, ordered newest first.
- */
 export async function getCravings(
   supabase: SupabaseClient,
   relationshipId: string
@@ -22,25 +22,23 @@ export async function getCravings(
     .from('cravings')
     .select('*')
     .eq('relationship_id', relationshipId)
+    .is('archived_at', null)
     .order('created_at', { ascending: false });
 
   if (error) {
     logger.error('Error fetching cravings', { relationshipId, error });
     throw new Error('Failed to fetch cravings');
   }
-
   return data || [];
 }
 
-/**
- * Create a new craving.
- */
 export async function createCraving(
   supabase: SupabaseClient,
   relationshipId: string,
   userId: string,
   partnerId: string,
-  content: string
+  content: string,
+  category: string = 'Other'
 ): Promise<Craving> {
   const { data, error } = await supabase
     .from('cravings')
@@ -49,6 +47,7 @@ export async function createCraving(
       user_id: userId,
       partner_id: partnerId,
       content: content.trim(),
+      category,
     })
     .select()
     .single();
@@ -57,20 +56,15 @@ export async function createCraving(
     logger.error('Error creating craving', { relationshipId, userId, error });
     throw new Error('Failed to create craving');
   }
-
   return data;
 }
 
-/**
- * Toggle the "fulfilled" status of a craving.
- * Only allows the user who created it or their partner to toggle.
- */
 export async function toggleCraving(
   supabase: SupabaseClient,
   cravingId: string,
   userId: string
 ): Promise<Craving> {
-  // First, fetch the current craving to check permissions and get current status
+  // Fetch current craving
   const { data: existing, error: fetchError } = await supabase
     .from('cravings')
     .select('*')
@@ -78,19 +72,20 @@ export async function toggleCraving(
     .single();
 
   if (fetchError || !existing) {
-    logger.error('Craving not found or fetch error', { cravingId, error: fetchError });
+    logger.error('Craving not found', { cravingId, error: fetchError });
     throw new Error('Craving not found');
   }
 
-  // Check if the user is part of this craving's relationship
   if (existing.user_id !== userId && existing.partner_id !== userId) {
     throw new Error('You do not have permission to toggle this craving');
   }
 
-  // Toggle the fulfilled status
   const { data, error } = await supabase
     .from('cravings')
-    .update({ fulfilled: !existing.fulfilled })
+    .update({ 
+      fulfilled: !existing.fulfilled,
+      updated_at: new Date().toISOString()
+    })
     .eq('id', cravingId)
     .select()
     .single();
@@ -99,20 +94,14 @@ export async function toggleCraving(
     logger.error('Error toggling craving', { cravingId, userId, error });
     throw new Error('Failed to toggle craving');
   }
-
   return data;
 }
 
-/**
- * Delete a craving.
- * Only allows the user who created it to delete.
- */
 export async function deleteCraving(
   supabase: SupabaseClient,
   cravingId: string,
   userId: string
 ): Promise<void> {
-  // First, check if the user owns this craving
   const { data: existing, error: fetchError } = await supabase
     .from('cravings')
     .select('user_id')
@@ -120,7 +109,7 @@ export async function deleteCraving(
     .single();
 
   if (fetchError || !existing) {
-    logger.error('Craving not found or fetch error', { cravingId, error: fetchError });
+    logger.error('Craving not found', { cravingId, error: fetchError });
     throw new Error('Craving not found');
   }
 

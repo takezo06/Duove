@@ -1,35 +1,25 @@
-import { incrementDailyUsage } from '../services/limitService';
 import { Router, Request, Response, NextFunction } from 'express';
 import { createUserClient } from '../config/supabase';
 import { logger } from '../config/logger';
+import { authMiddleware } from '../middleware/auth';
+import { dailyLimitMiddleware } from '../middleware/dailyLimit';
+import { incrementDailyUsage } from '../services/limitService';
 import {
   getCravings,
   createCraving,
   toggleCraving,
   deleteCraving,
 } from '../services/cravingsService';
-import { authMiddleware } from '../middleware/auth';
-import { dailyLimitMiddleware } from '../middleware/dailyLimit';
 
 const router = Router();
-
-// All routes require authentication
 router.use(authMiddleware);
 
-/**
- * GET /api/cravings
- * Fetch all cravings for the user's active relationship.
- */
+// GET /api/cravings?relationshipId=...
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // TODO: Fetch the user's active relationship ID from the database.
-    // For now, we assume it's passed or we'll hardcode a placeholder.
-    // We'll properly implement relationship fetching in Phase 2 refinement.
-    // Right now, we expect the frontend to pass ?relationshipId=xxx
     const relationshipId = req.query.relationshipId as string;
     if (!relationshipId) {
-      res.status(400).json({ error: 'relationshipId query param is required' });
-      return;
+      return res.status(400).json({ error: 'relationshipId query param is required' });
     }
 
     const supabase = createUserClient(req.token!);
@@ -41,37 +31,33 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-/**
- * POST /api/cravings
- * Create a new craving (enforces daily limit: 5 per user per day).
- */
+// POST /api/cravings
 router.post(
   '/',
   dailyLimitMiddleware('craving'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { relationshipId, partnerId, content } = req.body;
+      const { relationshipId, partnerId, content, category } = req.body;
       const userId = req.user!.id;
 
       if (!relationshipId || !partnerId || !content) {
-        res.status(400).json({ error: 'Missing required fields' });
-        return;
+        return res.status(400).json({ error: 'Missing required fields' });
       }
-
       if (content.trim().length === 0) {
-        res.status(400).json({ error: 'Content cannot be empty' });
-        return;
+        return res.status(400).json({ error: 'Content cannot be empty' });
       }
 
       const supabase = createUserClient(req.token!);
-      await incrementDailyUsage(supabase, userId, 'craving'); 
       const craving = await createCraving(
         supabase,
         relationshipId,
         userId,
         partnerId,
-        content
+        content,
+        category || 'Other'
       );
+
+      await incrementDailyUsage(supabase, userId, 'craving');
 
       res.status(201).json(craving);
     } catch (error) {
@@ -81,15 +67,11 @@ router.post(
   }
 );
 
-/**
- * PATCH /api/cravings/:id/toggle
- * Toggle the fulfilled status of a craving.
- */
+// PATCH /api/cravings/:id/toggle
 router.patch('/:id/toggle', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const cravingId = req.params.id as string;
     const userId = req.user!.id;
-
     const supabase = createUserClient(req.token!);
     const updated = await toggleCraving(supabase, cravingId, userId);
     res.status(200).json(updated);
@@ -99,18 +81,14 @@ router.patch('/:id/toggle', async (req: Request, res: Response, next: NextFuncti
   }
 });
 
-/**
- * DELETE /api/cravings/:id
- * Delete a craving (only creator).
- */
+// DELETE /api/cravings/:id
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const cravingId = req.params.id as string;
     const userId = req.user!.id;
-
     const supabase = createUserClient(req.token!);
     await deleteCraving(supabase, cravingId, userId);
-    res.status(204).send(); // No content
+    res.status(204).send();
   } catch (error) {
     logger.error('DELETE /api/cravings/:id error', { error });
     next(error);

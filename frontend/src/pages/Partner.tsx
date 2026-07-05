@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { Copy, Loader2, Users, Link, CheckCircle, ArrowRight } from 'lucide-react';
+import { Copy, Loader2, Users, Link, CheckCircle, ArrowRight, QrCode } from 'lucide-react';
 
 export function Partner() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -24,12 +24,9 @@ export function Partner() {
         const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/relationships/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (res.data) {
-          setHasActive(true);
-        }
+        if (res.data) setHasActive(true);
       } catch (err: any) {
         if (err.response?.status === 404) {
-          // Check pending
           try {
             const token2 = (await supabase.auth.getSession()).data.session?.access_token;
             const pendingRes = await axios.get(
@@ -40,9 +37,7 @@ export function Partner() {
               setHasPending(true);
               setInviteCode(pendingRes.data.invite_code);
             }
-          } catch {
-            // No pending
-          }
+          } catch {}
         }
         setHasActive(false);
       } finally {
@@ -65,7 +60,7 @@ export function Partner() {
       );
       setInviteCode(res.data.invite_code);
       setHasPending(true);
-      setSuccess('Invite code generated! Share this with your partner.');
+      setSuccess('✨ Invite code generated! Share it with your partner.');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to generate invite');
     } finally {
@@ -85,7 +80,7 @@ export function Partner() {
         { invite_code: inputCode.trim().toUpperCase() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setSuccess('You are now paired! Redirecting...');
+      setSuccess('🎉 You are now paired! Redirecting...');
       setTimeout(() => navigate('/'), 1500);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to join');
@@ -97,7 +92,7 @@ export function Partner() {
   const copyToClipboard = () => {
     if (inviteCode) {
       navigator.clipboard.writeText(inviteCode);
-      setSuccess('Copied to clipboard!');
+      setSuccess('📋 Copied to clipboard!');
       setTimeout(() => setSuccess(null), 2000);
     }
   };
@@ -131,23 +126,29 @@ export function Partner() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-semibold text-white mb-2">Partner Connection</h1>
-      <p className="text-neutral-400 mb-8">Pair with your partner to start sharing</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-white">Partner Connection</h1>
+        <p className="text-neutral-400 text-sm">Pair with your partner to start sharing</p>
+      </div>
 
-      {/* Mode selector */}
-      <div className="flex gap-2 mb-6 bg-neutral-800/50 rounded-lg p-1">
+      {/* Mode tabs */}
+      <div className="flex gap-1 p-1 mb-6 bg-neutral-800/50 rounded-xl border border-neutral-700/50">
         <button
           onClick={() => setMode('join')}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition ${
-            mode === 'join' ? 'bg-rose-500 text-white' : 'text-neutral-400 hover:text-white'
+          className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition ${
+            mode === 'join'
+              ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-700/30'
           }`}
         >
           Join with code
         </button>
         <button
           onClick={() => setMode('generate')}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition ${
-            mode === 'generate' ? 'bg-rose-500 text-white' : 'text-neutral-400 hover:text-white'
+          className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition ${
+            mode === 'generate'
+              ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-700/30'
           }`}
         >
           Generate invite
@@ -155,21 +156,22 @@ export function Partner() {
       </div>
 
       {mode === 'join' ? (
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6">
-          <h2 className="text-lg font-medium text-white mb-3">Enter your partner's code</h2>
-          <p className="text-sm text-neutral-400 mb-4">Ask your partner to generate an invite code and enter it below.</p>
+        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 md:p-8 shadow-xl">
+          <h2 className="text-lg font-medium text-white mb-1">Enter your partner's code</h2>
+          <p className="text-sm text-neutral-400 mb-4">Ask your partner to generate an invite code.</p>
           <div className="flex gap-2">
             <input
               type="text"
               placeholder="e.g. ABC12345"
               value={inputCode}
-              onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-              className="flex-1 bg-neutral-800/50 text-sm text-white placeholder:text-neutral-500 px-4 py-2.5 rounded-lg border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 uppercase"
+              onChange={(e) => setInputCode(e.target.value.toUpperCase().slice(0, 8))}
+              className="flex-1 bg-neutral-800/50 text-sm text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent uppercase transition font-mono tracking-wider"
+              maxLength={8}
             />
             <button
               onClick={joinRelationship}
               disabled={joining || !inputCode.trim()}
-              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium transition flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-rose-500/20"
             >
               {joining ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               Join
@@ -179,35 +181,35 @@ export function Partner() {
           {success && <p className="text-emerald-400 text-sm mt-3">{success}</p>}
         </div>
       ) : (
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6">
-          <h2 className="text-lg font-medium text-white mb-3">Generate invite code</h2>
+        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 md:p-8 shadow-xl">
+          <h2 className="text-lg font-medium text-white mb-1">Generate invite code</h2>
           <p className="text-sm text-neutral-400 mb-4">Create a code to share with your partner.</p>
           {!inviteCode ? (
             <button
               onClick={generateInvite}
               disabled={generating}
-              className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-rose-500/20"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
               Generate invite
             </button>
           ) : (
-            <div className="space-y-4">
-              <div className="bg-neutral-800 rounded-lg p-4 text-center">
-                <p className="text-xs text-neutral-500 uppercase tracking-wider">Your invite code</p>
-                <p className="text-2xl font-mono font-bold text-white tracking-widest">{inviteCode}</p>
+            <div className="space-y-5">
+              <div className="bg-neutral-800/70 rounded-xl p-5 text-center border border-neutral-700/50">
+                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Your invite code</p>
+                <p className="text-3xl font-mono font-bold text-white tracking-[0.3em]">{inviteCode}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <button
                   onClick={copyToClipboard}
-                  className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl transition flex items-center justify-center gap-2 border border-neutral-700/50"
                 >
                   <Copy className="w-4 h-4" />
                   Copy
                 </button>
                 <button
                   onClick={generateInvite}
-                  className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition"
+                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl transition border border-neutral-700/50"
                 >
                   Regenerate
                 </button>
