@@ -54,8 +54,7 @@ export function Sidebar() {
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
-  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
-
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
 
   // Fetch user info
@@ -81,9 +80,10 @@ export function Sidebar() {
           // Capitalize first letter of each word for nice display
           displayName = displayName
             .split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
             .join(' ');
-          
+
+
           setUserName(displayName);
           setUserEmail(user.email || '');
           setUserAvatar(displayName.charAt(0).toUpperCase());
