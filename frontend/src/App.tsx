@@ -9,6 +9,7 @@ import { Partner } from './pages/Partner';
 import { Cravings } from './pages/Cravings';
 import { Profile } from './pages/Profile';
 import { QA } from './pages/QA';
+import { QAHistory } from './pages/QAHistory';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/cravings" element={<Cravings />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/qa" element={<QA />} />
+          <Route path="/qa/history" element={<QAHistory />} />
           {/* add other protected routes here */}
         </Route>
       </Routes>
