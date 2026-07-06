@@ -7,11 +7,11 @@ import { logger } from './config/logger';
 import healthRouter from './routes/health';
 import cravingsRouter from './routes/cravings';
 import lettersRouter from './routes/letters';
-import qaRouter from './routes/qa';
 import cyclesRouter from './routes/cycles';
 import relationshipsRouter from './routes/relationships';
 import notificationsRouter from './routes/notifications';
 import profileRouter from './routes/profile';
+import qaRouter from './routes/qa';
 
 export const createApp = (): Express => {
   const app = express();
@@ -43,6 +43,7 @@ export const createApp = (): Express => {
   app.use('/api/relationships', relationshipsRouter);
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/profile', profileRouter);
+  app.use('/api/qa', qaRouter);
 
   // Error handler
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
