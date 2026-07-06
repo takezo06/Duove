@@ -10,6 +10,7 @@ import {
   Mail,
   MessageCircle,
   Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 
 interface Notification {
@@ -17,12 +18,13 @@ interface Notification {
   type: 'craving_added' | 'craving_fulfilled' | 'letter_received' | 'qa_answered';
   message: string;
   created_at: string;
+  link: string;
+  reference_id: string;
 }
 
-// Skeleton loading component
 function SkeletonNotification() {
   return (
-    <div className="flex items-center gap-4 bg-neutral-900 rounded-2xl border border-neutral-800 p-4 animate-pulse">
+    <div className="flex items-center gap-4 bg-neutral-900 rounded-2xl border border-neutral-800 p-4 animate-pulse cursor-pointer">
       <div className="w-10 h-10 rounded-full bg-neutral-700/50 flex-shrink-0" />
       <div className="flex-1 space-y-2">
         <div className="h-4 w-3/4 bg-neutral-700/50 rounded" />
@@ -32,7 +34,6 @@ function SkeletonNotification() {
   );
 }
 
-// Helper to format relative time
 function timeAgo(dateString: string): string {
   const now = new Date();
   const past = new Date(dateString);
@@ -53,7 +54,6 @@ function timeAgo(dateString: string): string {
   });
 }
 
-// Helper to group by date
 function groupNotifications(notifications: Notification[]) {
   const groups: { [key: string]: Notification[] } = {};
   const today = new Date().toDateString();
@@ -70,7 +70,6 @@ function groupNotifications(notifications: Notification[]) {
   return groups;
 }
 
-// Icon mapping
 const notificationIcon = (type: string) => {
   switch (type) {
     case 'craving_added':
@@ -86,7 +85,6 @@ const notificationIcon = (type: string) => {
   }
 };
 
-// Icon background colors
 const notificationBg = (type: string) => {
   switch (type) {
     case 'craving_added':
@@ -124,7 +122,6 @@ export function Notifications() {
         );
 
         setNotifications(res.data);
-        setLoading(false);
       } catch (err: any) {
         console.error('Error fetching notifications:', err);
         if (err.response?.status === 404) {
@@ -132,6 +129,7 @@ export function Notifications() {
         } else {
           setError('Failed to load notifications.');
         }
+      } finally {
         setLoading(false);
       }
     };
@@ -139,7 +137,10 @@ export function Notifications() {
     fetchNotifications();
   }, [navigate]);
 
-  // Loading skeleton
+  const handleNotificationClick = (notification: Notification) => {
+    navigate(notification.link, { state: { highlightId: notification.reference_id } });
+  };
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto">
@@ -158,7 +159,6 @@ export function Notifications() {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className="max-w-3xl mx-auto text-center py-12">
@@ -175,7 +175,6 @@ export function Notifications() {
     );
   }
 
-  // Empty state
   if (notifications.length === 0) {
     return (
       <div className="max-w-3xl mx-auto text-center py-16">
@@ -183,7 +182,7 @@ export function Notifications() {
           <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-400/20">
             <Sparkles className="w-8 h-8 text-rose-400" />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">All caught up! ✨</h2>
+          <h2 className="text-2xl font-semibold text-white mb-2">All caught up ✨</h2>
           <p className="text-neutral-400 max-w-md mx-auto">
             No notifications yet. We'll let you know when your partner does something sweet.
           </p>
@@ -192,12 +191,10 @@ export function Notifications() {
     );
   }
 
-  // Main view – grouped notifications
   const grouped = groupNotifications(notifications);
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
           <Heart className="w-5 h-5 text-rose-400 fill-rose-400/20" />
@@ -205,11 +202,9 @@ export function Notifications() {
         <h1 className="text-2xl font-semibold text-white">Notifications</h1>
       </div>
 
-      {/* List */}
       <div className="space-y-6">
         {Object.entries(grouped).map(([date, items]) => (
           <div key={date}>
-            {/* Date header */}
             <div className="flex items-center gap-3 mb-3">
               <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
                 {date}
@@ -217,12 +212,12 @@ export function Notifications() {
               <div className="flex-1 h-px bg-neutral-800/50" />
             </div>
 
-            {/* Items for this date */}
             <div className="space-y-3">
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-4 bg-neutral-900 rounded-2xl border border-neutral-800 p-4 hover:border-neutral-700 transition-all duration-200"
+                  onClick={() => handleNotificationClick(item)}
+                  className="flex items-center gap-4 bg-neutral-900 rounded-2xl border border-neutral-800 p-4 hover:border-neutral-700 hover:bg-neutral-800/50 transition-all duration-200 cursor-pointer group"
                 >
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center border flex-shrink-0 ${notificationBg(
@@ -235,6 +230,7 @@ export function Notifications() {
                     <p className="text-sm text-neutral-300">{item.message}</p>
                     <p className="text-xs text-neutral-500 mt-0.5">{timeAgo(item.created_at)}</p>
                   </div>
+                  <ArrowRight className="w-4 h-4 text-neutral-600 group-hover:text-rose-400 transition-colors" />
                 </div>
               ))}
             </div>
