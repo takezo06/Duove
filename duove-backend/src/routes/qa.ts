@@ -336,4 +336,114 @@ router.patch('/preferred-category', async (req: Request, res: Response, next: Ne
   }
 });
 
+// GET /api/qa/history?limit=20&offset=0
+router.get('/history', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    // Get relationship
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    // Fetch assignments with question and answers (joined)
+    // We can use a single query with nested selects
+    const { data: assignments, error, count } = await supabase
+      .from('qa_assignments')
+      .select(`
+        id,
+        assigned_date,
+        revealed_at,
+        qa_questions (*),
+        qa_answers!inner (
+          id,
+          user_id,
+          partner_id,
+          answer_text,
+          image_url,
+          submitted_at,
+          revealed_at
+        )
+      `, { count: 'exact' })
+      .eq('relationship_id', relationship.id)
+      .not('revealed_at', 'is', null) // only revealed assignments
+      .order('assigned_date', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      logger.error('Error fetching history', { error });
+      return res.status(500).json({ error: error.message });
+    }
+
+    // We also need the partner's display name for each answer, but we can fetch separately or include in query.
+    // For simplicity, we'll fetch partner names in a separate query for all partner ids.
+    // We'll extract all partner ids from answers.
+    const partnerIds = new Set<string>();
+    assignments?.forEach((a: any) => {
+      a.qa_answers?.forEach((ans: any) => {
+        if (ans.user_id !== userId) partnerIds.add(ans.user_id);
+        if (ans.partner_id !== userId) partnerIds.add(ans.partner_id);
+      });
+    });
+    const partnerIdArray = Array.from(partnerIds);
+    let partnerNames: Record<string, string> = {};
+    if (partnerIdArray.length > 0) {
+      const { data: partners, error: partnerError } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', partnerIdArray);
+      if (!partnerError) {
+        partnerNames = partners.reduce((acc: any, p: any) => {
+          acc[p.id] = p.display_name || 'Partner';
+          return acc;
+        }, {});
+      }
+    }
+
+    // Format the response
+    const formatted = assignments?.map((a: any) => {
+      const answers = a.qa_answers || [];
+      const yourAnswer = answers.find((ans: any) => ans.user_id === userId);
+      const partnerAnswer = answers.find((ans: any) => ans.user_id !== userId);
+      return {
+        id: a.id,
+        assigned_date: a.assigned_date,
+        revealed_at: a.revealed_at,
+        question: a.qa_questions,
+        yourAnswer: yourAnswer ? {
+          answer_text: yourAnswer.answer_text,
+          image_url: yourAnswer.image_url,
+          submitted_at: yourAnswer.submitted_at,
+        } : null,
+        partnerAnswer: partnerAnswer ? {
+          answer_text: partnerAnswer.answer_text,
+          image_url: partnerAnswer.image_url,
+          submitted_at: partnerAnswer.submitted_at,
+          partner_name: partnerNames[partnerAnswer.user_id] || 'Partner',
+        } : null,
+      };
+    });
+
+    res.json({
+      data: formatted,
+      count: count || 0,
+      limit,
+      offset,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

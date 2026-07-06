@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import {
@@ -10,8 +10,8 @@ import {
   CheckCircle,
   XCircle,
   Send,
-  ChevronDown,
   Settings,
+  History,
 } from 'lucide-react';
 
 interface Category {
@@ -180,7 +180,6 @@ export function QA() {
       );
       setSelectedCategoryId(categoryId);
       setShowCategoryModal(false);
-      // Refresh current to reflect the change (next question will use the category)
       await fetchCurrent();
       setSuccess('Category preference updated.');
       setTimeout(() => setSuccess(null), 3000);
@@ -204,9 +203,12 @@ export function QA() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto animate-pulse">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-neutral-800" />
-          <div className="h-8 w-40 bg-neutral-800 rounded" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-neutral-800" />
+            <div className="h-8 w-40 bg-neutral-800 rounded" />
+          </div>
+          <div className="h-10 w-28 bg-neutral-800 rounded-xl" />
         </div>
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 space-y-4">
           <div className="h-6 w-1/3 bg-neutral-800 rounded" />
@@ -251,6 +253,7 @@ export function QA() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
@@ -268,13 +271,22 @@ export function QA() {
             </button>
           )}
         </div>
-        <button
-          onClick={() => setShowCategoryModal(true)}
-          className="text-sm text-neutral-400 hover:text-white transition flex items-center gap-1.5"
-        >
-          <Settings className="w-4 h-4" />
-          Category
-        </button>
+        <div className="flex items-center gap-3">
+          {/* History Link with pink glow */}
+          <Link
+            to="/qa/history"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-400/30 text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all duration-200 shadow-[0_0_15px_rgba(244,63,94,0.15)] hover:shadow-[0_0_25px_rgba(244,63,94,0.35)]"
+          >
+            <History className="w-4 h-4" />
+            <span className="text-sm">History</span>
+          </Link>
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="text-sm text-neutral-400 hover:text-white transition flex items-center gap-1.5"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Question Card */}
