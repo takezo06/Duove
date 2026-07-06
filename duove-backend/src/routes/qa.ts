@@ -1,140 +1,339 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { createUserClient } from '../config/supabase';
-import { logger } from '../config/logger';
 import { authMiddleware } from '../middleware/auth';
+import { createUserClient } from '../config/supabase';
+import { createServiceClient } from '../config/supabaseAdmin';
+import { logger } from '../config/logger';
 import { dailyLimitMiddleware } from '../middleware/dailyLimit';
 import { incrementDailyUsage } from '../services/limitService';
-import {
-  getCurrentPrompt,
-  submitAnswer,
-  getAnswersForPrompt,
-  haveBothAnswered,
-} from '../services/qaService';
 
 const router = Router();
-
-// All routes require authentication
 router.use(authMiddleware);
 
-/**
- * GET /api/qa/current
- * Get the current week's prompt.
- */
+// ---- Helper: get or create today's assignment ----
+async function getOrCreateTodayAssignment(
+  supabase: any,
+  supabaseAdmin: any,
+  relationshipId: string,
+  preferredCategoryId: string | null = null
+) {
+  const today = new Date().toISOString().split('T')[0];
+
+  // 1. Check if there's already an assignment for today
+  let { data: assignment, error } = await supabase
+    .from('qa_assignments')
+    .select('*, qa_questions(*)')
+    .eq('relationship_id', relationshipId)
+    .eq('assigned_date', today)
+    .maybeSingle();
+
+  if (assignment) return assignment;
+
+  // 2. No assignment yet – create one
+  let query = supabaseAdmin
+    .from('qa_questions')
+    .select('*')
+    .eq('is_active', true);
+
+  if (preferredCategoryId) {
+    query = query.eq('category_id', preferredCategoryId);
+  }
+
+  // Avoid recent questions (last 10)
+  const { data: usedQuestions } = await supabase
+    .from('qa_assignments')
+    .select('question_id')
+    .eq('relationship_id', relationshipId)
+    .order('assigned_date', { ascending: false })
+    .limit(10);
+
+  const usedIds = usedQuestions?.map((q: any) => q.question_id) || [];
+  if (usedIds.length > 0) {
+    query = query.not('id', 'in', `(${usedIds.join(',')})`);
+  }
+
+  const { data: available, error: availError } = await query.limit(1);
+
+  let question;
+  if (availError || !available || available.length === 0) {
+    // Fallback: get any active question
+    const { data: fallback, error: fbError } = await supabaseAdmin
+      .from('qa_questions')
+      .select('*')
+      .eq('is_active', true)
+      .limit(1);
+    if (fbError || !fallback || fallback.length === 0) {
+      throw new Error('No questions available');
+    }
+    question = fallback[0];
+  } else {
+    question = available[0];
+  }
+
+  const { data: newAssignment, error: insertError } = await supabaseAdmin
+    .from('qa_assignments')
+    .insert({
+      question_id: question.id,
+      relationship_id: relationshipId,
+      assigned_date: today,
+    })
+    .select('*, qa_questions(*)')
+    .single();
+
+  if (insertError) throw insertError;
+  return newAssignment;
+}
+
+// ---- GET /api/qa/current ----
 router.get('/current', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
     const supabase = createUserClient(req.token!);
-    const prompt = await getCurrentPrompt(supabase, today);
-
-    if (!prompt) {
-      res.status(404).json({ error: 'No prompt assigned for this week' });
-      return;
-    }
-
-    res.status(200).json(prompt);
-  } catch (error) {
-    logger.error('GET /api/qa/current error', { error });
-    next(error);
-  }
-});
-
-/**
- * GET /api/qa/answers
- * Get answers for the current prompt (with reveal logic).
- * Query params: promptId, relationshipId
- */
-router.get('/answers', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { promptId, relationshipId } = req.query;
+    const supabaseAdmin = createServiceClient();
     const userId = req.user!.id;
 
-    if (!promptId || !relationshipId) {
-      res.status(400).json({ error: 'promptId and relationshipId are required' });
-      return;
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id, user_id, partner_id, preferred_category_id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
     }
 
-    const supabase = createUserClient(req.token!);
-    const result = await getAnswersForPrompt(
+    // Check if today's assignment exists; if not, create it
+    const assignment = await getOrCreateTodayAssignment(
       supabase,
-      promptId as string,
-      relationshipId as string,
-      userId
+      supabaseAdmin,
+      relationship.id,
+      relationship.preferred_category_id
     );
 
-    res.status(200).json(result);
-  } catch (error) {
-    logger.error('GET /api/qa/answers error', { error });
-    next(error);
+    // Get answers for this assignment
+    const { data: answers, error: ansError } = await supabase
+      .from('qa_answers')
+      .select('*')
+      .eq('question_id', assignment.question_id)
+      .eq('relationship_id', relationship.id);
+
+    if (ansError) {
+      logger.error('Error fetching answers', { error: ansError });
+      return res.status(500).json({ error: ansError.message });
+    }
+
+    const yourAnswer = answers?.find((a: any) => a.user_id === userId) || null;
+    const partnerAnswer = answers?.find((a: any) => a.user_id !== userId) || null;
+    const bothAnswered = answers?.length === 2;
+
+    // Reveal automatically if both answered and not yet revealed
+    let revealed = assignment.revealed_at !== null;
+    if (bothAnswered && !revealed) {
+      // Reveal immediately
+      const { error: updateError } = await supabaseAdmin
+        .from('qa_assignments')
+        .update({ revealed_at: new Date().toISOString() })
+        .eq('id', assignment.id);
+      if (!updateError) {
+        revealed = true;
+        assignment.revealed_at = new Date().toISOString();
+      }
+    }
+
+    // Compute next available time (midnight)
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const secondsUntilNext = Math.floor((nextMidnight.getTime() - now.getTime()) / 1000);
+
+    // Partner name
+    const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
+    const { data: partnerData } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', partnerId)
+      .maybeSingle();
+
+    res.json({
+      assignment,
+      question: assignment.qa_questions,
+      answers,
+      yourAnswer,
+      partnerAnswer: bothAnswered && revealed ? partnerAnswer : null,
+      bothAnswered,
+      revealed,
+      partnerName: partnerData?.display_name || 'Partner',
+      nextQuestionAvailableIn: secondsUntilNext,
+      preferredCategoryId: relationship.preferred_category_id,
+    });
+  } catch (err) {
+    next(err);
   }
 });
 
-/**
- * POST /api/qa/submit
- * Submit an answer to the current prompt (enforces daily limit: 5 Q&A/day).
- */
-router.post(
-  '/submit',
-  dailyLimitMiddleware('qa'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { promptId, relationshipId, partnerId, answerText, imageUrl } = req.body;
-      const userId = req.user!.id;
-
-      // Validation
-      if (!promptId || !relationshipId || !partnerId || !answerText) {
-        res.status(400).json({ error: 'Missing required fields' });
-        return;
-      }
-
-      if (answerText.trim().length === 0) {
-        res.status(400).json({ error: 'Answer cannot be empty' });
-        return;
-      }
-
-      const supabase = createUserClient(req.token!);
-
-      // Check if user already answered this prompt
-      const { data: existing } = await supabase
-        .from('qa_answers')
-        .select('id')
-        .eq('prompt_id', promptId)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (existing) {
-        res.status(400).json({ error: 'You have already answered this prompt' });
-        return;
-      }
-
-      // Submit the answer
-      const answer = await submitAnswer(
-        supabase,
-        promptId,
-        relationshipId,
-        userId,
-        partnerId,
-        answerText,
-        imageUrl || null
-      );
-
-      // Increment daily usage
-      await incrementDailyUsage(supabase, userId, 'qa');
-
-      // Check if both have now answered
-      const bothAnswered = await haveBothAnswered(supabase, promptId, relationshipId);
-
-      res.status(201).json({
-        answer,
-        bothAnswered,
-        message: bothAnswered
-          ? 'Both partners have answered! Answers will reveal in 24 hours.'
-          : 'Answer submitted! Waiting for your partner.',
-      });
-    } catch (error) {
-      logger.error('POST /api/qa/submit error', { error });
-      next(error);
+// ---- POST /api/qa/submit ----
+router.post('/submit', dailyLimitMiddleware('qa'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { question_id, answer_text, image_url } = req.body;
+    if (!question_id || !answer_text) {
+      return res.status(400).json({ error: 'question_id and answer_text required' });
     }
+
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id, user_id, partner_id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
+
+    const { data: existing, error: existError } = await supabase
+      .from('qa_answers')
+      .select('id')
+      .eq('question_id', question_id)
+      .eq('relationship_id', relationship.id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(400).json({ error: 'You have already answered this question' });
+    }
+
+    const { data: answer, error: ansError } = await supabase
+      .from('qa_answers')
+      .insert({
+        question_id,
+        relationship_id: relationship.id,
+        user_id: userId,
+        partner_id: partnerId,
+        answer_text: answer_text.trim(),
+        image_url: image_url || null,
+      })
+      .select()
+      .single();
+
+    if (ansError) {
+      logger.error('Error submitting answer', { error: ansError });
+      return res.status(500).json({ error: ansError.message });
+    }
+
+    await incrementDailyUsage(supabase, userId, 'qa');
+
+    const { count, error: countError } = await supabase
+      .from('qa_answers')
+      .select('*', { count: 'exact', head: true })
+      .eq('question_id', question_id)
+      .eq('relationship_id', relationship.id);
+
+    const bothAnswered = count === 2;
+
+    if (bothAnswered) {
+      logger.info('Both partners have answered question', { question_id, relationshipId: relationship.id });
+    }
+
+    res.json({
+      answer,
+      bothAnswered,
+      message: bothAnswered
+        ? 'Both partners have answered. Answers will reveal in 24 hours.'
+        : 'Answer submitted. Waiting for your partner.',
+    });
+  } catch (err) {
+    next(err);
   }
-);
+});
+
+// ---- POST /api/qa/skip ----
+router.post('/skip', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const supabaseAdmin = createServiceClient();
+    const userId = req.user!.id;
+
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data: assignment, error: assignError } = await supabase
+      .from('qa_assignments')
+      .select('id')
+      .eq('relationship_id', relationship.id)
+      .eq('assigned_date', today)
+      .is('skipped_at', null)
+      .maybeSingle();
+
+    if (assignError || !assignment) {
+      return res.status(404).json({ error: 'No active question to skip' });
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('qa_assignments')
+      .update({
+        skipped_at: new Date().toISOString(),
+        skipped_by: userId,
+      })
+      .eq('id', assignment.id);
+
+    if (updateError) {
+      logger.error('Error skipping question', { error: updateError });
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    res.json({ message: 'Question skipped. A new one will be assigned.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+// ---- PATCH /api/qa/preferred-category ----
+router.patch('/preferred-category', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { category_id } = req.body;
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    const { error: updateError } = await supabase
+      .from('relationships')
+      .update({ preferred_category_id: category_id || null })
+      .eq('id', relationship.id);
+
+    if (updateError) {
+      logger.error('Error updating preferred category', { error: updateError });
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    res.json({ message: 'Preferred category updated' });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;
