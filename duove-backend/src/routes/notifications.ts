@@ -6,6 +6,92 @@ import { logger } from '../config/logger';
 const router = Router();
 router.use(authMiddleware);
 
+// GET /api/notifications/unread-count
+router.get('/unread-count', async (req, res, next) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    // Get last_read_at from profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('last_read_at')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message });
+    }
+
+    const lastReadAt = profile?.last_read_at || new Date(0).toISOString();
+
+    // Get relationship
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.json({ count: 0 });
+    }
+
+    const relationshipId = relationship.id;
+
+    // Count unread cravings
+    const { count: cravingsCount, error: cravingsError } = await supabase
+      .from('cravings')
+      .select('*', { count: 'exact', head: true })
+      .eq('relationship_id', relationshipId)
+      .neq('user_id', userId)
+      .gt('created_at', lastReadAt);
+
+    // Count unread letters
+    const { count: lettersCount, error: lettersError } = await supabase
+      .from('letters')
+      .select('*', { count: 'exact', head: true })
+      .eq('relationship_id', relationshipId)
+      .neq('sender_id', userId)
+      .gt('created_at', lastReadAt);
+
+    // Count unread QA answers
+    const { count: qaCount, error: qaError } = await supabase
+      .from('qa_answers')
+      .select('*', { count: 'exact', head: true })
+      .eq('relationship_id', relationshipId)
+      .neq('user_id', userId)
+      .gt('created_at', lastReadAt);
+
+    const totalCount = (cravingsCount || 0) + (lettersCount || 0) + (qaCount || 0);
+
+    res.json({ count: totalCount });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/notifications/read
+router.post('/read', async (req, res, next) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ last_read_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ message: 'Notifications marked as read' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/notifications
 router.get('/', async (req, res, next) => {
   try {
