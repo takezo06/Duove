@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import {
   Home,
@@ -32,6 +32,9 @@ const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 256;
 
 export function Sidebar() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('sidebar-width');
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -43,6 +46,7 @@ export function Sidebar() {
   const [userName, setUserName] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userAvatar, setUserAvatar] = useState<string>('?');
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
@@ -57,44 +61,60 @@ export function Sidebar() {
   const sidebarRef = useRef<HTMLElement | null>(null);
   const widthRef = useRef(width);
 
-  const navigate = useNavigate();
-
-  // Fetch user info (unchanged)
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error('Error fetching user:', error);
-          setLoadingUser(false);
-          return;
-        }
-        if (user) {
-          const metadata = user.user_metadata || {};
-          let displayName = 
-            metadata.full_name || 
-            metadata.name || 
-            metadata.username || 
-            user.email?.split('@')[0] || 
-            'User';
-          
-          displayName = displayName
-            .split(' ')
-            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(' ');
-          
-          setUserName(displayName);
-          setUserEmail(user.email || '');
-          setUserAvatar(displayName.charAt(0).toUpperCase());
-        }
-      } catch (err) {
-        console.error('Failed to fetch user:', err);
-      } finally {
+  // Fetch user info with profile avatar
+  const fetchUser = async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error fetching user:', error);
         setLoadingUser(false);
+        return;
       }
-    };
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle();
 
+        let displayName = 'User';
+        let avatarUrl = null;
+
+        if (profile) {
+          if (profile.display_name) displayName = profile.display_name;
+          if (profile.avatar_url) avatarUrl = profile.avatar_url;
+        } else {
+          const meta = user.user_metadata || {};
+          displayName = meta.full_name || meta.name || meta.username || user.email?.split('@')[0] || 'User';
+        }
+
+        displayName = displayName
+          .split(' ')
+          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+
+        setUserName(displayName);
+        setUserEmail(user.email || '');
+        setUserAvatar(displayName.charAt(0).toUpperCase());
+        setProfileAvatarUrl(avatarUrl);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user:', err);
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  useEffect(() => {
     fetchUser();
+
+    const handleProfileUpdate = () => {
+      fetchUser();
+    };
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+    };
   }, []);
 
   // Persist width
@@ -112,7 +132,6 @@ export function Sidebar() {
     }
   }, [width, isCollapsed]);
 
-  // Update widthRef on state change
   useEffect(() => {
     widthRef.current = width;
   }, [width]);
@@ -120,7 +139,7 @@ export function Sidebar() {
   const currentWidth = isCollapsed ? MIN_WIDTH : width;
   const showText = currentWidth >= 120;
 
-  // ---- Drag handlers with direct DOM manipulation ----
+  // ---- Drag handlers ----
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
@@ -131,7 +150,6 @@ export function Sidebar() {
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
     if (sidebarRef.current) {
-      // Disable transition for instant feedback
       sidebarRef.current.style.transition = 'none';
       sidebarRef.current.style.willChange = 'width';
     }
@@ -141,17 +159,13 @@ export function Sidebar() {
     if (!isDragging.current) return;
     let newWidth = startWidth.current + (ev.clientX - startX.current);
     newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth));
-    // Directly update the DOM
     if (sidebarRef.current) {
       sidebarRef.current.style.width = `${newWidth}px`;
     }
-    // Update ref
     widthRef.current = newWidth;
-    // If it expands beyond MIN_WIDTH, uncollapse
     if (newWidth > MIN_WIDTH && isCollapsed) {
       setIsCollapsed(false);
     }
-    // If it reaches MIN_WIDTH, collapse
     if (newWidth === MIN_WIDTH && !isCollapsed) {
       setIsCollapsed(true);
     }
@@ -164,14 +178,11 @@ export function Sidebar() {
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     if (sidebarRef.current) {
-      // Re-enable transition
       sidebarRef.current.style.transition = '';
       sidebarRef.current.style.willChange = '';
     }
-    // Sync react state with final width
     const finalWidth = widthRef.current;
     setWidth(finalWidth);
-    // Ensure collapse state matches
     if (finalWidth === MIN_WIDTH) {
       setIsCollapsed(true);
     } else if (finalWidth > MIN_WIDTH) {
@@ -222,6 +233,12 @@ export function Sidebar() {
 
   const shouldShowTooltips = isCollapsed || !showText;
 
+  // Check if a nav item is active
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <div className="relative flex-shrink-0 h-screen">
       {/* Tooltip */}
@@ -261,48 +278,69 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden">
-          {navItems.map(({ icon: Icon, label, path }) => (
-            <a
-              key={label}
-              href={path}
-              onMouseEnter={(e) => {
-                if (shouldShowTooltips) handleMouseEnter(label, e);
-              }}
-              onMouseLeave={handleMouseLeave}
-              className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-lg 
-                text-sm font-medium transition-all duration-200 
-                text-neutral-400 hover:text-white hover:bg-neutral-700/50
-                ${!showText ? 'justify-center' : ''}
-                group relative
-              `}
-            >
-              <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110`} />
-              <span
-                className={`whitespace-nowrap transition-all duration-300 ease-in-out ${
-                  showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
-                }`}
+          {navItems.map(({ icon: Icon, label, path }) => {
+            const active = isActive(path);
+            return (
+              <a
+                key={label}
+                href={path}
+                onMouseEnter={(e) => {
+                  if (shouldShowTooltips) handleMouseEnter(label, e);
+                }}
+                onMouseLeave={handleMouseLeave}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg 
+                  text-sm font-medium transition-all duration-200 
+                  ${active 
+                    ? 'bg-neutral-800/70 text-white border-l-2 border-rose-400 font-semibold' 
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-700/50'
+                  }
+                  ${!showText ? 'justify-center' : ''}
+                  group relative
+                `}
               >
-                {label}
-              </span>
-            </a>
-          ))}
+                <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${active ? 'text-rose-400 scale-110' : 'group-hover:scale-110'}`} />
+                <span
+                  className={`whitespace-nowrap transition-all duration-300 ease-in-out ${
+                    showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
+                  }`}
+                >
+                  {label}
+                </span>
+                {active && !showText && (
+                  <span className="absolute left-full ml-2 px-2 py-1 bg-rose-400/20 text-rose-400 text-xs rounded border border-rose-400/30 pointer-events-none whitespace-nowrap">
+                    ●
+                  </span>
+                )}
+              </a>
+            );
+          })}
         </nav>
 
-        {/* Footer */}
+        {/* Footer (same as before, but with active state for User if on profile) */}
         <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-3 overflow-x-hidden">
-          <div className={`
-            flex items-center gap-3 px-3 py-2.5 rounded-lg 
-            transition-all duration-200
-            hover:bg-neutral-700/50
-            ${!showText ? 'justify-center' : ''}
-          `}>
-            <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0 transition-transform duration-300 hover:scale-105">
-              {loadingUser ? '...' : userAvatar}
+          <div
+            className={`
+              flex items-center gap-3 px-3 py-2.5 rounded-lg 
+              transition-all duration-200
+              hover:bg-neutral-700/50
+              ${!showText ? 'justify-center' : ''}
+            `}
+          >
+            <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0 overflow-hidden">
+              {loadingUser ? (
+                '...'
+              ) : profileAvatarUrl ? (
+                <img src={profileAvatarUrl} alt={userName} className="w-full h-full object-cover" />
+              ) : (
+                userAvatar
+              )}
             </div>
-            <div className={`overflow-hidden min-w-0 transition-all duration-300 ease-in-out ${
-              showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
-            }`}>
+            <div
+              className={`overflow-hidden min-w-0 transition-all duration-300 ease-in-out ${
+                showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
+              }`}
+            >
               <p className="text-sm text-white font-medium truncate">
                 {loadingUser ? 'Loading...' : userName || 'User'}
               </p>
@@ -313,7 +351,6 @@ export function Sidebar() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Collapse button */}
             <button
               onClick={toggleCollapse}
               className={`
@@ -331,7 +368,6 @@ export function Sidebar() {
               )}
             </button>
 
-            {/* Logout button */}
             <button
               onClick={handleLogout}
               onMouseEnter={(e) => {
