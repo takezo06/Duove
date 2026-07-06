@@ -116,12 +116,24 @@ export function Notifications() {
         }
 
         const token = (await supabase.auth.getSession()).data.session?.access_token;
+
+        // Fetch notifications
         const res = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}/api/notifications`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-
         setNotifications(res.data);
+
+        // Mark as read after fetching
+        if (token) {
+          await axios.post(
+            `${import.meta.env.VITE_BACKEND_URL}/api/notifications/read`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          // Notify sidebar to refresh badge
+          window.dispatchEvent(new Event('notifications-read'));
+        }
       } catch (err: any) {
         console.error('Error fetching notifications:', err);
         if (err.response?.status === 404) {

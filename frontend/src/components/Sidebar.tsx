@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import axios from 'axios';
 import {
   Home,
   CalendarDays,
@@ -49,6 +50,8 @@ export function Sidebar() {
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipText, setTooltipText] = useState('');
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
@@ -61,7 +64,7 @@ export function Sidebar() {
   const sidebarRef = useRef<HTMLElement | null>(null);
   const widthRef = useRef(width);
 
-  // Fetch user info with profile avatar
+  // Fetch user info
   const fetchUser = async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -107,13 +110,40 @@ export function Sidebar() {
 
   useEffect(() => {
     fetchUser();
-
     const handleProfileUpdate = () => {
       fetchUser();
     };
     window.addEventListener('profile-updated', handleProfileUpdate);
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
+    };
+  }, []);
+
+  // Fetch unread count
+  const fetchUnreadCount = async () => {
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) return;
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/notifications/unread-count`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUnreadCount(res.data.count || 0);
+    } catch (err) {
+      console.error('Error fetching unread count:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+
+    const handleNotificationsRead = () => {
+      fetchUnreadCount();
+    };
+    window.addEventListener('notifications-read', handleNotificationsRead);
+
+    return () => {
+      window.removeEventListener('notifications-read', handleNotificationsRead);
     };
   }, []);
 
@@ -233,7 +263,6 @@ export function Sidebar() {
 
   const shouldShowTooltips = isCollapsed || !showText;
 
-  // Check if a nav item is active
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
@@ -280,6 +309,7 @@ export function Sidebar() {
         <nav className="flex-1 px-2 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden">
           {navItems.map(({ icon: Icon, label, path }) => {
             const active = isActive(path);
+            const isBell = label === 'Notifications';
             return (
               <a
                 key={label}
@@ -299,7 +329,14 @@ export function Sidebar() {
                   group relative
                 `}
               >
-                <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${active ? 'text-rose-400 scale-110' : 'group-hover:scale-110'}`} />
+                <div className="relative">
+                  <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${active ? 'text-rose-400 scale-110' : 'group-hover:scale-110'}`} />
+                  {isBell && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full text-[10px] text-white flex items-center justify-center font-medium">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </div>
                 <span
                   className={`whitespace-nowrap transition-all duration-300 ease-in-out ${
                     showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
@@ -317,7 +354,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Footer (same as before, but with active state for User if on profile) */}
+        {/* Footer */}
         <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-3 overflow-x-hidden">
           <div
             className={`
@@ -351,6 +388,7 @@ export function Sidebar() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Collapse button */}
             <button
               onClick={toggleCollapse}
               className={`
@@ -368,6 +406,7 @@ export function Sidebar() {
               )}
             </button>
 
+            {/* Logout button */}
             <button
               onClick={handleLogout}
               onMouseEnter={(e) => {
