@@ -31,6 +31,7 @@ const navItems = [
 const MIN_WIDTH = 64;
 const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 256;
+const MOBILE_BREAKPOINT = 768;
 
 export function Sidebar() {
   const location = useLocation();
@@ -41,7 +42,8 @@ export function Sidebar() {
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    return localStorage.getItem('sidebar-collapsed') === 'true';
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === 'true';
   });
 
   const [userName, setUserName] = useState<string>('');
@@ -51,6 +53,7 @@ export function Sidebar() {
   const [loadingUser, setLoadingUser] = useState(true);
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipText, setTooltipText] = useState('');
@@ -64,7 +67,33 @@ export function Sidebar() {
   const sidebarRef = useRef<HTMLElement | null>(null);
   const widthRef = useRef(width);
 
-  // Fetch user info
+  // ---- Mobile detection ----
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+      setIsMobile(mobile);
+      if (mobile) {
+        // Force collapsed on mobile
+        setIsCollapsed(true);
+        setWidth(MIN_WIDTH);
+        widthRef.current = MIN_WIDTH;
+      } else {
+        // Restore user preference from localStorage
+        const savedCollapsed = localStorage.getItem('sidebar-collapsed');
+        const savedWidth = localStorage.getItem('sidebar-width');
+        if (savedCollapsed !== null) setIsCollapsed(savedCollapsed === 'true');
+        if (savedWidth) setWidth(parseInt(savedWidth, 10));
+        else setWidth(DEFAULT_WIDTH);
+        widthRef.current = width;
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // ---- User info ----
   const fetchUser = async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -110,16 +139,12 @@ export function Sidebar() {
 
   useEffect(() => {
     fetchUser();
-    const handleProfileUpdate = () => {
-      fetchUser();
-    };
+    const handleProfileUpdate = () => fetchUser();
     window.addEventListener('profile-updated', handleProfileUpdate);
-    return () => {
-      window.removeEventListener('profile-updated', handleProfileUpdate);
-    };
+    return () => window.removeEventListener('profile-updated', handleProfileUpdate);
   }, []);
 
-  // Fetch unread count
+  // ---- Unread count ----
   const fetchUnreadCount = async () => {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -136,25 +161,18 @@ export function Sidebar() {
 
   useEffect(() => {
     fetchUnreadCount();
-
-    const handleNotificationsRead = () => {
-      fetchUnreadCount();
-    };
+    const handleNotificationsRead = () => fetchUnreadCount();
     window.addEventListener('notifications-read', handleNotificationsRead);
-
-    return () => {
-      window.removeEventListener('notifications-read', handleNotificationsRead);
-    };
+    return () => window.removeEventListener('notifications-read', handleNotificationsRead);
   }, []);
 
-  // Persist width
+  // ---- Persist width/collapse ----
   useEffect(() => {
-    localStorage.setItem('sidebar-width', String(width));
-  }, [width]);
-
-  useEffect(() => {
-    localStorage.setItem('sidebar-collapsed', String(isCollapsed));
-  }, [isCollapsed]);
+    if (!isMobile) {
+      localStorage.setItem('sidebar-width', String(width));
+      localStorage.setItem('sidebar-collapsed', String(isCollapsed));
+    }
+  }, [width, isCollapsed, isMobile]);
 
   useEffect(() => {
     if (!isCollapsed) {
@@ -169,8 +187,9 @@ export function Sidebar() {
   const currentWidth = isCollapsed ? MIN_WIDTH : width;
   const showText = currentWidth >= 120;
 
-  // ---- Drag handlers ----
+  // ---- Drag handlers (disabled on mobile) ----
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isMobile) return;
     e.preventDefault();
     isDragging.current = true;
     startX.current = e.clientX;
@@ -213,14 +232,12 @@ export function Sidebar() {
     }
     const finalWidth = widthRef.current;
     setWidth(finalWidth);
-    if (finalWidth === MIN_WIDTH) {
-      setIsCollapsed(true);
-    } else if (finalWidth > MIN_WIDTH) {
-      setIsCollapsed(false);
-    }
+    if (finalWidth === MIN_WIDTH) setIsCollapsed(true);
+    else if (finalWidth > MIN_WIDTH) setIsCollapsed(false);
   };
 
   const toggleCollapse = () => {
+    if (isMobile) return;
     if (isCollapsed) {
       const target = lastExpandedWidth.current >= 120 ? lastExpandedWidth.current : DEFAULT_WIDTH;
       setIsCollapsed(false);
@@ -239,7 +256,7 @@ export function Sidebar() {
     navigate('/login');
   };
 
-  // Tooltip handlers
+  // ---- Tooltip handlers ----
   const handleMouseEnter = useCallback((label: string, e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltipText(label);
@@ -263,6 +280,7 @@ export function Sidebar() {
 
   const shouldShowTooltips = isCollapsed || !showText;
 
+  // ---- Active state ----
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
@@ -388,23 +406,25 @@ export function Sidebar() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Collapse button */}
-            <button
-              onClick={toggleCollapse}
-              className={`
-                flex items-center justify-center
-                w-9 h-9 rounded-lg 
-                text-neutral-400 hover:text-white hover:bg-neutral-700/50
-                transition-all duration-200
-                ${!showText ? 'flex-1' : ''}
-              `}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="w-4 h-4 transition-transform duration-300 hover:translate-x-0.5" />
-              ) : (
-                <ChevronLeft className="w-4 h-4 transition-transform duration-300 hover:-translate-x-0.5" />
-              )}
-            </button>
+            {/* Collapse button – hidden on mobile */}
+            {!isMobile && (
+              <button
+                onClick={toggleCollapse}
+                className={`
+                  flex items-center justify-center
+                  w-9 h-9 rounded-lg 
+                  text-neutral-400 hover:text-white hover:bg-neutral-700/50
+                  transition-all duration-200
+                  ${!showText ? 'flex-1' : ''}
+                `}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="w-4 h-4 transition-transform duration-300 hover:translate-x-0.5" />
+                ) : (
+                  <ChevronLeft className="w-4 h-4 transition-transform duration-300 hover:-translate-x-0.5" />
+                )}
+              </button>
+            )}
 
             {/* Logout button */}
             <button
@@ -427,16 +447,18 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Drag handle */}
-      <div
-        className="absolute top-0 right-0 w-2 h-full cursor-col-resize group transition-colors duration-200"
-        onMouseDown={handleMouseDown}
-      >
-        <div className="w-full h-full bg-transparent group-hover:bg-rose-400/30 group-active:bg-rose-400/40 transition-colors duration-200 rounded-r-sm" />
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="w-0.5 h-8 bg-rose-400/40 rounded-full shadow-lg shadow-rose-400/20" />
+      {/* Drag handle – hidden on mobile */}
+      {!isMobile && (
+        <div
+          className="absolute top-0 right-0 w-2 h-full cursor-col-resize group transition-colors duration-200"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="w-full h-full bg-transparent group-hover:bg-rose-400/30 group-active:bg-rose-400/40 transition-colors duration-200 rounded-r-sm" />
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="w-0.5 h-8 bg-rose-400/40 rounded-full shadow-lg shadow-rose-400/20" />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
