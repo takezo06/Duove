@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import {
@@ -49,6 +49,10 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export function Cravings() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const highlightId = location.state?.highlightId;
+
   const [cravings, setCravings] = useState<Craving[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +64,23 @@ export function Cravings() {
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [fetchingRelationship, setFetchingRelationship] = useState(true);
-  const navigate = useNavigate();
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  // Highlight effect
+  useEffect(() => {
+    if (highlightId && cravings.length > 0) {
+      const found = cravings.find(c => c.id === highlightId);
+      if (found) {
+        setHighlightedId(highlightId);
+        const element = document.getElementById(`craving-${highlightId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Auto-remove highlight after 5 seconds
+          setTimeout(() => setHighlightedId(null), 5000);
+        }
+      }
+    }
+  }, [highlightId, cravings]);
 
   // Fetch user and relationship
   useEffect(() => {
@@ -270,27 +290,15 @@ export function Cravings() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="
-                w-full bg-neutral-800/50 text-sm text-white 
-                px-4 py-3 pr-10 rounded-xl 
-                border border-neutral-700 
-                appearance-none cursor-pointer
-                hover:bg-neutral-700/30 
-                focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent
-                transition-all duration-200
-              "
+              className="w-full bg-neutral-800/50 text-sm text-white px-4 py-3 pr-10 rounded-xl border border-neutral-700 appearance-none focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition cursor-pointer hover:bg-neutral-700/30"
             >
               {CATEGORIES.map((cat) => (
-                <option 
-                  key={cat.value} 
-                  value={cat.value} 
-                  className="bg-neutral-900 text-white hover:bg-rose-500/20 hover:text-rose-300"
-                >
+                <option key={cat.value} value={cat.value} className="bg-neutral-900 text-white hover:bg-rose-500/20 hover:text-rose-300">
                   {cat.label}
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none transition-transform duration-200" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
           </div>
         </div>
         <button
@@ -303,7 +311,6 @@ export function Cravings() {
         </button>
       </form>
 
-      {/* Filter bar */}
       {cravings.length > 0 && (
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Filter className="w-4 h-4 text-neutral-500" />
@@ -334,7 +341,6 @@ export function Cravings() {
         </div>
       )}
 
-      {/* List – shows ALL cravings from both partners */}
       {filteredCravings.length === 0 ? (
         <div className="text-center text-neutral-500 py-16 bg-neutral-900/50 rounded-2xl border border-neutral-800/50">
           <Sparkles className="w-10 h-10 mx-auto mb-3 text-neutral-600" />
@@ -351,12 +357,18 @@ export function Cravings() {
             const category = craving.category || 'Other';
             const CategoryIcon = CATEGORIES.find((c) => c.value === category)?.icon || MoreHorizontal;
             const colorClass = CATEGORY_COLORS[category] || CATEGORY_COLORS.Other;
+            const isHighlighted = highlightedId === craving.id;
 
             return (
               <div
                 key={craving.id}
+                id={`craving-${craving.id}`}
                 className={`flex items-center gap-4 bg-neutral-900 rounded-2xl border p-4 transition ${
                   craving.fulfilled ? 'border-neutral-700/30 bg-neutral-900/60' : 'border-neutral-800 hover:border-neutral-700'
+                } ${
+                  isHighlighted
+                    ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-neutral-900 shadow-lg shadow-rose-400/20'
+                    : ''
                 }`}
               >
                 <button
@@ -379,7 +391,6 @@ export function Cravings() {
                 <span className="text-xs text-neutral-500">
                   {new Date(craving.created_at).toLocaleDateString()}
                 </span>
-                {/* Only show delete button if the current user created it */}
                 {craving.user_id === userId && (
                   <button
                     onClick={() => handleDelete(craving.id)}
