@@ -9,4 +9,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    allowedHosts: true // Allows localtunnel and VS Code dev tunnels to bypass host checks
+  }
 })

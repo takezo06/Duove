@@ -1,134 +1,299 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { createUserClient } from '../config/supabase';
-import { logger } from '../config/logger';
 import { authMiddleware } from '../middleware/auth';
+import { createUserClient } from '../config/supabase';
+import { createServiceClient } from '../config/supabaseAdmin';
+import { CycleEngine } from '../services/cycleService';
+import { logger } from '../config/logger';
 import {
-  logCycle,
   getCycleLogs,
   getLatestCycle,
+  getSymptomLogs,
+  logCycle,
+  logSymptoms,
   predictNextCycle,
 } from '../services/cycleService';
 
 const router = Router();
-
-// All routes require authentication
 router.use(authMiddleware);
 
-/**
- * Helper function to check if user can track cycles.
- */
-async function canTrackCycles(
-  supabase: any,
-  userId: string
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('can_track_cycles')
-    .eq('id', userId)
-    .single();
-
-  if (error || !data) {
-    return false;
-  }
-
-  return data.can_track_cycles === true;
-}
-
-/**
- * GET /api/cycles
- * Get all cycle logs for the authenticated user.
- */
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/cycles/stats
+router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.id;
     const supabase = createUserClient(req.token!);
-    const cycles = await getCycleLogs(supabase, userId);
-    res.status(200).json(cycles);
-  } catch (error) {
-    logger.error('GET /api/cycles error', { error });
-    next(error);
-  }
-});
+    const userId = req.user!.id;
 
-/**
- * GET /api/cycles/latest
- * Get the most recent cycle log.
- */
-router.get('/latest', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id;
-    const supabase = createUserClient(req.token!);
-    const cycle = await getLatestCycle(supabase, userId);
-    
-    if (!cycle) {
-      res.status(404).json({ error: 'No cycles found' });
-      return;
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
     }
-    
-    res.status(200).json(cycle);
-  } catch (error) {
-    logger.error('GET /api/cycles/latest error', { error });
-    next(error);
-  }
-});
 
-/**
- * GET /api/cycles/predict
- * Get the predicted next cycle start date.
- */
-router.get('/predict', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id;
-    const supabase = createUserClient(req.token!);
+    // Use the exported prediction function
     const prediction = await predictNextCycle(supabase, userId);
-    res.status(200).json(prediction);
-  } catch (error) {
-    logger.error('GET /api/cycles/predict error', { error });
-    next(error);
-  }
-});
 
-/**
- * POST /api/cycles
- * Log a new cycle.
- * Only allowed if user has can_track_cycles = true.
- */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { relationshipId, startDate, endDate } = req.body;
-    const userId = req.user!.id;
+    const cycles = await getCycleLogs(supabase, userId);
+    const lastPeriodStart = cycles.length > 0 ? cycles[cycles.length - 1].start_date : null;
 
-    // Validate required fields
-    if (!relationshipId || !startDate || !endDate) {
-      res.status(400).json({ error: 'Missing required fields: relationshipId, startDate, endDate' });
-      return;
-    }
-
-    const supabase = createUserClient(req.token!);
-
-    // Check if user can track cycles
-    const canTrack = await canTrackCycles(supabase, userId);
-    if (!canTrack) {
-      res.status(403).json({ 
-        error: 'You do not have permission to track cycles',
-        message: 'Please ask your partner to enable cycle tracking for you.'
-      });
-      return;
-    }
-
-    // Log the cycle
-    const cycle = await logCycle(
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const symptoms = await getSymptomLogs(
       supabase,
       userId,
-      relationshipId,
-      startDate,
-      endDate
+      thirtyDaysAgo.toISOString().split('T')[0]
     );
 
-    res.status(201).json(cycle);
-  } catch (error) {
-    logger.error('POST /api/cycles error', { error });
-    next(error);
+    const now = new Date();
+    const calendarData = [];
+    for (let i = -7; i <= 7; i++) {
+      const date = new Date(now);
+      date.setDate(now.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      const found = symptoms.find((s: any) => s.log_date === dateStr);
+      const hasBleeding = found?.bleeding_intensity ? true : false;
+      const hasSymptoms = !!found?.physical_symptoms?.length;
+      calendarData.push({ date: dateStr, bleeding: hasBleeding, symptoms: hasSymptoms });
+    }
+
+    res.json({
+      prediction,
+      calendar: calendarData,
+      recentCycles: cycles.slice(-6).map((c: any) => ({
+        start: c.start_date,
+        end: c.end_date,
+      })),
+      lastPeriodStart,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/cycles/history
+router.get('/history', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+    const cycles = await getCycleLogs(supabase, userId);
+    res.json(cycles);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/cycles/symptoms
+router.get('/symptoms', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+    const { from, to } = req.query;
+    const logs = await getSymptomLogs(
+      supabase,
+      userId,
+      from as string | undefined,
+      to as string | undefined
+    );
+    res.json(logs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/cycles/log
+router.post('/log', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { start_date, end_date, is_manual_override } = req.body;
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    const newCycle = await logCycle(
+      supabase,
+      userId,
+      relationship.id,
+      start_date,
+      end_date,
+      is_manual_override || false
+    );
+    res.status(201).json(newCycle);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/cycles/partner/stats – partner's cycle stats (read-only)
+router.get('/partner/stats', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    // Get the active relationship
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id, user_id, partner_id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    // Determine partner ID
+    const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
+
+    // Use service role to fetch partner's data (bypass RLS)
+    const supabaseAdmin = createServiceClient();
+    const partnerCycles = await getCycleLogs(supabaseAdmin, partnerId);
+    const partnerSymptoms = await getSymptomLogs(supabaseAdmin, partnerId);
+
+    // Build prediction using CycleEngine
+    const engine = new CycleEngine(partnerCycles);
+    const prediction = engine.getPrediction();
+
+    const lastPeriodStart = partnerCycles.length > 0 ? partnerCycles[partnerCycles.length - 1].start_date : null;
+
+    // Build calendar for the last 7 days
+    const now = new Date();
+    const calendarData = [];
+    for (let i = -7; i <= 7; i++) {
+      const date = new Date(now);
+      date.setDate(now.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      const found = partnerSymptoms.find((s: any) => s.log_date === dateStr);
+      const hasBleeding = found?.bleeding_intensity ? true : false;
+      const hasSymptoms = !!found?.physical_symptoms?.length;
+      calendarData.push({ date: dateStr, bleeding: hasBleeding, symptoms: hasSymptoms });
+    }
+
+    // Get partner's display name
+    const { data: partnerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('display_name')
+      .eq('id', partnerId)
+      .single();
+
+    res.json({
+      prediction,
+      calendar: calendarData,
+      lastPeriodStart,
+      partnerName: partnerProfile?.display_name || 'Partner',
+      symptom_logs: partnerSymptoms,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/cycles/symptoms
+router.post('/symptoms', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { log_date, ...symptomData } = req.body;
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    const result = await logSymptoms(
+      supabase,
+      userId,
+      relationship.id,
+      log_date,
+      symptomData
+    );
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/cycles/tips?phase=...&audience=...
+router.get('/tips', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phase, audience } = req.query;
+    if (!phase || !audience) {
+      return res.status(400).json({ error: 'phase and audience are required' });
+    }
+
+    const supabase = createUserClient(req.token!);
+    // Use service role to get tips (or regular supabase if RLS allows)
+    // Since tips are public, we can use the user-scoped client.
+    const { data: tips, error } = await supabase
+      .from('cycle_tips')
+      .select('tip_text')
+      .eq('phase', phase)
+      .eq('audience', audience)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      logger.error('Error fetching tips', { error });
+      return res.status(500).json({ error: error.message });
+    }
+
+    // If no tips found, return an empty array
+    res.json(tips || []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/cycles/partner/symptoms – partner's symptom logs (read-only)
+router.get('/partner/symptoms', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    // Get relationship and partner ID
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id, user_id, partner_id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) return res.status(404).json({ error: 'No active relationship found' });
+
+    const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
+
+    // Use service role to bypass RLS
+    const supabaseAdmin = createServiceClient();
+    const { data: symptoms, error } = await supabaseAdmin
+      .from('daily_symptom_logs')
+      .select('*')
+      .eq('user_id', partnerId)
+      .order('log_date', { ascending: false });
+
+    if (error) {
+      logger.error('Error fetching partner symptoms', { error });
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(symptoms);
+  } catch (err) {
+    next(err);
   }
 });
 
