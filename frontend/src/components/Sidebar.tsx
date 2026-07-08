@@ -63,7 +63,7 @@ export function Sidebar() {
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
-  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const widthRef = useRef(width);
 

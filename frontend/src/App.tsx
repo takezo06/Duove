@@ -10,6 +10,9 @@ import { Cravings } from './pages/Cravings';
 import { Profile } from './pages/Profile';
 import { QA } from './pages/QA';
 import { QAHistory } from './pages/QAHistory';
+import { CycleTracker } from './pages/CycleTracker';
+import { CycleAnalytics } from './pages/CycleAnalytics';
+import { CycleLog } from './pages/CycleLog';
 
 function App() {
   return (
@@ -25,6 +28,9 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/qa" element={<QA />} />
           <Route path="/qa/history" element={<QAHistory />} />
+          <Route path="/cycle" element={<CycleTracker />} />
+          <Route path="/cycle/analytics" element={<CycleAnalytics />} />
+          <Route path="/cycle/log" element={<CycleLog />} />
           {/* add other protected routes here */}
         </Route>
       </Routes>
