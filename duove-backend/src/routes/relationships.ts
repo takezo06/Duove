@@ -76,17 +76,27 @@ function getConversion(startDate: Date, endDate: Date): string {
 // ----- Helper: resolve partner display name -----
 async function getPartnerDisplayName(partnerId: string): Promise<string> {
   const supabaseAdmin = createServiceClient();
-  const { data: authUser, error } = await supabaseAdmin.auth.admin.getUserById(partnerId);
-  if (error || !authUser) {
-    console.error('Error fetching user via admin API:', error);
-    return 'Partner';
+  // Try the profiles table first (where display_name is stored)
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles')
+    .select('display_name')
+    .eq('id', partnerId)
+    .maybeSingle();
+
+  if (!error && profile?.display_name) {
+    return profile.display_name;
   }
-  const user = authUser.user;
-  const meta = user.user_metadata || {};
-  if (meta.full_name) return meta.full_name;
-  if (meta.name) return meta.name;
-  if (meta.username) return meta.username;
-  if (user.email) return user.email.split('@')[0];
+
+  // Fallback to auth metadata
+  const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(partnerId);
+  if (authUser?.user) {
+    const meta = authUser.user.user_metadata || {};
+    if (meta.full_name) return meta.full_name;
+    if (meta.name) return meta.name;
+    if (meta.username) return meta.username;
+    if (authUser.user.email) return authUser.user.email.split('@')[0];
+  }
+
   return 'Partner';
 }
 // ----- GET /me -----
