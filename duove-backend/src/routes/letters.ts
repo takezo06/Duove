@@ -144,7 +144,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// ---- GET / – retrieve letters (both partners) ----
+// GET / – retrieve letters (both partners), optionally single by id
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const supabase = createUserClient(req.token!);
@@ -159,8 +159,33 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (!rel) return res.json([]);
 
-    const limit = parseInt(req.query.limit as string) || 20;
+    // If an ID is provided, return just that letter (if it belongs to the relationship)
+    const letterId = req.query.id as string | undefined;
+    if (letterId) {
+      const { data, error } = await supabase
+        .from('love_letters')
+        .select('*')
+        .eq('id', letterId)
+        .eq('relationship_id', rel.id)
+        .single();
 
+      if (error) return res.json([]);
+      // Enrich with sender/recipient names
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', [rel.user_id, rel.partner_id]);
+
+      const enriched = {
+        ...data,
+        sender_name: data.sender_name || profiles?.find(p => p.id === data.sender_id)?.display_name || 'Unknown',
+        recipient_name: data.recipient_name || profiles?.find(p => p.id === (data.sender_id === rel.user_id ? rel.partner_id : rel.user_id))?.display_name || 'Unknown',
+      };
+      return res.json([enriched]); // return as array for consistency
+    }
+
+    // Otherwise, fetch limited list
+    const limit = parseInt(req.query.limit as string) || 20;
     const { data, error } = await supabase
       .from('love_letters')
       .select('*')
@@ -170,7 +195,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (error) throw error;
 
-    // Enrich with display names
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, display_name')

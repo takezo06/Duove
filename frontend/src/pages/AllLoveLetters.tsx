@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { Heart, ArrowLeft } from 'lucide-react';
@@ -14,6 +15,9 @@ export function AllLoveLetters() {
   const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
   const [isModalLoading, setIsModalLoading] = useState(false);
 
+  const location = useLocation();
+  const highlightId = (location.state as any)?.highlightId;
+
   useEffect(() => {
     const fetchAll = async () => {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -25,7 +29,7 @@ export function AllLoveLetters() {
         );
         setLetters(res.data);
         
-        // Give the DOM a tiny extra beat to assemble, ensuring the browser catches the transition start point
+        // Trigger scatter animation after data loads
         setTimeout(() => {
           setAnimateScatter(true);
         }, 200);
@@ -37,6 +41,39 @@ export function AllLoveLetters() {
     };
     fetchAll();
   }, []);
+
+  // Handle highlighted letter from notification
+  useEffect(() => {
+    if (!highlightId || loading) return;
+
+    const highlightLetter = async () => {
+      // Try to find the letter in the already loaded list
+      let letter = letters.find(l => l.id === highlightId);
+      
+      if (!letter) {
+        // Fetch it directly from the backend
+        try {
+          const token = (await supabase.auth.getSession()).data.session?.access_token;
+          if (!token) return;
+          const res = await axios.get(
+            `${import.meta.env.VITE_BACKEND_URL}/api/love-letters?id=${highlightId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (res.data.length > 0) {
+            letter = res.data[0];
+          }
+        } catch (err) {
+          console.error('Failed to fetch highlighted letter', err);
+        }
+      }
+
+      if (letter) {
+        handleOpenLetter(letter);
+      }
+    };
+
+    highlightLetter();
+  }, [highlightId, letters, loading]);
 
   const handleOpenLetter = (letter: any) => {
     setSelectedLetter(letter);
@@ -74,13 +111,8 @@ export function AllLoveLetters() {
           </p>
         </div>
       ) : (
-        /* 
-          Using 3D perspective to make the rotation and translation calculations look deep and physical.
-          will-change-transform tells the GPU to pre-render the flight pathway.
-        */
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 [perspective:1200px]">
           {letters.map((letter, index) => {
-            // Highly specific coordinates to mimic the dropped stack from the photo
             const rotations = [-16, 14, -8, 22, -12, 6, -18, 10];
             const xOffsets = [-50, 60, -30, 40, -70, 55, -25, 35];
             const yOffsets = [140, 160, 130, 180, 150, 135, 145, 155];
@@ -94,18 +126,15 @@ export function AllLoveLetters() {
                 key={letter.id}
                 className="will-change-transform opacity-0"
                 style={{
-                  // Clean, high-performance animation curve (Quart Ease-Out)
                   transition: 'transform 1200ms cubic-bezier(0.25, 1, 0.5, 1), opacity 1000ms linear, z-index 1200ms step-end',
                   transform: animateScatter 
                     ? 'translate3d(0, 0, 0) rotate(0deg) scale(1)' 
                     : `translate3d(${x}px, ${y}px, 0) rotate(${rotation}deg) scale(0.92)`,
                   opacity: animateScatter ? 1 : 0.2,
                   zIndex: animateScatter ? 1 : 50 - index,
-                  // Smooth, elegant 80ms stagger delay so they peel away from each other gracefully
                   transitionDelay: animateScatter ? `${index * 80}ms` : '0ms'
                 }}
               >
-                {/* Micro-interaction layer: slight float up when hovering over the card after settling */}
                 <div className="transition-transform duration-300 ease-out hover:-translate-y-1.5 hover:shadow-xl">
                   <EnvelopeCard
                     letter={letter}
