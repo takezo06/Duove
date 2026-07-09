@@ -12,7 +12,6 @@ router.get('/unread-count', async (req, res, next) => {
     const supabase = createUserClient(req.token!);
     const userId = req.user!.id;
 
-    // Get last_read_at from profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('last_read_at')
@@ -25,7 +24,6 @@ router.get('/unread-count', async (req, res, next) => {
 
     const lastReadAt = profile?.last_read_at || new Date(0).toISOString();
 
-    // Get relationship
     const { data: relationship, error: relError } = await supabase
       .from('relationships')
       .select('id')
@@ -47,9 +45,9 @@ router.get('/unread-count', async (req, res, next) => {
       .neq('user_id', userId)
       .gt('created_at', lastReadAt);
 
-    // Count unread letters
+    // Count unread love letters ← FIXED table name
     const { count: lettersCount, error: lettersError } = await supabase
-      .from('letters')
+      .from('love_letters')
       .select('*', { count: 'exact', head: true })
       .eq('relationship_id', relationshipId)
       .neq('sender_id', userId)
@@ -111,7 +109,7 @@ router.get('/', async (req, res, next) => {
 
     const relationshipId = relationship.id;
 
-    // 2. Fetch recent cravings (by partner)
+    // Fetch recent cravings (by partner)
     const { data: cravings, error: cravingsError } = await supabase
       .from('cravings')
       .select('id, content, fulfilled, user_id, created_at')
@@ -120,16 +118,16 @@ router.get('/', async (req, res, next) => {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // 3. Fetch recent letters (received)
+    // Fetch recent love letters (received) ← FIXED table name
     const { data: letters, error: lettersError } = await supabase
-      .from('letters')
+      .from('love_letters')
       .select('id, sender_id, created_at')
       .eq('relationship_id', relationshipId)
       .neq('sender_id', userId)
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // 4. Fetch recent QA answers (by partner)
+    // Fetch recent QA answers (by partner)
     const { data: qaAnswers, error: qaError } = await supabase
       .from('qa_answers')
       .select('id, user_id, created_at')
@@ -138,7 +136,7 @@ router.get('/', async (req, res, next) => {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // 5. Format notifications with links
+    // Format notifications with links
     const notifications: any[] = [];
 
     cravings?.forEach((c: any) => {
