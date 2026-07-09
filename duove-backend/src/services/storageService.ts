@@ -11,7 +11,7 @@ const BUCKET_NAME = 'letter-images';
 export async function uploadLetterImage(
   supabase: SupabaseClient,
   userId: string,
-  file: Express.Multer.File
+  file: any
 ): Promise<string> {
   // Validate file size (200 KB max, as per plan)
   const MAX_SIZE = 200 * 1024; // 200 KB

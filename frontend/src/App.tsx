@@ -13,6 +13,8 @@ import { QAHistory } from './pages/QAHistory';
 import { CycleTracker } from './pages/CycleTracker';
 import { CycleAnalytics } from './pages/CycleAnalytics';
 import { CycleLog } from './pages/CycleLog';
+import { LoveLetters} from './pages/LoveLetters'
+import { AllLoveLetters } from './pages/AllLoveLetters';
 
 function App() {
   return (
@@ -31,6 +33,8 @@ function App() {
           <Route path="/cycle" element={<CycleTracker />} />
           <Route path="/cycle/analytics" element={<CycleAnalytics />} />
           <Route path="/cycle/log" element={<CycleLog />} />
+          <Route path="/letters" element={<LoveLetters />} />
+          <Route path="/letters/all" element={<AllLoveLetters />} />
           {/* add other protected routes here */}
         </Route>
       </Routes>

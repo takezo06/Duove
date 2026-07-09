@@ -13,6 +13,7 @@ import notificationsRouter from './routes/notifications';
 import profileRouter from './routes/profile';
 import qaRouter from './routes/qa';
 
+
 export const createApp = (): Express => {
   const app = express();
 
@@ -32,12 +33,13 @@ export const createApp = (): Express => {
 
   // Body parsing
   app.use(express.json({ limit: '10mb' }));
+  app.get('/test-letters', (req, res) => res.json({ ok: true }));
 
   // Routes
   app.use('/health', healthRouter);
 
   app.use('/api/cravings', cravingsRouter);
-  app.use('/api/letters', lettersRouter);
+  app.use('/api/love-letters', lettersRouter);
   app.use('/api/qa', qaRouter);
   app.use('/api/cycles', cyclesRouter);
   app.use('/api/relationships', relationshipsRouter);
