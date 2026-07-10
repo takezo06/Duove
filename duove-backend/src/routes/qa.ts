@@ -336,16 +336,15 @@ router.patch('/preferred-category', async (req: Request, res: Response, next: Ne
   }
 });
 
-// GET /api/qa/history?limit=20&offset=0
+// GET /api/qa/history?cursor=<date>&limit=20
 router.get('/history', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
-    const offset = parseInt(req.query.offset as string) || 0;
-
+    const cursor = req.query.cursor as string | undefined; // assigned_date to start after
     const supabase = createUserClient(req.token!);
     const userId = req.user!.id;
 
-    // Get relationship
+    // 1. Get relationship
     const { data: relationship, error: relError } = await supabase
       .from('relationships')
       .select('id')
@@ -357,90 +356,79 @@ router.get('/history', async (req: Request, res: Response, next: NextFunction) =
       return res.status(404).json({ error: 'No active relationship found' });
     }
 
-    // Fetch assignments with question and answers (joined)
-    // We can use a single query with nested selects
-    const { data: assignments, error, count } = await supabase
+    // 2. Fetch assignments with questions (left join answers separately to keep it simple)
+    let assignmentQuery = supabase
       .from('qa_assignments')
       .select(`
         id,
         assigned_date,
         revealed_at,
-        qa_questions (*),
-        qa_answers!inner (
-          id,
-          user_id,
-          partner_id,
-          answer_text,
-          image_url,
-          submitted_at,
-          revealed_at
-        )
-      `, { count: 'exact' })
+        qa_questions (id, question_text, category_id)
+      `)
       .eq('relationship_id', relationship.id)
-      .not('revealed_at', 'is', null) // only revealed assignments
       .order('assigned_date', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .limit(limit + 1); // fetch one extra to see if there are more
 
-    if (error) {
-      logger.error('Error fetching history', { error });
-      return res.status(500).json({ error: error.message });
+    if (cursor) {
+      assignmentQuery = assignmentQuery.lt('assigned_date', cursor);
     }
 
-    // We also need the partner's display name for each answer, but we can fetch separately or include in query.
-    // For simplicity, we'll fetch partner names in a separate query for all partner ids.
-    // We'll extract all partner ids from answers.
-    const partnerIds = new Set<string>();
-    assignments?.forEach((a: any) => {
-      a.qa_answers?.forEach((ans: any) => {
-        if (ans.user_id !== userId) partnerIds.add(ans.user_id);
-        if (ans.partner_id !== userId) partnerIds.add(ans.partner_id);
-      });
-    });
-    const partnerIdArray = Array.from(partnerIds);
-    let partnerNames: Record<string, string> = {};
-    if (partnerIdArray.length > 0) {
-      const { data: partners, error: partnerError } = await supabase
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', partnerIdArray);
-      if (!partnerError) {
-        partnerNames = partners.reduce((acc: any, p: any) => {
-          acc[p.id] = p.display_name || 'Partner';
-          return acc;
-        }, {});
-      }
+    const { data: assignments, error: assignError } = await assignmentQuery;
+
+    if (assignError) {
+      logger.error('Error fetching assignments', { error: assignError });
+      return res.status(500).json({ error: assignError.message });
     }
 
-    // Format the response
-    const formatted = assignments?.map((a: any) => {
-      const answers = a.qa_answers || [];
-      const yourAnswer = answers.find((ans: any) => ans.user_id === userId);
-      const partnerAnswer = answers.find((ans: any) => ans.user_id !== userId);
+    const hasMore = assignments.length > limit;
+    const page = hasMore ? assignments.slice(0, limit) : assignments;
+
+    // 3. For these assignments, get all related answers
+    const questionIds = page.map(a => (a.qa_questions as any)?.id).filter(Boolean);
+    const { data: answers, error: ansError } = await supabase
+      .from('qa_answers')
+      .select('*')
+      .in('question_id', questionIds)
+      .eq('relationship_id', relationship.id);
+
+    if (ansError) {
+      logger.error('Error fetching answers', { error: ansError });
+      return res.status(500).json({ error: ansError.message });
+    }
+
+    // 4. Format response matching frontend expectations
+    const items = page.map((assignment: any) => {
+      const question = assignment.qa_questions;
+      const questionAnswers = (answers || []).filter(
+        a => a.question_id === question?.id
+      );
+      const yourAnswer = questionAnswers.find(a => a.user_id === userId) || null;
+      const partnerAnswer = questionAnswers.find(a => a.user_id !== userId) || null;
+
       return {
-        id: a.id,
-        assigned_date: a.assigned_date,
-        revealed_at: a.revealed_at,
-        question: a.qa_questions,
-        yourAnswer: yourAnswer ? {
-          answer_text: yourAnswer.answer_text,
-          image_url: yourAnswer.image_url,
-          submitted_at: yourAnswer.submitted_at,
-        } : null,
-        partnerAnswer: partnerAnswer ? {
-          answer_text: partnerAnswer.answer_text,
-          image_url: partnerAnswer.image_url,
-          submitted_at: partnerAnswer.submitted_at,
-          partner_name: partnerNames[partnerAnswer.user_id] || 'Partner',
-        } : null,
+        id: assignment.id,
+        assigned_date: assignment.assigned_date,
+        revealed_at: assignment.revealed_at,
+        question: {
+          id: question?.id,
+          question_text: question?.question_text,
+          category_id: question?.category_id,
+        },
+        your_answer: yourAnswer
+          ? { answer_text: yourAnswer.answer_text, submitted_at: yourAnswer.submitted_at }
+          : null,
+        partner_answer: partnerAnswer
+          ? { answer_text: partnerAnswer.answer_text, submitted_at: partnerAnswer.submitted_at }
+          : null,
+        both_answered: questionAnswers.length === 2,
       };
     });
 
-    res.json({
-      data: formatted,
-      count: count || 0,
-      limit,
-      offset,
-    });
+    const nextCursor = hasMore && page.length > 0
+      ? page[page.length - 1].assigned_date
+      : null;
+
+    res.json({ items, hasMore, nextCursor });
   } catch (err) {
     next(err);
   }

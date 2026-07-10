@@ -130,8 +130,9 @@ router.post('/log', async (req: Request, res: Response, next: NextFunction) => {
       is_manual_override || false
     );
     res.status(201).json(newCycle);
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    logger.error('Error in POST /api/cycles/log', { error: err.message || err });
+    res.status(500).json({ error: err.message || 'Failed to save cycle start' });
   }
 });
 
