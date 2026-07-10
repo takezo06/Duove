@@ -19,6 +19,10 @@ export function useCycleData() {
 
   const fetchData = useCallback(async (rangeOption: RangeOption, start?: string, end?: string) => {
     setLoading(true);
+    // Clear previous data to avoid showing own while loading partner's
+    setSymptomLogs([]);
+    setCalendar([]);
+
     try {
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
@@ -38,7 +42,11 @@ export function useCycleData() {
       setPrediction(statsData.prediction);
       setLastPeriodStart(statsData.lastPeriodStart || null);
 
-      // 2. Compute date range for past data
+      if (viewingPartner) {
+        setPartnerName(statsData.partnerName || 'Partner');
+      }
+
+      // 2. Compute date range
       let fromDate = '';
       let toDate = '';
       const now = new Date();
@@ -64,14 +72,14 @@ export function useCycleData() {
         toDate = end;
       }
 
-      // 3. Fetch symptom logs for the past range
-      let symptomsUrl = `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`;
-      const params = new URLSearchParams();
-      if (fromDate) params.append('from', fromDate);
-      if (toDate) params.append('to', toDate);
-      if (params.toString()) symptomsUrl += `?${params.toString()}`;
-      const symptomsRes = await axios.get(symptomsUrl, {
+      // 3. Fetch symptom logs – use partner endpoint when viewingPartner
+      const symptomsEndpoint = viewingPartner
+        ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/symptoms`
+        : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`;
+
+      const symptomsRes = await axios.get(symptomsEndpoint, {
         headers: { Authorization: `Bearer ${token}` },
+        params: { from: fromDate, to: toDate },
       });
       const rawSymptoms = symptomsRes.data || [];
       const formattedSymptoms = rawSymptoms.map((item: any) => ({
@@ -80,14 +88,17 @@ export function useCycleData() {
       }));
       setSymptomLogs(formattedSymptoms);
 
-      // 4. Fetch ALL cycle history (to mark bleeding days and find earliest)
-      const historyRes = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/cycles/history`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // 4. Fetch cycle history – use partner history when viewingPartner
+      const historyEndpoint = viewingPartner
+        ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/history`
+        : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/history`;
+
+      const historyRes = await axios.get(historyEndpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const allCycles = historyRes.data || [];
 
-      // Earliest cycle start (for blank dots before first period)
+      // Earliest cycle start
       if (allCycles.length > 0) {
         const starts = allCycles.map((c: any) => c.start_date).filter(Boolean);
         if (starts.length > 0) {
@@ -96,7 +107,7 @@ export function useCycleData() {
         }
       }
 
-      // Helper: check if a date falls inside any cycle (for bleeding flag)
+      // Helper: bleeding day check
       const isBleedingDay = (dateStr: string) => {
         return allCycles.some((c: any) => {
           const cStart = c.start_date;
@@ -105,7 +116,7 @@ export function useCycleData() {
         });
       };
 
-      // 5. Build base calendar: from fromDate up to toDate (past & today)
+      // 5. Build calendar
       const startDate = new Date(fromDate);
       const endDate = new Date(toDate);
       const calendarDays: any[] = [];
@@ -118,7 +129,7 @@ export function useCycleData() {
           date: dateStr,
           bleeding: isBleedingDay(dateStr),
           symptoms: symptom?.physical_symptoms?.length > 0 || false,
-          ...symptom, // merge all symptom fields for popup
+          ...symptom,
         });
         current.setDate(current.getDate() + 1);
       }
@@ -128,13 +139,10 @@ export function useCycleData() {
       const avgCycle = statsData.prediction?.averageCycleLength || 28;
 
       if (nextPeriodStart) {
-        // Decide how far into the future to extend: at least the next period start,
-        // but also include one full predicted cycle after that (so we see the next menstrual/follicular/ovulation/luteal phases)
         const nextPeriodDate = new Date(nextPeriodStart);
         const futureLimit = new Date(nextPeriodDate);
-        futureLimit.setDate(futureLimit.getDate() + avgCycle); // next-next period start
+        futureLimit.setDate(futureLimit.getDate() + avgCycle);
 
-        // Continue from the day after the last existing date (or today if none)
         const lastExistingDate = calendarDays.length > 0
           ? calendarDays[calendarDays.length - 1].date
           : todayStr;
@@ -143,7 +151,6 @@ export function useCycleData() {
 
         while (cursor < futureLimit) {
           const dateStr = cursor.toISOString().split('T')[0];
-          // Avoid duplicates (safety)
           if (!calendarDays.find(d => d.date === dateStr)) {
             calendarDays.push({
               date: dateStr,
@@ -155,7 +162,6 @@ export function useCycleData() {
         }
       }
 
-      // Sort calendar by date (should already be in order, but just in case)
       calendarDays.sort((a, b) => a.date.localeCompare(b.date));
       setCalendar(calendarDays);
     } catch (err) {
@@ -166,8 +172,9 @@ export function useCycleData() {
   }, [viewingPartner]);
 
   useEffect(() => {
+    setPrediction(null);                 // clear old data immediately
     fetchData(range, customStart, customEnd);
-  }, [range, viewingPartner, fetchData, customStart, customEnd]);
+  }, [range, viewingPartner, customStart, customEnd]);
 
   const togglePartnerView = () => setViewingPartner(prev => !prev);
 

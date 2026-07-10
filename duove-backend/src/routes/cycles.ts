@@ -108,7 +108,10 @@ router.post(
   '/log',
   cycleLogLimiter,
   body('start_date').isISO8601().withMessage('Valid start_date required'),
-  body('end_date').optional().isISO8601().withMessage('end_date must be a valid date'),
+  body('end_date')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('end_date must be a valid date'),
   async (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -153,7 +156,7 @@ router.post(
   cycleLogLimiter,
   body('log_date').isISO8601().withMessage('Valid log_date required'),
   body('bleeding_intensity')
-    .optional()
+    .optional({ values: 'falsy' })   // skip validation if null, undefined, empty string, etc.
     .isIn(['spotting', 'light', 'medium', 'heavy'])
     .withMessage('Invalid bleeding intensity'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -289,11 +292,18 @@ router.get('/partner/symptoms', async (req: Request, res: Response, next: NextFu
 
     const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
     const supabaseAdmin = createServiceClient();
-    const { data: symptoms, error } = await supabaseAdmin
+
+    let query = supabaseAdmin
       .from('daily_symptom_logs')
       .select('*')
       .eq('user_id', partnerId)
       .order('log_date', { ascending: false });
+
+    // Apply date range filters if provided
+    if (req.query.from) query = query.gte('log_date', req.query.from as string);
+    if (req.query.to) query = query.lte('log_date', req.query.to as string);
+
+    const { data: symptoms, error } = await query;
 
     if (error) {
       logger.error('Error fetching partner symptoms', { error });
@@ -301,6 +311,29 @@ router.get('/partner/symptoms', async (req: Request, res: Response, next: NextFu
     }
 
     res.json(symptoms);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/partner/history', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id, user_id, partner_id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) return res.status(404).json({ error: 'No active relationship found' });
+
+    const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
+    const supabaseAdmin = createServiceClient();
+    const cycles = await getCycleLogs(supabaseAdmin, partnerId);
+    res.json(cycles);
   } catch (err) {
     next(err);
   }

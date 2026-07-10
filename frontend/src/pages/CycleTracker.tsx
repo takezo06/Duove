@@ -61,16 +61,21 @@ export function CycleTracker() {
 
   // Fetch symptom for a date – local then API
   const fetchSymptomForDate = async (date: string): Promise<any> => {
-    let symptom = symptomLogs.find((s) => s.log_date === date);
-    if (symptom) return symptom;
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!token) return null;
+
+    const endpoint = viewingPartner
+      ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/symptoms`
+      : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`;
+
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      if (!token) return null;
-      const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms?from=${date}&to=${date}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      return res.data[0] || null;
+      const res = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { from: date, to: date },
+      });
+      const logs = res.data || [];
+      // Return the first log that matches the date (should be only one)
+      return logs.find((log: any) => log.log_date === date) || null;
     } catch (err) {
       console.error('Failed to fetch symptom for popup', err);
       return null;
