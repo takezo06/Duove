@@ -1,11 +1,9 @@
-// duove-backend/src/index.ts
 import { config } from './config/env';
 import { logger } from './config/logger';
 import { createApp } from './app';
 
 (async () => {
   try {
-    await initRoutes();
     const app = createApp();
     const PORT = config.port;
 
@@ -14,8 +12,7 @@ import { createApp } from './app';
       logger.info(`📅 Health check available at http://localhost:${PORT}/health`);
     });
 
-    // startScheduler is disabled until we confirm stability
-    // import('./services/scheduler').then(({ startScheduler }) => startScheduler());
+    // startScheduler();   // disabled for now
 
     const shutdown = () => {
       logger.info('Shutting down gracefully...');
