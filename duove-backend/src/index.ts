@@ -1,6 +1,8 @@
 import { config } from './config/env';
 import { logger } from './config/logger';
 import { createApp } from './app';
+import WebSocket from 'ws';
+(globalThis as any).WebSocket = WebSocket;
 
 (async () => {
   try {
