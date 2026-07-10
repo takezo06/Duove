@@ -80,39 +80,38 @@ A clean workspace displaying all core platform items at a glance:
 * A registered Spotify Developer Application Client
 
 ### 1. Clone the Repository
-```bash
+```
 git clone https://github.com/your-username/duove.git
 cd duove
-```bash
 ```
+
 
 ### 2. Run the Environment Setup Script
 Execute the interactive setup utility script to auto-generate localized, secure environment configs:
-```bash
+```
 chmod +x setup-env.sh
 ./setup-env.sh
-```bash
 ```
+
 
 > ⚠️ Manual Override: If you choose to configure parameters manually, create duove-backend/.env and frontend/.env.local using the definitions outlined in the configuration section below.
 
 ### 3. Initialize & Launch Backend Core
-```bash
+```
 cd duove-backend
 npm install
 npm run dev
-```bash
 ```
 
 *The API gateway engine compiles automatically and listens live on port 5000.*
 
 ### 4. Initialize & Launch Frontend Workspace
-```bash
+```
 cd ../frontend
 npm install
 npm run dev
-```bash
 ```
+
 
 *The local development server launches instantly on port 5173.*
 
@@ -128,7 +127,7 @@ npm run dev
 The interactive setup configuration script handles creating these files safely. Ensure your live keys match these explicit definitions:
 
 ### Backend Configuration (duove-backend/.env)
-```
+
 ```
 PORT=5000
 NODE_ENV=development
@@ -139,17 +138,16 @@ SUPABASE_ANON_KEY=your-supabase-anon-public-key
 SPOTIFY_CLIENT_ID=your-spotify-developer-client-id
 SPOTIFY_CLIENT_SECRET=your-spotify-developer-client-secret
 FRONTEND_URL=http://localhost:5173
+```
 
-```
-```
 ### Frontend Configuration (frontend/.env.local)
-```
+
 ```
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-public-key
 VITE_BACKEND_URL=http://localhost:5000
 ```
-```
+
 
 > 🛑 Security Guardrail: Never expose SUPABASE_SERVICE_ROLE_KEY or SPOTIFY_CLIENT_SECRET into frontend builds. These represent high-privileged administrative actions restricted exclusively to server-side code.
 
