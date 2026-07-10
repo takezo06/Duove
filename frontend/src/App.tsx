@@ -15,6 +15,7 @@ import { CycleAnalytics } from './pages/CycleAnalytics';
 import { CycleLog } from './pages/CycleLog';
 import { LoveLetters} from './pages/LoveLetters'
 import { AllLoveLetters } from './pages/AllLoveLetters';
+import { NotFound } from './pages/NotFound';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
           <Route path="/cycle/log" element={<CycleLog />} />
           <Route path="/letters" element={<LoveLetters />} />
           <Route path="/letters/all" element={<AllLoveLetters />} />
+          <Route path="*" element={<NotFound />} />
           {/* add other protected routes here */}
         </Route>
       </Routes>
