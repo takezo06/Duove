@@ -13,8 +13,10 @@ import { phaseColors } from '../components/cycle/constants';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { Sparkles } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function CycleTracker() {
+  usePageTitle('Cycle Tracker');
   const {
     loading,
     prediction,

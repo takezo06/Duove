@@ -311,7 +311,11 @@ export function Sidebar() {
         <div className="flex items-center h-16 px-5 border-b border-neutral-800/50 flex-shrink-0 overflow-x-hidden">
           <div className={`flex items-center gap-3 w-full ${!showText ? 'justify-center' : ''}`}>
             <div className="w-9 h-9 rounded-lg bg-rose-400/10 flex items-center justify-center border border-rose-400/20 flex-shrink-0 transition-transform duration-300 ease-in-out hover:scale-105">
-              <Heart className="w-5 h-5 text-rose-400 fill-rose-400/20 transition-transform duration-300" />
+              <img
+                src="/duove-logo.svg"
+                alt="Duove"
+                className="w-full h-full object-contain"
+              />
             </div>
             <span
               className={`text-xl font-semibold text-white whitespace-nowrap transition-all duration-300 ease-in-out ${
