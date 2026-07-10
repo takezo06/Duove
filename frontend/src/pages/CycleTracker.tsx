@@ -7,7 +7,21 @@ import { DateRangeSelector } from '../components/cycle/DateRangeSelector';
 import { StatsCards } from '../components/cycle/StatsCards';
 import { useDailyTip } from '../hooks/useDailyTip';
 import { phaseColors } from '../components/cycle/constants';
-import { Loader2, Activity, Users, BarChart3, Plus, Sparkles, Smile, Flame, Heart, Moon, Droplet } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import axios from 'axios';
+import {
+  Loader2,
+  Activity,
+  Users,
+  BarChart3,
+  Plus,
+  Sparkles,
+  Smile,
+  Flame,
+  Heart,
+  Moon,
+  Droplet,
+} from 'lucide-react';
 
 export function CycleTracker() {
   const {
@@ -33,14 +47,26 @@ export function CycleTracker() {
   const [stickyDate, setStickyDate] = useState<string | null>(null);
   const [popupSymptom, setPopupSymptom] = useState<any | null>(null);
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
-  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; placement: 'top' | 'bottom' } | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{
+    top: number;
+    left: number;
+    placement: 'top' | 'bottom';
+  } | null>(null);
 
   const popupRef = useRef<HTMLDivElement>(null);
   const todayStr = new Date().toISOString().split('T')[0];
-
   const activeDate = stickyDate || hoveredDate;
 
-  // Helper to compute cycle day for a given date (same logic as CalendarGrid)
+  // Refresh if we just logged a new cycle (via localStorage flag)
+  useEffect(() => {
+    const refreshFlag = localStorage.getItem('cycle-refresh');
+    if (refreshFlag) {
+      fetchData(range);
+      localStorage.removeItem('cycle-refresh');
+    }
+  }, []); // runs once on mount
+
+  // Cycle day for popup
   const getCycleDayForPopupDate = (dateStr: string): number | null => {
     if (!prediction?.averageCycleLength) return null;
     const avgCycle = prediction.averageCycleLength;
@@ -48,7 +74,9 @@ export function CycleTracker() {
     if (!referenceStart && prediction.cycleDay) {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
-      const estStart = new Date(now.getTime() - (prediction.cycleDay - 1) * 86400000);
+      const estStart = new Date(
+        now.getTime() - (prediction.cycleDay - 1) * 86400000
+      );
       referenceStart = estStart.toISOString().split('T')[0];
     }
     if (!referenceStart) return null;
@@ -56,37 +84,68 @@ export function CycleTracker() {
     start.setHours(0, 0, 0, 0);
     const date = new Date(dateStr);
     date.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((date.getTime() - start.getTime()) / 86400000);
+    const diffDays = Math.floor(
+      (date.getTime() - start.getTime()) / 86400000
+    );
     let cycleDay = (diffDays % avgCycle) + 1;
     if (cycleDay <= 0) cycleDay += avgCycle;
     return cycleDay;
   };
 
-  // Determine phase key for a cycle day (for text color)
-  const getPhaseKey = (cycleDay: number | null): keyof typeof phaseColors | null => {
+  const getPhaseKey = (
+    cycleDay: number | null
+  ): keyof typeof phaseColors | null => {
     if (!cycleDay || !prediction) return null;
     const avgCycle = prediction.averageCycleLength || 28;
     const bleeds = prediction.averageBleedingDays || 5;
     const ovuDay = avgCycle - 14;
     const fertileStart = ovuDay - 5;
     const fertileEnd = ovuDay;
-
     if (cycleDay <= bleeds) return 'menstrual';
     if (cycleDay >= fertileStart && cycleDay <= fertileEnd) return 'fertile';
     if (cycleDay > fertileEnd && cycleDay < avgCycle) return 'luteal';
     return 'follicular';
   };
 
-  const activeCycleDay = activeDate ? getCycleDayForPopupDate(activeDate) : null;
+  const activeCycleDay = activeDate
+    ? getCycleDayForPopupDate(activeDate)
+    : null;
   const activePhaseKey = getPhaseKey(activeCycleDay);
-  const activePhaseColor = activePhaseKey ? phaseColors[activePhaseKey] : null;
+  const activePhaseColor = activePhaseKey
+    ? phaseColors[activePhaseKey]
+    : null;
 
-  const handleDayHover = (date: string | null, element: HTMLElement | null) => {
+  // Fetch symptom for a date – first from local, then from API
+  const fetchSymptomForDate = async (date: string): Promise<any> => {
+    // 1. Check local logs
+    let symptom = symptomLogs.find((s) => s.log_date === date);
+    if (symptom) return symptom;
+
+    // 2. Fetch from backend
+    try {
+      const token = (await supabase.auth.getSession()).data.session
+        ?.access_token;
+      if (!token) return null;
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms?from=${date}&to=${date}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return res.data[0] || null;
+    } catch (err) {
+      console.error('Failed to fetch symptom for popup', err);
+      return null;
+    }
+  };
+
+  const handleDayHover = async (
+    date: string | null,
+    element: HTMLElement | null
+  ) => {
     if (stickyDate) return;
     if (date && element) {
       setHoveredDate(date);
       setTargetElement(element);
-      const symptom = symptomLogs.find((s) => s.log_date === date);
+      const symptom = await fetchSymptomForDate(date);
       setPopupSymptom(symptom || null);
     } else {
       setHoveredDate(null);
@@ -96,7 +155,7 @@ export function CycleTracker() {
     }
   };
 
-  const handleDayClick = (date: string, element: HTMLElement) => {
+  const handleDayClick = async (date: string, element: HTMLElement) => {
     if (stickyDate === date) {
       setStickyDate(null);
       setHoveredDate(null);
@@ -107,15 +166,19 @@ export function CycleTracker() {
       setStickyDate(date);
       setHoveredDate(null);
       setTargetElement(element);
-      const symptom = symptomLogs.find((s) => s.log_date === date);
+      const symptom = await fetchSymptomForDate(date);
       setPopupSymptom(symptom || null);
     }
   };
 
+  // Outside click closes sticky popup
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
       if (!stickyDate) return;
-      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(event.target as Node)
+      ) {
         setStickyDate(null);
         setHoveredDate(null);
         setTargetElement(null);
@@ -124,28 +187,31 @@ export function CycleTracker() {
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    return () =>
+      document.removeEventListener('mousedown', handleOutsideClick);
   }, [stickyDate]);
 
+  // Position popup near target element
   useEffect(() => {
     if (!targetElement) {
       setPopupPosition(null);
       return;
     }
-
     const updatePosition = () => {
       const rect = targetElement.getBoundingClientRect();
       const popupWidth = 288;
-      const popupHeight = popupRef.current ? popupRef.current.offsetHeight : 150;
+      const popupHeight = popupRef.current
+        ? popupRef.current.offsetHeight
+        : 150;
       const viewportHeight = window.innerHeight;
       const viewportWidth = window.innerWidth;
-
       const spaceAbove = rect.top;
       const spaceBelow = viewportHeight - rect.bottom;
-
-      let placement: 'top' | 'bottom' = spaceAbove >= popupHeight || spaceAbove > spaceBelow ? 'top' : 'bottom';
+      let placement: 'top' | 'bottom' =
+        spaceAbove >= popupHeight || spaceAbove > spaceBelow
+          ? 'top'
+          : 'bottom';
       let top = 0;
-
       if (placement === 'top') {
         top = rect.top - popupHeight;
         if (top < 8 && spaceBelow >= popupHeight) {
@@ -154,23 +220,36 @@ export function CycleTracker() {
         }
       } else {
         top = rect.bottom;
-        if (top + popupHeight > viewportHeight - 8 && spaceAbove >= popupHeight) {
+        if (
+          top + popupHeight > viewportHeight - 8 &&
+          spaceAbove >= popupHeight
+        ) {
           placement = 'top';
           top = rect.top - popupHeight;
         }
       }
-
-      let clampedTop = Math.max(8, Math.min(top, viewportHeight - popupHeight - 8));
-      if (clampedTop + popupHeight > rect.top && clampedTop < rect.bottom) {
-        clampedTop = placement === 'top' ? rect.top - popupHeight : rect.bottom;
+      let clampedTop = Math.max(
+        8,
+        Math.min(top, viewportHeight - popupHeight - 8)
+      );
+      if (
+        clampedTop + popupHeight > rect.top &&
+        clampedTop < rect.bottom
+      ) {
+        clampedTop =
+          placement === 'top' ? rect.top - popupHeight : rect.bottom;
       }
-
       const left = rect.left + rect.width / 2 - popupWidth / 2;
-      const clampedLeft = Math.max(8, Math.min(left, viewportWidth - popupWidth - 8));
-
-      setPopupPosition({ top: clampedTop, left: clampedLeft, placement });
+      const clampedLeft = Math.max(
+        8,
+        Math.min(left, viewportWidth - popupWidth - 8)
+      );
+      setPopupPosition({
+        top: clampedTop,
+        left: clampedLeft,
+        placement,
+      });
     };
-
     updatePosition();
     const frameId = requestAnimationFrame(updatePosition);
     const timerId = setTimeout(updatePosition, 32);
@@ -187,6 +266,14 @@ export function CycleTracker() {
     viewingPartner ? 'partner' : 'self'
   );
 
+  // Refresh when new cycle logged (backup event listener)
+  useEffect(() => {
+    const handler = () => fetchData(range);
+    window.addEventListener('cycle-logged', handler);
+    return () => window.removeEventListener('cycle-logged', handler);
+  }, [range, fetchData]);
+
+  // Apply custom date range
   const applyCustomRange = () => {
     if (customStart && customEnd) {
       fetchData('custom', customStart, customEnd);
@@ -201,12 +288,14 @@ export function CycleTracker() {
     );
   }
 
-  if (!prediction) {
+  if (!prediction || !prediction.nextPeriodStart) {
     return (
       <div className="max-w-4xl mx-auto text-center py-16">
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
           <h2 className="text-2xl font-semibold text-white mb-2">
-            {viewingPartner ? `${partnerName || 'Partner'} has no cycle data yet` : 'No cycle data yet'}
+            {viewingPartner
+              ? `${partnerName || 'Partner'} has no cycle data yet`
+              : 'No cycle data yet'}
           </h2>
           <p className="text-neutral-400">
             {viewingPartner
@@ -214,7 +303,10 @@ export function CycleTracker() {
               : 'Start tracking by logging your first cycle.'}
           </p>
           {!viewingPartner && (
-            <Link to="/cycle/log" className="mt-4 inline-block px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition">
+            <Link
+              to="/cycle/log"
+              className="mt-4 inline-block px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition"
+            >
               Log your first cycle
             </Link>
           )}
@@ -223,9 +315,16 @@ export function CycleTracker() {
     );
   }
 
-  const { phase, cycleDay, nextPeriodStart, ovulationDay, fertileWindowStart, fertileWindowEnd, daysUntilPeriod, averageCycleLength } = prediction;
-  console.log('prediction:', prediction);
-console.log('lastPeriodStart:', lastPeriodStart);
+  const {
+    phase,
+    cycleDay,
+    nextPeriodStart,
+    ovulationDay,
+    fertileWindowStart,
+    fertileWindowEnd,
+    daysUntilPeriod,
+    averageCycleLength,
+  } = prediction;
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -245,33 +344,48 @@ console.log('lastPeriodStart:', lastPeriodStart);
             maxHeight: '340px',
             overflowY: 'visible',
             pointerEvents: stickyDate ? 'auto' : 'none',
-            marginTop: popupPosition.placement === 'bottom' ? '12px' : '-12px',
+            marginTop:
+              popupPosition.placement === 'bottom' ? '12px' : '-12px',
           }}
         >
           <div className="max-h-[308px] overflow-y-auto w-full h-full pr-1">
             <div
               className="absolute left-1/2 -translate-x-1/2 w-0 h-0 pointer-events-none z-30"
               style={{
-                [popupPosition.placement === 'top' ? 'bottom' : 'top']: '-10px',
+                [popupPosition.placement === 'top'
+                  ? 'bottom'
+                  : 'top']: '-10px',
                 borderLeft: '10px solid transparent',
                 borderRight: '10px solid transparent',
-                [popupPosition.placement === 'top' ? 'borderTop' : 'borderBottom']: '10px solid #404040',
+                [popupPosition.placement === 'top'
+                  ? 'borderTop'
+                  : 'borderBottom']: '10px solid #404040',
               }}
             />
             <div
               className="absolute left-1/2 -translate-x-1/2 w-0 h-0 pointer-events-none z-30"
               style={{
-                [popupPosition.placement === 'top' ? 'bottom' : 'top']: '-8.5px',
+                [popupPosition.placement === 'top'
+                  ? 'bottom'
+                  : 'top']: '-8.5px',
                 borderLeft: '10px solid transparent',
                 borderRight: '10px solid transparent',
-                [popupPosition.placement === 'top' ? 'borderTop' : 'borderBottom']: '10px solid #171717',
+                [popupPosition.placement === 'top'
+                  ? 'borderTop'
+                  : 'borderBottom']: '10px solid #171717',
               }}
             />
 
             <div className="flex items-center justify-between mb-2 relative z-10">
-              <span className="text-white font-medium">{formatDate(activeDate)}</span>
+              <span className="text-white font-medium">
+                {formatDate(activeDate)}
+              </span>
               {activeCycleDay && (
-                <span className={`text-xs font-medium ${activePhaseColor?.text || 'text-neutral-400'}`}>
+                <span
+                  className={`text-xs font-medium ${
+                    activePhaseColor?.text || 'text-neutral-400'
+                  }`}
+                >
                   Day {activeCycleDay}
                 </span>
               )}
@@ -279,20 +393,24 @@ console.log('lastPeriodStart:', lastPeriodStart);
 
             {popupSymptom ? (
               <div className="space-y-1 text-sm relative z-10">
-                {/* Bleeding intensity – moved here with Droplet icon */}
-                {popupSymptom.bleeding_intensity != null && popupSymptom.bleeding_intensity !== '' && (
-                  <div className="flex items-center gap-2 text-neutral-300">
-                    <Droplet className="w-3.5 h-3.5 text-red-400" />
-                    <span>Bleeding: {popupSymptom.bleeding_intensity}</span>
-                  </div>
-                )}
-                {popupSymptom.physical_symptoms && popupSymptom.physical_symptoms.length > 0 && (
+                {popupSymptom.bleeding_intensity != null &&
+                  popupSymptom.bleeding_intensity !== '' && (
+                    <div className="flex items-center gap-2 text-neutral-300">
+                      <Droplet className="w-3.5 h-3.5 text-red-400" />
+                      <span>
+                        Bleeding: {popupSymptom.bleeding_intensity}
+                      </span>
+                    </div>
+                  )}
+                {popupSymptom.physical_symptoms?.length > 0 && (
                   <div className="flex items-center gap-2 text-neutral-300">
                     <Activity className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{popupSymptom.physical_symptoms.join(', ')}</span>
+                    <span>
+                      {popupSymptom.physical_symptoms.join(', ')}
+                    </span>
                   </div>
                 )}
-                {popupSymptom.moods && popupSymptom.moods.length > 0 && (
+                {popupSymptom.moods?.length > 0 && (
                   <div className="flex items-center gap-2 text-neutral-300">
                     <Smile className="w-3.5 h-3.5 text-pink-400" />
                     <span>{popupSymptom.moods.join(', ')}</span>
@@ -310,24 +428,32 @@ console.log('lastPeriodStart:', lastPeriodStart);
                     <span>Drive: {popupSymptom.sex_drive}</span>
                   </div>
                 )}
-                {popupSymptom.sexual_activity && popupSymptom.sexual_activity.length > 0 && (
+                {popupSymptom.sexual_activity?.length > 0 && (
                   <div className="flex items-center gap-2 text-neutral-300">
                     <Heart className="w-3.5 h-3.5 text-purple-400 fill-purple-400/20" />
-                    <span>Sex: {popupSymptom.sexual_activity.join(', ')}</span>
+                    <span>
+                      Sex: {popupSymptom.sexual_activity.join(', ')}
+                    </span>
                   </div>
                 )}
                 {popupSymptom.lifestyle?.sleep_hours && (
                   <div className="flex items-center gap-2 text-neutral-300">
                     <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Sleep: {popupSymptom.lifestyle.sleep_hours}h</span>
+                    <span>
+                      Sleep: {popupSymptom.lifestyle.sleep_hours}h
+                    </span>
                   </div>
                 )}
                 {popupSymptom.lifestyle?.stress && (
-                  <div className="text-neutral-300">Stress: {popupSymptom.lifestyle.stress}</div>
+                  <div className="text-neutral-300">
+                    Stress: {popupSymptom.lifestyle.stress}
+                  </div>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-neutral-500 relative z-10">No logs for this day</p>
+              <p className="text-sm text-neutral-500 relative z-10">
+                No logs for this day
+              </p>
             )}
           </div>
         </div>
@@ -338,10 +464,14 @@ console.log('lastPeriodStart:', lastPeriodStart);
         <div>
           <h1 className="text-2xl font-semibold text-white flex items-center gap-2">
             <Activity className="w-6 h-6 text-rose-400" />
-            {viewingPartner ? `${partnerName || 'Partner'}'s Cycle` : 'Cycle Tracker'}
+            {viewingPartner
+              ? `${partnerName || 'Partner'}'s Cycle`
+              : 'Cycle Tracker'}
           </h1>
           <p className="text-sm text-neutral-400">
-            {viewingPartner ? `Viewing ${partnerName || 'partner'}'s cycle insights` : 'Your menstrual cycle insights'}
+            {viewingPartner
+              ? `Viewing ${partnerName || 'partner'}'s cycle insights`
+              : 'Your menstrual cycle insights'}
           </p>
         </div>
         <div className="flex gap-3 flex-wrap">
@@ -358,11 +488,17 @@ console.log('lastPeriodStart:', lastPeriodStart);
           </button>
           {!viewingPartner && (
             <>
-              <Link to="/cycle/analytics" className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm flex items-center gap-2 transition">
+              <Link
+                to="/cycle/analytics"
+                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm flex items-center gap-2 transition"
+              >
                 <BarChart3 className="w-4 h-4" />
                 Analytics
               </Link>
-              <Link to="/cycle/log" className="px-4 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm flex items-center gap-2 transition shadow-lg shadow-rose-500/20">
+              <Link
+                to="/cycle/log"
+                className="px-4 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm flex items-center gap-2 transition shadow-lg shadow-rose-500/20"
+              >
                 <Plus className="w-4 h-4" />
                 Log
               </Link>
@@ -372,7 +508,11 @@ console.log('lastPeriodStart:', lastPeriodStart);
       </div>
 
       {/* Main Circle */}
-      <CycleCircle phase={phase} cycleDay={cycleDay} daysUntilPeriod={daysUntilPeriod} />
+      <CycleCircle
+        phase={phase}
+        cycleDay={cycleDay}
+        daysUntilPeriod={daysUntilPeriod}
+      />
 
       {/* Stats Cards */}
       <StatsCards
@@ -422,9 +562,13 @@ console.log('lastPeriodStart:', lastPeriodStart);
           </p>
         </div>
         {tipLoading ? (
-          <p className="text-xs text-neutral-400 mt-2 animate-pulse">Loading tip...</p>
+          <p className="text-xs text-neutral-400 mt-2 animate-pulse">
+            Loading tip...
+          </p>
         ) : (
-          <p className="text-xs text-neutral-400 mt-2">{dailyTip || 'Listen to your body today.'}</p>
+          <p className="text-xs text-neutral-400 mt-2">
+            {dailyTip || 'Listen to your body today.'}
+          </p>
         )}
       </div>
     </div>

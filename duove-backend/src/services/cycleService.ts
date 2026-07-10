@@ -239,20 +239,28 @@ export async function logCycle(
   endDate?: string,
   isManualOverride: boolean = false
 ) {
+  // Upsert: if a cycle with this user+start already exists, update it; else insert.
   const { data, error } = await supabase
     .from('cycle_logs')
-    .insert({
-      user_id: userId,
-      relationship_id: relationshipId,
-      start_date: startDate,
-      end_date: endDate || null,
-      is_manual_override: isManualOverride,
-    })
+    .upsert(
+      {
+        user_id: userId,
+        relationship_id: relationshipId,
+        start_date: startDate,
+        end_date: endDate || null,
+        is_manual_override: isManualOverride,
+      },
+      {
+        onConflict: 'user_id, start_date',   // assumes a unique constraint on these columns
+        ignoreDuplicates: false,
+      }
+    )
     .select()
     .single();
+
   if (error) {
     logger.error('Error logging cycle', { userId, error });
-    throw new Error('Failed to log cycle');
+    throw new Error(`Failed to log cycle: ${error.message}`);
   }
   return data;
 }

@@ -12,7 +12,7 @@ interface CalendarGridProps {
   range: string;
   symptomLogs: any[];
   lastPeriodStart: string | null;
-  earliestCycleStart: string | null; // NEW
+  earliestCycleStart: string | null;
   prediction: any;
   onDayHover: (date: string | null, element: HTMLElement | null) => void;
   onDayClick: (date: string, element: HTMLElement) => void;
@@ -30,14 +30,16 @@ export function CalendarGrid({
   onDayClick,
   todayStr,
 }: CalendarGridProps) {
-  // Compute cycle day for any date, but only if it's on or after earliestCycleStart
+  // Compute cycle day for any date, but only if we have data and date is on/after the first known cycle
   const getCycleDayForDate = (dateStr: string): number | null => {
-    // No cycle day if before the first ever period
-    if (earliestCycleStart && dateStr < earliestCycleStart) return null;
+    // 1. Determine the earliest date we should show dots from
+    const threshold = earliestCycleStart || lastPeriodStart;
+    if (threshold && dateStr < threshold) return null;
 
+    // 2. If we have no cycle data at all, don't compute anything
     if (!prediction?.averageCycleLength) return null;
 
-    const avgCycle = prediction.averageCycleLength;
+    // 3. Find a reference start date
     let referenceStart = lastPeriodStart;
     if (!referenceStart && prediction.cycleDay) {
       const now = new Date();
@@ -53,8 +55,8 @@ export function CalendarGrid({
     date.setHours(0, 0, 0, 0);
 
     const diffDays = Math.floor((date.getTime() - start.getTime()) / 86400000);
-    let cycleDay = (diffDays % avgCycle) + 1;
-    if (cycleDay <= 0) cycleDay += avgCycle;
+    let cycleDay = (diffDays % prediction.averageCycleLength) + 1;
+    if (cycleDay <= 0) cycleDay += prediction.averageCycleLength;
     return cycleDay;
   };
 
