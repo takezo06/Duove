@@ -10,11 +10,8 @@ export function createServiceClient(): SupabaseClient {
       throw new Error('Supabase URL or service role key missing.');
     }
     adminClient = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      realtime: { transport: WebSocket },
+      auth: { autoRefreshToken: false, persistSession: false },
+      realtime: { transport: WebSocket as any },
     });
   }
   return adminClient;
