@@ -6,10 +6,16 @@ import { LetterDetailModal } from './LetterDetailModal';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
-export function RecentLettersList() {
+interface RecentLettersListProps {
+  onSelectLetter?: (letter: any) => void;   // optional external control
+}
+
+export function RecentLettersList({ onSelectLetter }: RecentLettersListProps) {
   const [letters, setLetters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
+  const [internalSelected, setInternalSelected] = useState<any | null>(null);
+
+  const selectedLetter = onSelectLetter ? undefined : internalSelected;  // when external control is active, we don't use internal state
 
   const fetchRecent = async () => {
     const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -29,6 +35,14 @@ export function RecentLettersList() {
   useEffect(() => {
     fetchRecent();
   }, []);
+
+  const handleLetterClick = (letter: any) => {
+    if (onSelectLetter) {
+      onSelectLetter(letter);              // let parent handle it
+    } else {
+      setInternalSelected(letter);         // use internal modal
+    }
+  };
 
   return (
     <>
@@ -50,17 +64,18 @@ export function RecentLettersList() {
               <LetterCard
                 key={letter.id}
                 letter={letter}
-                onClick={() => setSelectedLetter(letter)}
+                onClick={() => handleLetterClick(letter)}
               />
             ))}
           </div>
         )}
       </div>
 
-      {selectedLetter && (
+      {/* Only show internal modal when no external control is provided */}
+      {!onSelectLetter && internalSelected && (
         <LetterDetailModal
-          letter={selectedLetter}
-          onClose={() => setSelectedLetter(null)}
+          letter={internalSelected}
+          onClose={() => setInternalSelected(null)}
         />
       )}
     </>
