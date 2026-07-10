@@ -20,7 +20,7 @@ export const createApp = (): Express => {
   // Security
   app.use(helmet());
   app.use(cors({
-    origin: config.nodeEnv === 'production' ? process.env.FRONTEND_URL! : 'https://duove.vercel.app',
+    origin: config.nodeEnv === 'production' ? (process.env.FRONTEND_URL || '*') : '*',
     credentials: true,
   }));
 
