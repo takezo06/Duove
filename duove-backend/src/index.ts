@@ -7,13 +7,14 @@ import { startScheduler } from './services/scheduler';
   try {
     const app = createApp();
     const PORT = config.port;
+    console.log('✅ About to start the server on port', PORT);
 
     const server = app.listen(PORT, () => {
       logger.info(`🚀 Duove backend running on port ${PORT} in ${config.nodeEnv} mode`);
       logger.info(`📅 Health check available at http://localhost:${PORT}/health`);
     });
 
-    startScheduler();
+   // startScheduler();
 
     const shutdown = () => {
       logger.info('Shutting down gracefully...');
