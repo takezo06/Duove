@@ -46,8 +46,12 @@ export function Signup() {
       <div className="w-full max-w-md">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-rose-400/10 border border-rose-400/20 mb-4">
-            <Heart className="w-6 h-6 text-rose-400 fill-rose-400/20" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-rose-400/10 border border-rose-400/20 mb-4">
+              <img
+                src="/duove-logo.svg"
+                alt="Duove"
+                className="w-full h-full object-contain"
+              />
           </div>
           <h1 className="text-2xl font-semibold text-white">Create your account</h1>
           <p className="text-neutral-400 text-sm mt-1">Start your journey together</p>
