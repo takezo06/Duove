@@ -4,16 +4,14 @@ import WebSocket from 'ws';
 
 // User-scoped client (for RLS)
 export function createUserClient(accessToken: string): SupabaseClient {
-  if (!accessToken) {
-    throw new Error('Access token is required.');
-  }
+  if (!accessToken) throw new Error('Access token is required.');
   if (!config.supabaseUrl || !config.supabaseAnonKey) {
     throw new Error('Supabase URL or anon key is missing.');
   }
   return createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
-    realtime: { transport: WebSocket },
+    realtime: { transport: WebSocket as any },
   });
 }
 
@@ -23,6 +21,6 @@ export const supabaseAdmin = createClient(
   config.supabaseServiceRoleKey,
   {
     auth: { autoRefreshToken: false, persistSession: false },
-    realtime: { transport: WebSocket },
+    realtime: { transport: WebSocket as any },
   }
 );
