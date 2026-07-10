@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { config } from './env';
+import WebSocket from 'ws';
 
 let adminClient: SupabaseClient | null = null;
 
@@ -13,6 +14,7 @@ export function createServiceClient(): SupabaseClient {
         autoRefreshToken: false,
         persistSession: false,
       },
+      realtime: { transport: WebSocket },
     });
   }
   return adminClient;

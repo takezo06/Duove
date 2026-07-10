@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { config } from './env';
+import WebSocket from 'ws';
 
 // User-scoped client (for RLS)
 export function createUserClient(accessToken: string): SupabaseClient {
@@ -12,6 +13,7 @@ export function createUserClient(accessToken: string): SupabaseClient {
   return createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    realtime: { transport: WebSocket },
   });
 }
 
@@ -21,5 +23,6 @@ export const supabaseAdmin = createClient(
   config.supabaseServiceRoleKey,
   {
     auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { transport: WebSocket },
   }
 );
