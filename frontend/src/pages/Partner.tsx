@@ -13,14 +13,15 @@ import {
   Edit2,
   X,
   Save,
+  Copy,
+  Check,
+  UserPlus,
+  Link as LinkIcon,
 } from 'lucide-react';
 
+// ---------- Types ----------
 interface Stats {
-  user: {
-    id: string;
-    account_created: string;
-    account_age: string;
-  };
+  user: { id: string; account_created: string; account_age: string };
   relationship: {
     id: string;
     paired_at: string | null;
@@ -35,17 +36,11 @@ interface Stats {
     days_until_monthsary: number | null;
     status: string;
   };
-  partner: {
-    id: string;
-    display_name: string;
-  };
-  stats: {
-    cravings: number;
-    letters_sent: number;
-    letters_received: number;
-  };
+  partner: { id: string; display_name: string };
+  stats: { cravings: number; letters_sent: number; letters_received: number };
 }
 
+// ---------- Small skeletons ----------
 function SkeletonCard() {
   return (
     <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden">
@@ -62,6 +57,7 @@ function SkeletonCard() {
   );
 }
 
+// ---------- Component ----------
 export function Partner() {
   usePageTitle('Partner');
   const [loading, setLoading] = useState(true);
@@ -72,62 +68,123 @@ export function Partner() {
   const [updatingAnniversary, setUpdatingAnniversary] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          navigate('/login');
-          return;
-        }
+  // ---- Invite / Join state ----
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/relationships/stats`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+  const fetchStats = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { navigate('/login'); return; }
 
-        if (res.data) {
-          setStats(res.data);
-          if (res.data.relationship.anniversary_date) {
-            setNewAnniversaryDate(res.data.relationship.anniversary_date);
-          }
-        } else {
-          setError('No data found.');
-        }
-      } catch (err: any) {
-        console.error('Error fetching stats:', err);
-        if (err.response?.status === 404) {
-          setError('No active relationship found.');
-        } else {
-          setError('Failed to load stats.');
-        }
-      } finally {
-        setLoading(false);
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/stats`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setStats(res.data);
+      if (res.data.relationship.anniversary_date) {
+        setNewAnniversaryDate(res.data.relationship.anniversary_date);
       }
-    };
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        // No relationship yet → show pairing UI
+        setStats(null);
+        setError(null);
+      } else {
+        setError('Failed to load relationship data.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Try to fetch pending invite code
+  const fetchPendingInvite = async () => {
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) return;
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/pending`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data?.invite_code) {
+        setInviteCode(res.data.invite_code);
+      }
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
     fetchStats();
-  }, [navigate]);
+    fetchPendingInvite();
+  }, []);
+
+  // ---- Actions ----
+  const generateInvite = async () => {
+    setGeneratingInvite(true);
+    setJoinError(null);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/invite`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setInviteCode(res.data.invite_code);
+    } catch (err: any) {
+      setJoinError(err.response?.data?.error || 'Failed to generate invite code.');
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
+  const joinRelationship = async () => {
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/join`,
+        { invite_code: joinCode.trim().toUpperCase() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Success → refetch stats (should now show active relationship)
+      await fetchStats();
+      setJoinCode('');
+    } catch (err: any) {
+      setJoinError(err.response?.data?.error || 'Failed to join. Check the code and try again.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const copyInviteCode = () => {
+    if (inviteCode) {
+      navigator.clipboard.writeText(inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const updateAnniversary = async () => {
     if (!newAnniversaryDate) return;
     setUpdatingAnniversary(true);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await axios.patch(
+      await axios.patch(
         `${import.meta.env.VITE_BACKEND_URL}/api/relationships/anniversary`,
         { anniversary_date: newAnniversaryDate },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setStats(prev => prev ? {
-        ...prev,
-        relationship: {
-          ...prev.relationship,
-          anniversary_date: newAnniversaryDate,
-          next_anniversary: res.data.anniversary_date,
-        }
-      } : null);
+      // Refresh stats
+      await fetchStats();
       setEditingAnniversary(false);
     } catch (err) {
       console.error('Error updating anniversary:', err);
@@ -139,17 +196,16 @@ export function Partner() {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Not set';
     return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+      year: 'numeric', month: 'long', day: 'numeric',
     });
   };
+
+  // ==================== RENDER ====================
 
   // Loading skeleton
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto animate-pulse">
-        {/* Header skeleton */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-neutral-800" />
@@ -163,53 +219,20 @@ export function Partner() {
           </div>
           <div className="h-8 w-28 bg-neutral-800 rounded" />
         </div>
-
         <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center">
-            <div className="h-8 w-12 mx-auto bg-neutral-800 rounded" />
-            <div className="h-4 w-16 mx-auto mt-1 bg-neutral-800 rounded" />
-          </div>
-          <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center">
-            <div className="h-8 w-12 mx-auto bg-neutral-800 rounded" />
-            <div className="h-4 w-16 mx-auto mt-1 bg-neutral-800 rounded" />
-          </div>
-          <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center">
-            <div className="h-8 w-12 mx-auto bg-neutral-800 rounded" />
-            <div className="h-4 w-16 mx-auto mt-1 bg-neutral-800 rounded" />
-          </div>
-        </div>
-
-        <div className="bg-neutral-900/50 rounded-2xl border border-neutral-800/50 p-4 flex flex-wrap items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-neutral-800 rounded" />
-            <div className="h-4 w-32 bg-neutral-800 rounded" />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-neutral-800 rounded" />
-            <div className="h-4 w-32 bg-neutral-800 rounded" />
-          </div>
+          <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
         </div>
       </div>
     );
   }
 
-  // Error state
-  if (error || !stats) {
+  // Generic error (not relationship missing)
+  if (error) {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
-          <p className="text-neutral-400">{error || 'No data'}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition"
-          >
+          <p className="text-neutral-400">{error}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition">
             Retry
           </button>
         </div>
@@ -217,6 +240,101 @@ export function Partner() {
     );
   }
 
+  // ==================== PAIRING FLOW (no active relationship) ====================
+  if (!stats) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-8">
+        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8 md:p-12 shadow-xl">
+          <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-400/20">
+            <UserPlus className="w-8 h-8 text-rose-400" />
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-2">You're not paired yet</h2>
+          <p className="text-neutral-400 max-w-md mx-auto mb-8">
+            Generate an invite code and share it with your partner, or enter a code you received to connect.
+          </p>
+
+          {/* Invite Section */}
+          <div className="border border-neutral-800 rounded-2xl p-5 mb-6 bg-neutral-800/20">
+            <h3 className="text-white font-medium mb-3 flex items-center justify-center gap-2">
+              <LinkIcon className="w-4 h-4 text-rose-400" />
+              Create Invite Code
+            </h3>
+            {inviteCode ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-2xl font-mono font-bold text-rose-400 tracking-widest">
+                    {inviteCode}
+                  </span>
+                  <button
+                    onClick={copyInviteCode}
+                    className="p-1.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-neutral-300 hover:text-white transition"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-neutral-500">
+                  Share this code with your partner. Once they join, you'll appear here.
+                </p>
+                <button
+                  onClick={generateInvite}
+                  disabled={generatingInvite}
+                  className="text-sm text-rose-400 hover:underline disabled:opacity-50"
+                >
+                  Generate new code
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={generateInvite}
+                disabled={generatingInvite}
+                className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
+              >
+                {generatingInvite ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
+                Generate Invite Code
+              </button>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex-1 h-px bg-neutral-800" />
+            <span className="text-neutral-600 text-xs font-medium">OR</span>
+            <div className="flex-1 h-px bg-neutral-800" />
+          </div>
+
+          {/* Join Section */}
+          <div className="border border-neutral-800 rounded-2xl p-5 bg-neutral-800/20">
+            <h3 className="text-white font-medium mb-3 flex items-center justify-center gap-2">
+              <UserPlus className="w-4 h-4 text-rose-400" />
+              Join with a Code
+            </h3>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="Enter 8‑character code"
+                maxLength={8}
+                className="flex-1 bg-neutral-800/50 text-sm text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 uppercase"
+              />
+              <button
+                onClick={joinRelationship}
+                disabled={joining || joinCode.trim().length !== 8}
+                className="px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition disabled:opacity-50"
+              >
+                {joining ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Join'}
+              </button>
+            </div>
+            {joinError && (
+              <p className="text-rose-400 text-sm mt-2">{joinError}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== ACTIVE RELATIONSHIP (stats exist) ====================
   const partnerName = stats.partner.display_name || 'Partner';
 
   return (
@@ -247,7 +365,7 @@ export function Partner() {
         </button>
       </div>
 
-      {/* Stats Grid – 4 identical cards with consistent styling */}
+      {/* Stats Grid */}
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         {/* Card 1: Together */}
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden hover:border-rose-400/30 transition">
@@ -256,16 +374,10 @@ export function Partner() {
             <Heart className="w-4 h-4 text-rose-400" />
             Together
           </div>
-          <p className="text-xl font-semibold text-white leading-tight">
-            {stats.relationship.together_duration}
-          </p>
-          <p className="text-sm text-rose-400/80 font-medium mt-1">
-            Since {formatDate(stats.relationship.paired_at)}
-          </p>
+          <p className="text-xl font-semibold text-white leading-tight">{stats.relationship.together_duration}</p>
+          <p className="text-sm text-rose-400/80 font-medium mt-1">Since {formatDate(stats.relationship.paired_at)}</p>
           {stats.relationship.together_conversion && (
-            <p className="text-sm text-rose-400/60 font-mono mt-1">
-              {stats.relationship.together_conversion}
-            </p>
+            <p className="text-sm text-rose-400/60 font-mono mt-1">{stats.relationship.together_conversion}</p>
           )}
         </div>
 
@@ -276,18 +388,12 @@ export function Partner() {
             <CalendarDays className="w-4 h-4 text-rose-400" />
             Since Anniversary
           </div>
-          <p className="text-xl font-semibold text-white leading-tight">
-            {stats.relationship.anniversary_duration}
-          </p>
+          <p className="text-xl font-semibold text-white leading-tight">{stats.relationship.anniversary_duration}</p>
           <p className="text-sm text-rose-400/80 font-medium mt-1">
-            {stats.relationship.anniversary_date
-              ? `Anniversary: ${formatDate(stats.relationship.anniversary_date)}`
-              : 'No anniversary date set'}
+            {stats.relationship.anniversary_date ? `Anniversary: ${formatDate(stats.relationship.anniversary_date)}` : 'No anniversary date set'}
           </p>
           {stats.relationship.anniversary_conversion && (
-            <p className="text-sm text-rose-400/60 font-mono mt-1">
-              {stats.relationship.anniversary_conversion}
-            </p>
+            <p className="text-sm text-rose-400/60 font-mono mt-1">{stats.relationship.anniversary_conversion}</p>
           )}
         </div>
 
@@ -299,15 +405,11 @@ export function Partner() {
             Next Anniversary
           </div>
           <p className="text-xl font-semibold text-white leading-tight">
-            {stats.relationship.next_anniversary
-              ? formatDate(stats.relationship.next_anniversary)
-              : 'Not set'}
+            {stats.relationship.next_anniversary ? formatDate(stats.relationship.next_anniversary) : 'Not set'}
           </p>
           {stats.relationship.days_until_anniversary !== null && (
             <p className="text-sm text-rose-400/80 font-medium mt-1">
-              {stats.relationship.days_until_anniversary === 0
-                ? '🎉 Today!'
-                : `${stats.relationship.days_until_anniversary} day${stats.relationship.days_until_anniversary > 1 ? 's' : ''} to go`}
+              {stats.relationship.days_until_anniversary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_anniversary} day${stats.relationship.days_until_anniversary > 1 ? 's' : ''} to go`}
             </p>
           )}
         </div>
@@ -320,15 +422,11 @@ export function Partner() {
             Next Monthsary
           </div>
           <p className="text-xl font-semibold text-white leading-tight">
-            {stats.relationship.next_monthsary
-              ? formatDate(stats.relationship.next_monthsary)
-              : 'Not available'}
+            {stats.relationship.next_monthsary ? formatDate(stats.relationship.next_monthsary) : 'Not available'}
           </p>
           {stats.relationship.days_until_monthsary !== null && (
             <p className="text-sm text-rose-400/80 font-medium mt-1">
-              {stats.relationship.days_until_monthsary === 0
-                ? '🎉 Today!'
-                : `${stats.relationship.days_until_monthsary} day${stats.relationship.days_until_monthsary > 1 ? 's' : ''} to go`}
+              {stats.relationship.days_until_monthsary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_monthsary} day${stats.relationship.days_until_monthsary > 1 ? 's' : ''} to go`}
             </p>
           )}
         </div>
@@ -355,10 +453,7 @@ export function Partner() {
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 mb-6 animate-fadeIn">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-medium">Set Your Anniversary Date</h3>
-            <button
-              onClick={() => setEditingAnniversary(false)}
-              className="text-neutral-400 hover:text-white transition"
-            >
+            <button onClick={() => setEditingAnniversary(false)} className="text-neutral-400 hover:text-white transition">
               <X className="w-4 h-4" />
             </button>
           </div>
