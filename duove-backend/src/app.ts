@@ -9,6 +9,7 @@ import healthRouter from './routes/health';
 // import cravingsRouter from './routes/cravings';
 // import lettersRouter from './routes/letters';
 // import cyclesRouter from './routes/cycles';
+import cyclesRouter from './routes/cycles';
 // import relationshipsRouter from './routes/relationships';
 // import notificationsRouter from './routes/notifications';
 // import profileRouter from './routes/profile';
@@ -32,10 +33,7 @@ export const createApp = (): Express => {
   // Only health route for now
   app.use('/health', healthRouter);
 
-  // All other routes disabled for testing
-  // app.use('/api/cravings', cravingsRouter);
-  // app.use('/api/love-letters', lettersRouter);
-  // ...
+  app.use('/api/cycles', cyclesRouter);
 
   // Error handler remains
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
