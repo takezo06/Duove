@@ -155,7 +155,6 @@ VITE_BACKEND_URL=http://localhost:5000
 
 ## 📁 Project Structure
 ```
-```
 duove/
 ├── duove-backend/
 │   ├── src/
@@ -181,7 +180,6 @@ duove/
 │   │   └── App.tsx           # Primary routing initialization matrix
 
 ---
-```
 ```
 
 ## 📦 Deployment
