@@ -1,19 +1,44 @@
-import express from 'express';
-import cors from 'cors';
+import { config } from './config/env';
 import { logger } from './config/logger';
+import { createApp } from './app';
+// import { startScheduler } from './services/scheduler';   // ← temporarily disabled
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+(async () => {
+  try {
+    const app = createApp();
+    const PORT = config.port;
 
-// Simple health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', env: process.env.NODE_ENV });
-});
+    const server = app.listen(PORT, () => {
+      logger.info(`🚀 Duove backend running on port ${PORT} in ${config.nodeEnv} mode`);
+      logger.info(`📅 Health check available at http://localhost:${PORT}/health`);
+    });
 
-const PORT = parseInt(process.env.PORT || '5000', 10);
+    // startScheduler();   // ← disabled until we confirm stability
 
-app.listen(PORT, () => {
-  logger.info(`✅ Minimal server running on port ${PORT}`);
-  console.log('✅ Minimal server started');
-});
+    const shutdown = () => {
+      logger.info('Shutting down gracefully...');
+      server.close(() => {
+        logger.info('Server closed.');
+        process.exit(0);
+      });
+      setTimeout(() => {
+        logger.error('Forced shutdown after timeout');
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught exception', { error: error.message, stack: error.stack });
+    });
+
+    process.on('unhandledRejection', (reason) => {
+      logger.error('Unhandled rejection', { reason });
+    });
+  } catch (err) {
+    console.error('Fatal error during startup:', err);
+    process.exit(1);
+  }
+})();
