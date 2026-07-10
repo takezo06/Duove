@@ -113,7 +113,10 @@ export function AllLoveLetters() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 [perspective:1200px]">
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2"
+            style={{ perspective: '1200px' }}
+          >
           {letters.map((letter, index) => {
             const rotations = [-16, 14, -8, 22, -12, 6, -18, 10];
             const xOffsets = [-50, 60, -30, 40, -70, 55, -25, 35];
