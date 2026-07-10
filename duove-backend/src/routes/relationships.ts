@@ -3,6 +3,19 @@ import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../config/supabase';
 import { createServiceClient } from '../config/supabaseAdmin';
 import { logger } from '../config/logger';
+import rateLimit from 'express-rate-limit';
+
+const inviteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,                  // max 10 invite attempts per window
+  message: { error: 'Too many invite attempts, please try again later.' },
+});
+
+const joinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,                  // slightly higher for join attempts (guessing codes)
+  message: { error: 'Too many join attempts, please try again later.' },
+});
 
 const router = Router();
 router.use(authMiddleware);
@@ -157,7 +170,7 @@ router.get('/pending', async (req: Request, res: Response, next: NextFunction) =
 });
 
 // ----- POST /invite -----
-router.post('/invite', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/invite', inviteLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const supabase = createUserClient(req.token!);
     const userId = req.user!.id;
@@ -245,7 +258,7 @@ router.post('/invite', async (req: Request, res: Response, next: NextFunction) =
 });
 
 // ----- POST /join -----
-router.post('/join', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/join', joinLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { invite_code } = req.body;
     if (!invite_code) return res.status(400).json({ error: 'invite_code required' });

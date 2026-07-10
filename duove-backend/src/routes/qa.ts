@@ -48,7 +48,7 @@ async function getOrCreateTodayAssignment(
 
   const usedIds = usedQuestions?.map((q: any) => q.question_id) || [];
   if (usedIds.length > 0) {
-    query = query.not('id', 'in', `(${usedIds.join(',')})`);
+    query = query.not('id', 'in', usedIds);
   }
 
   const { data: available, error: availError } = await query.limit(1);

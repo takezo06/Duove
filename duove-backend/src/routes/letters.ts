@@ -3,9 +3,20 @@ import axios from 'axios';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../config/supabase';
 import { createServiceClient } from '../config/supabaseAdmin';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
 router.use(authMiddleware);
+// Increase body limit only for this router (love letters may include long URLs)
+router.use(express.json({ limit: '10mb' }));
+
+// Rate limiter for sending letters – one letter per minute is plenty
+const letterLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 1,              // max 1 letter per minute
+  message: { error: 'You can send one love letter per minute.' },
+});
 
 // ---- Spotify song search ----
 router.get('/search-song', async (req: Request, res: Response, next: NextFunction) => {
@@ -46,8 +57,8 @@ router.get('/search-song', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// ---- POST / – send a love letter ----
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+// ---- POST / – send a love letter (with rate limit) ----
+router.post('/', letterLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const supabase = createUserClient(req.token!);
     const userId = req.user!.id;
@@ -135,7 +146,6 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       }
     } catch (notifErr) {
       console.error('Failed to create notification:', notifErr);
-      // Do NOT fail the whole request – the letter is already saved
     }
 
     res.status(201).json(data);
@@ -159,7 +169,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (!rel) return res.json([]);
 
-    // If an ID is provided, return just that letter (if it belongs to the relationship)
     const letterId = req.query.id as string | undefined;
     if (letterId) {
       const { data, error } = await supabase
@@ -170,7 +179,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         .single();
 
       if (error) return res.json([]);
-      // Enrich with sender/recipient names
+
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, display_name')
@@ -181,10 +190,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         sender_name: data.sender_name || profiles?.find(p => p.id === data.sender_id)?.display_name || 'Unknown',
         recipient_name: data.recipient_name || profiles?.find(p => p.id === (data.sender_id === rel.user_id ? rel.partner_id : rel.user_id))?.display_name || 'Unknown',
       };
-      return res.json([enriched]); // return as array for consistency
+      return res.json([enriched]);
     }
 
-    // Otherwise, fetch limited list
     const limit = parseInt(req.query.limit as string) || 20;
     const { data, error } = await supabase
       .from('love_letters')
