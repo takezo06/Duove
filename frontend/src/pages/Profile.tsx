@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   Loader2,
   User,
@@ -20,6 +21,7 @@ interface Profile {
 }
 
 export function Profile() {
+  usePageTitle('Profile');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);

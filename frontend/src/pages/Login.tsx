@@ -2,8 +2,10 @@ import { useState, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Heart, Mail, Lock, Loader2 } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function Login() {
+  usePageTitle('Login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

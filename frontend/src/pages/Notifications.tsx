@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   Loader2,
   Heart,
@@ -101,6 +102,7 @@ const notificationBg = (type: string) => {
 };
 
 export function Notifications() {
+  usePageTitle('Notifications');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);

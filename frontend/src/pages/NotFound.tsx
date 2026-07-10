@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import { FileQuestion, ArrowLeft } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
+
 
 export function NotFound() {
+  usePageTitle('Page Not Found');
   return (
     <div className="max-w-4xl mx-auto px-4 py-20 text-center">
       <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-12 shadow-xl">

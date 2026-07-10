@@ -7,8 +7,10 @@ import { Link } from 'react-router-dom';
 import { EnvelopeCard } from '../components/love-letters/EnvelopeCard';
 import { LetterDetailModal } from '../components/love-letters/LetterDetailModal';
 import { AllLettersSkeleton } from '../components/love-letters/SkeletonCard';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function AllLoveLetters() {
+  usePageTitle('All Letters');
   const [letters, setLetters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [animateScatter, setAnimateScatter] = useState(false);

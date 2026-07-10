@@ -6,8 +6,10 @@ import { Heart, Plus } from 'lucide-react';
 import { RecentLettersList } from '../components/love-letters/RecentLettersList';
 import { SendLetterModal } from '../components/love-letters/SendLetterModal';
 import { LetterDetailModal } from '../components/love-letters/LetterDetailModal';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function LoveLetters() {
+  usePageTitle('Love Letters');
   const [showModal, setShowModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedLetter, setSelectedLetter] = useState<any | null>(null);

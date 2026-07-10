@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { usePageTitle } from '../hooks/usePageTitle';
 import axios from 'axios';
 import {
   CheckCircle,
@@ -49,6 +50,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export function Cravings() {
+  usePageTitle('Cravings');
   const navigate = useNavigate();
   const location = useLocation();
   const highlightId = location.state?.highlightId;

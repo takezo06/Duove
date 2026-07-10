@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   Loader2,
   Calendar,
@@ -38,6 +39,7 @@ const categoryConfig: Record<string, { icon: any; color: string; bg: string; lab
 };
 
 export function CycleLog() {
+  usePageTitle('Log Symptoms');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);

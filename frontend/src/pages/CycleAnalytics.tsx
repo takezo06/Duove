@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   Loader2,
   BarChart3,
@@ -22,6 +23,7 @@ interface SymptomLog {
 }
 
 export function CycleAnalytics() {
+  usePageTitle('Cycle Analytics');
   const [loading, setLoading] = useState(true);
   const [symptoms, setSymptoms] = useState<SymptomLog[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   Loader2,
   Sparkles,
@@ -13,6 +14,7 @@ import {
   Settings,
   History,
 } from 'lucide-react';
+
 
 interface Category {
   id: string;
@@ -59,6 +61,7 @@ interface CurrentQA {
 }
 
 export function QA() {
+  usePageTitle('Daily Q&A');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [skipping, setSkipping] = useState(false);

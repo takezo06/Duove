@@ -2,8 +2,11 @@ import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Heart, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
+
 
 export function Signup() {
+  usePageTitle('Signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
