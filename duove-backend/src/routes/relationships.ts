@@ -357,6 +357,20 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
     const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
     const partnerDisplayName = await getPartnerDisplayName(partnerId);
 
+    // Fetch partner's avatar URL using service client (bypass RLS)
+    let partnerAvatarUrl: string | null = null;
+    try {
+      const supabaseAdmin = createServiceClient();
+      const { data: partnerProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', partnerId)
+        .single();
+      partnerAvatarUrl = partnerProfile?.avatar_url || null;
+    } catch {
+      partnerAvatarUrl = null;
+    }
+
     // Count cravings
     const { count: cravingsCount, error: cravingsError } = await supabase
       .from('cravings')
@@ -472,6 +486,7 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
       partner: {
         id: partnerId,
         display_name: partnerDisplayName,
+        avatar_url: partnerAvatarUrl,
       },
       stats: {
         cravings: cravingsCount || 0,

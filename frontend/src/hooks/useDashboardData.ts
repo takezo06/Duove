@@ -82,6 +82,7 @@ export function useDashboardData(): DashboardData {
           { headers }
         );
         const stats = statsRes.data;
+        console.log('Partner avatar_url:', stats.partner?.avatar_url);
         const partnerId = stats.partner?.id;
         const partnerName = stats.partner?.display_name || 'Your Partner';
 
@@ -95,18 +96,8 @@ export function useDashboardData(): DashboardData {
           daysTogether = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         }
 
-        // 3. Fetch partner's avatar
-        let partnerAvatarUrl: string | null = null;
-        if (partnerId) {
-          const { data: partnerProfile } = await supabase
-            .from('profiles')
-            .select('avatar_url')
-            .eq('id', partnerId)
-            .single();
-          if (partnerProfile?.avatar_url) {
-            partnerAvatarUrl = partnerProfile.avatar_url;
-          }
-        }
+        // 3. Partner avatar from stats response
+        let partnerAvatarUrl = stats.partner?.avatar_url || null;
 
         // 4. Cycle prediction
         let cycleData = null;
