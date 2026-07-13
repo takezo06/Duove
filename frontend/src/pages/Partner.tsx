@@ -40,7 +40,7 @@ interface Stats {
   stats: { cravings: number; letters_sent: number; letters_received: number };
 }
 
-// ---------- Small skeletons ----------
+// ---------- Skeleton ----------
 function SkeletonCard() {
   return (
     <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden">
@@ -57,7 +57,6 @@ function SkeletonCard() {
   );
 }
 
-// ---------- Component ----------
 export function Partner() {
   usePageTitle('Partner');
   const [loading, setLoading] = useState(true);
@@ -76,16 +75,21 @@ export function Partner() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // ---------- Data fetching ----------
   const fetchStats = async () => {
     setLoading(true);
     setError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate('/login'); return; }
-
+      if (!user) {
+        navigate('/login');
+        return;
+      }
       const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/stats`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/stats?_t=${Date.now()}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStats(res.data);
@@ -94,7 +98,6 @@ export function Partner() {
       }
     } catch (err: any) {
       if (err.response?.status === 404) {
-        // No relationship yet → show pairing UI
         setStats(null);
         setError(null);
       } else {
@@ -105,25 +108,19 @@ export function Partner() {
     }
   };
 
-  // Try to fetch pending invite code
   const fetchPendingInvite = async () => {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) return;
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/pending`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/pending?_t=${Date.now()}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.data?.invite_code) {
-        setInviteCode(res.data.invite_code);
-      }
-    } catch { /* ignore */ }
+      if (res.data?.invite_code) setInviteCode(res.data.invite_code);
+    } catch { /* no pending invite */ }
   };
 
-  useEffect(() => {
-    fetchStats();
-    fetchPendingInvite();
-  }, []);
+  useEffect(() => { fetchStats(); fetchPendingInvite(); }, []);
 
   // ---- Actions ----
   const generateInvite = async () => {
@@ -139,9 +136,7 @@ export function Partner() {
       setInviteCode(res.data.invite_code);
     } catch (err: any) {
       setJoinError(err.response?.data?.error || 'Failed to generate invite code.');
-    } finally {
-      setGeneratingInvite(false);
-    }
+    } finally { setGeneratingInvite(false); }
   };
 
   const joinRelationship = async () => {
@@ -155,14 +150,11 @@ export function Partner() {
         { invite_code: joinCode.trim().toUpperCase() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Success → refetch stats (should now show active relationship)
       await fetchStats();
       setJoinCode('');
     } catch (err: any) {
       setJoinError(err.response?.data?.error || 'Failed to join. Check the code and try again.');
-    } finally {
-      setJoining(false);
-    }
+    } finally { setJoining(false); }
   };
 
   const copyInviteCode = () => {
@@ -183,30 +175,23 @@ export function Partner() {
         { anniversary_date: newAnniversaryDate },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Refresh stats
       await fetchStats();
       setEditingAnniversary(false);
-    } catch (err) {
-      console.error('Error updating anniversary:', err);
-    } finally {
-      setUpdatingAnniversary(false);
-    }
+    } catch (err) { console.error('Error updating anniversary:', err); }
+    finally { setUpdatingAnniversary(false); }
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'Not set';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string | null) =>
+    dateStr
+      ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : 'Not set';
 
   // ==================== RENDER ====================
 
-  // Loading skeleton
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto animate-pulse">
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-4xl mx-auto animate-pulse px-4 py-6">
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-neutral-800" />
             <div>
@@ -219,17 +204,16 @@ export function Partner() {
           </div>
           <div className="h-8 w-28 bg-neutral-800 rounded" />
         </div>
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
           <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
         </div>
       </div>
     );
   }
 
-  // Generic error (not relationship missing)
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-12">
+      <div className="max-w-2xl mx-auto text-center py-16 px-4">
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
           <p className="text-neutral-400">{error}</p>
           <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition">
@@ -240,12 +224,12 @@ export function Partner() {
     );
   }
 
-  // ==================== PAIRING FLOW (no active relationship) ====================
+  // ==================== PAIRING FLOW ====================
   if (!stats) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-8">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8 md:p-12 shadow-xl">
-          <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-400/20">
+      <div className="max-w-2xl mx-auto px-4 py-10">
+        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8 md:p-12 shadow-xl text-center">
+          <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-rose-400/20">
             <UserPlus className="w-8 h-8 text-rose-400" />
           </div>
           <h2 className="text-2xl font-semibold text-white mb-2">You're not paired yet</h2>
@@ -253,69 +237,50 @@ export function Partner() {
             Generate an invite code and share it with your partner, or enter a code you received to connect.
           </p>
 
-          {/* Invite Section */}
-          <div className="border border-neutral-800 rounded-2xl p-5 mb-6 bg-neutral-800/20">
-            <h3 className="text-white font-medium mb-3 flex items-center justify-center gap-2">
+          <div className="border border-neutral-800 rounded-2xl p-6 mb-6 bg-neutral-800/20">
+            <h3 className="text-white font-medium mb-4 flex items-center justify-center gap-2">
               <LinkIcon className="w-4 h-4 text-rose-400" />
               Create Invite Code
             </h3>
             {inviteCode ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-2xl font-mono font-bold text-rose-400 tracking-widest">
-                    {inviteCode}
-                  </span>
-                  <button
-                    onClick={copyInviteCode}
-                    className="p-1.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-neutral-300 hover:text-white transition"
-                  >
+              <div className="space-y-4">
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-3xl font-mono font-bold text-rose-400 tracking-widest">{inviteCode}</span>
+                  <button onClick={copyInviteCode} className="p-2 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-neutral-300 hover:text-white transition">
                     {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-neutral-500">
-                  Share this code with your partner. Once they join, you'll appear here.
-                </p>
-                <button
-                  onClick={generateInvite}
-                  disabled={generatingInvite}
-                  className="text-sm text-rose-400 hover:underline disabled:opacity-50"
-                >
+                <p className="text-xs text-neutral-500">Share this code with your partner. Once they join, you'll appear here.</p>
+                <button onClick={generateInvite} disabled={generatingInvite} className="text-sm text-rose-400 hover:underline disabled:opacity-50">
                   Generate new code
                 </button>
               </div>
             ) : (
-              <button
-                onClick={generateInvite}
-                disabled={generatingInvite}
-                className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
-              >
-                {generatingInvite ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
-                Generate Invite Code
+              <button onClick={generateInvite} disabled={generatingInvite} className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition disabled:opacity-50">
+                {generatingInvite ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Generate Invite Code'}
               </button>
             )}
           </div>
 
-          {/* Divider */}
           <div className="flex items-center gap-3 mb-6">
             <div className="flex-1 h-px bg-neutral-800" />
             <span className="text-neutral-600 text-xs font-medium">OR</span>
             <div className="flex-1 h-px bg-neutral-800" />
           </div>
 
-          {/* Join Section */}
-          <div className="border border-neutral-800 rounded-2xl p-5 bg-neutral-800/20">
-            <h3 className="text-white font-medium mb-3 flex items-center justify-center gap-2">
+          <div className="border border-neutral-800 rounded-2xl p-6 bg-neutral-800/20">
+            <h3 className="text-white font-medium mb-4 flex items-center justify-center gap-2">
               <UserPlus className="w-4 h-4 text-rose-400" />
               Join with a Code
             </h3>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <input
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="Enter 8‑character code"
                 maxLength={8}
-                className="flex-1 bg-neutral-800/50 text-sm text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 uppercase"
+                className="flex-1 bg-neutral-800/50 text-sm text-white placeholder-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 uppercase"
               />
               <button
                 onClick={joinRelationship}
@@ -325,29 +290,28 @@ export function Partner() {
                 {joining ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Join'}
               </button>
             </div>
-            {joinError && (
-              <p className="text-rose-400 text-sm mt-2">{joinError}</p>
-            )}
+            {joinError && <p className="text-rose-400 text-sm mt-3">{joinError}</p>}
           </div>
         </div>
       </div>
     );
   }
 
-  // ==================== ACTIVE RELATIONSHIP (stats exist) ====================
+  // ==================== ACTIVE RELATIONSHIP ====================
   const partnerName = stats.partner.display_name || 'Partner';
+  const cardBase = 'bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden hover:border-rose-400/30 transition-all duration-200';
 
   return (
-    <div className="max-w-4xl mx-auto animate-fadeIn">
+    <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
             <Heart className="w-6 h-6 text-rose-400 fill-rose-400/20" />
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-white">Your Relationship</h1>
-            <p className="text-neutral-400 text-sm flex items-center gap-2">
+            <p className="text-neutral-400 text-sm flex items-center gap-2 mt-0.5">
               with <span className="text-rose-400 font-medium">{partnerName}</span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-emerald-400 text-xs font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -356,101 +320,102 @@ export function Partner() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setEditingAnniversary(true)}
-          className="text-xs text-neutral-400 hover:text-rose-400 transition flex items-center gap-1"
-        >
-          <Edit2 className="w-3 h-3" />
+        <button onClick={() => setEditingAnniversary(true)} className="text-xs text-neutral-400 hover:text-rose-400 transition flex items-center gap-1.5">
+          <Edit2 className="w-3.5 h-3.5" />
           {stats.relationship.anniversary_date ? 'Edit anniversary' : 'Set anniversary'}
         </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid md:grid-cols-2 gap-4 mb-6">
-        {/* Card 1: Together */}
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden hover:border-rose-400/30 transition">
+      {/* Stats Grid – 2x2 */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        <div className={cardBase}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="flex items-center gap-2 text-neutral-400 text-sm mb-1">
-            <Heart className="w-4 h-4 text-rose-400" />
-            Together
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
+              <Heart className="w-4 h-4 text-rose-400" />
+              Together
+            </div>
+            <p className="text-2xl font-semibold text-white leading-tight">{stats.relationship.together_duration}</p>
+            <p className="text-sm text-rose-400/80 font-medium mt-1.5">Since {formatDate(stats.relationship.paired_at)}</p>
+            {stats.relationship.together_conversion && (
+              <p className="text-sm text-rose-400/60 font-mono mt-1.5">{stats.relationship.together_conversion}</p>
+            )}
           </div>
-          <p className="text-xl font-semibold text-white leading-tight">{stats.relationship.together_duration}</p>
-          <p className="text-sm text-rose-400/80 font-medium mt-1">Since {formatDate(stats.relationship.paired_at)}</p>
-          {stats.relationship.together_conversion && (
-            <p className="text-sm text-rose-400/60 font-mono mt-1">{stats.relationship.together_conversion}</p>
-          )}
         </div>
 
-        {/* Card 2: Since Anniversary */}
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden hover:border-rose-400/30 transition">
+        <div className={cardBase}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="flex items-center gap-2 text-neutral-400 text-sm mb-1">
-            <CalendarDays className="w-4 h-4 text-rose-400" />
-            Since Anniversary
-          </div>
-          <p className="text-xl font-semibold text-white leading-tight">{stats.relationship.anniversary_duration}</p>
-          <p className="text-sm text-rose-400/80 font-medium mt-1">
-            {stats.relationship.anniversary_date ? `Anniversary: ${formatDate(stats.relationship.anniversary_date)}` : 'No anniversary date set'}
-          </p>
-          {stats.relationship.anniversary_conversion && (
-            <p className="text-sm text-rose-400/60 font-mono mt-1">{stats.relationship.anniversary_conversion}</p>
-          )}
-        </div>
-
-        {/* Card 3: Next Anniversary */}
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden hover:border-rose-400/30 transition">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="flex items-center gap-2 text-neutral-400 text-sm mb-1">
-            <Calendar className="w-4 h-4 text-rose-400" />
-            Next Anniversary
-          </div>
-          <p className="text-xl font-semibold text-white leading-tight">
-            {stats.relationship.next_anniversary ? formatDate(stats.relationship.next_anniversary) : 'Not set'}
-          </p>
-          {stats.relationship.days_until_anniversary !== null && (
-            <p className="text-sm text-rose-400/80 font-medium mt-1">
-              {stats.relationship.days_until_anniversary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_anniversary} day${stats.relationship.days_until_anniversary > 1 ? 's' : ''} to go`}
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
+              <CalendarDays className="w-4 h-4 text-rose-400" />
+              Since Anniversary
+            </div>
+            <p className="text-2xl font-semibold text-white leading-tight">{stats.relationship.anniversary_duration}</p>
+            <p className="text-sm text-rose-400/80 font-medium mt-1.5">
+              {stats.relationship.anniversary_date ? `Anniversary: ${formatDate(stats.relationship.anniversary_date)}` : 'No anniversary date set'}
             </p>
-          )}
+            {stats.relationship.anniversary_conversion && (
+              <p className="text-sm text-rose-400/60 font-mono mt-1.5">{stats.relationship.anniversary_conversion}</p>
+            )}
+          </div>
         </div>
 
-        {/* Card 4: Next Monthsary */}
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden hover:border-rose-400/30 transition">
+        <div className={cardBase}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="flex items-center gap-2 text-neutral-400 text-sm mb-1">
-            <Calendar className="w-4 h-4 text-rose-400" />
-            Next Monthsary
-          </div>
-          <p className="text-xl font-semibold text-white leading-tight">
-            {stats.relationship.next_monthsary ? formatDate(stats.relationship.next_monthsary) : 'Not available'}
-          </p>
-          {stats.relationship.days_until_monthsary !== null && (
-            <p className="text-sm text-rose-400/80 font-medium mt-1">
-              {stats.relationship.days_until_monthsary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_monthsary} day${stats.relationship.days_until_monthsary > 1 ? 's' : ''} to go`}
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
+              <Calendar className="w-4 h-4 text-rose-400" />
+              Next Anniversary
+            </div>
+            <p className="text-2xl font-semibold text-white leading-tight">
+              {stats.relationship.next_anniversary ? formatDate(stats.relationship.next_anniversary) : 'Not set'}
             </p>
-          )}
+            {stats.relationship.days_until_anniversary !== null && (
+              <p className="text-sm text-rose-400/80 font-medium mt-1.5">
+                {stats.relationship.days_until_anniversary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_anniversary} day${stats.relationship.days_until_anniversary > 1 ? 's' : ''} to go`}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className={cardBase}>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
+              <Calendar className="w-4 h-4 text-rose-400" />
+              Next Monthsary
+            </div>
+            <p className="text-2xl font-semibold text-white leading-tight">
+              {stats.relationship.next_monthsary ? formatDate(stats.relationship.next_monthsary) : 'Not available'}
+            </p>
+            {stats.relationship.days_until_monthsary !== null && (
+              <p className="text-sm text-rose-400/80 font-medium mt-1.5">
+                {stats.relationship.days_until_monthsary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_monthsary} day${stats.relationship.days_until_monthsary > 1 ? 's' : ''} to go`}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Quick Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center hover:bg-neutral-900/70 transition">
           <p className="text-2xl font-semibold text-white">{stats.stats.cravings}</p>
-          <p className="text-xs text-neutral-500">Cravings</p>
+          <p className="text-xs text-neutral-500 mt-1">Cravings</p>
         </div>
         <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center hover:bg-neutral-900/70 transition">
           <p className="text-2xl font-semibold text-white">{stats.stats.letters_sent}</p>
-          <p className="text-xs text-neutral-500">Letters Sent</p>
+          <p className="text-xs text-neutral-500 mt-1">Letters Sent</p>
         </div>
         <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center hover:bg-neutral-900/70 transition">
           <p className="text-2xl font-semibold text-white">{stats.stats.letters_received}</p>
-          <p className="text-xs text-neutral-500">Letters Received</p>
+          <p className="text-xs text-neutral-500 mt-1">Letters Received</p>
         </div>
       </div>
 
       {/* Anniversary Editor */}
       {editingAnniversary && (
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 mb-6 animate-fadeIn">
+        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-medium">Set Your Anniversary Date</h3>
             <button onClick={() => setEditingAnniversary(false)} className="text-neutral-400 hover:text-white transition">

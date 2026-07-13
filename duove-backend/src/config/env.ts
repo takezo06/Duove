@@ -1,4 +1,12 @@
-// No dotenv import – Railway provides these directly.
+import dotenv from 'dotenv';
+
+// Safely try to load local .env – ignore if missing (production)
+try {
+  dotenv.config();
+} catch {
+  // no-op
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
