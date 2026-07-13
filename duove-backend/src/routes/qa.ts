@@ -18,7 +18,7 @@ async function getOrCreateTodayAssignment(
 ) {
   const today = new Date().toISOString().split('T')[0];
 
-  // 1. Check if there's already an assignment for today
+  // 1. Return existing assignment if already created today
   let { data: assignment, error } = await supabase
     .from('qa_assignments')
     .select('*, qa_questions(*)')
@@ -28,7 +28,7 @@ async function getOrCreateTodayAssignment(
 
   if (assignment) return assignment;
 
-  // 2. No assignment yet – create one
+  // 2. Build the base query for available questions
   let query = supabaseAdmin
     .from('qa_questions')
     .select('*')
@@ -38,8 +38,8 @@ async function getOrCreateTodayAssignment(
     query = query.eq('category_id', preferredCategoryId);
   }
 
-  // Avoid recent questions (last 10)
-  const { data: usedQuestions } = await supabase
+  // 3. Exclude questions used in the last 10 assignments for this relationship
+  const { data: usedQuestions, error: usedError } = await supabase
     .from('qa_assignments')
     .select('question_id')
     .eq('relationship_id', relationshipId)
@@ -47,19 +47,25 @@ async function getOrCreateTodayAssignment(
     .limit(10);
 
   const usedIds = usedQuestions?.map((q: any) => q.question_id) || [];
+
   if (usedIds.length > 0) {
+    // Exclude them using a simple "not in" array filter
     query = query.not('id', 'in', usedIds);
   }
 
-  const { data: available, error: availError } = await query.limit(1);
+  // 4. Get a random question from the remaining pool
+  const { data: available, error: availError } = await query
+    .order('random()', { ascending: true })
+    .limit(1);
 
   let question;
   if (availError || !available || available.length === 0) {
-    // Fallback: get any active question
+    // Fallback: any active question (ignoring exclusions if pool is small)
     const { data: fallback, error: fbError } = await supabaseAdmin
       .from('qa_questions')
       .select('*')
       .eq('is_active', true)
+      .order('random()', { ascending: true })
       .limit(1);
     if (fbError || !fallback || fallback.length === 0) {
       throw new Error('No questions available');
@@ -69,6 +75,7 @@ async function getOrCreateTodayAssignment(
     question = available[0];
   }
 
+  // 5. Create the assignment
   const { data: newAssignment, error: insertError } = await supabaseAdmin
     .from('qa_assignments')
     .insert({
@@ -165,6 +172,26 @@ router.get('/current', async (req: Request, res: Response, next: NextFunction) =
       nextQuestionAvailableIn: secondsUntilNext,
       preferredCategoryId: relationship.preferred_category_id,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/qa/categories
+router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const { data, error } = await supabase
+      .from('qa_categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      logger.error('Error fetching categories', { error });
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
   } catch (err) {
     next(err);
   }
