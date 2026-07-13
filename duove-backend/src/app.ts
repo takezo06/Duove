@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { config } from './config/env';
 import { logger } from './config/logger';
 import healthRouter from './routes/health';
+import accountRouter from './routes/account';
 
 export const createApp = (): Express => {
   const app = express();
@@ -23,6 +24,9 @@ export const createApp = (): Express => {
 
   // Health always works
   app.use('/health', healthRouter);
+
+  //account settings
+  app.use('/api/account', accountRouter);
 
   // Safely mount all other routes
   const routeMap: Record<string, string> = {

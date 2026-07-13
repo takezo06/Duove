@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { ChangePassword } from '../components/profile/ChangePassword';
+import { DeleteRelationship } from '../components/profile/DeleteRelationship';
+import { DeleteAccount } from '../components/profile/DeleteAccount';
 import {
   Loader2,
   User,
@@ -140,10 +143,8 @@ export function Profile() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update local profile state with the new data
       setProfile(res.data);
       setDisplayName(res.data.display_name || '');
-      // Update avatar preview to the new URL
       if (res.data.avatar_url) {
         setAvatarPreview(res.data.avatar_url);
       } else {
@@ -153,15 +154,8 @@ export function Profile() {
       setAvatarFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       setIsEditingName(false);
-      
-      // Force sidebar to refresh (by dispatching a custom event or using a global state)
-      // We'll use a simple method: reload user info in sidebar by triggering a re-fetch
-      // This will be handled by the sidebar's own useEffect that listens to auth changes
-      // but we can also manually trigger a re-fetch by calling the sidebar's fetch function.
-      // For simplicity, we'll just reload the page? No, better to use a global state context.
-      // We'll create a simple event listener: window.dispatchEvent(new Event('profile-updated'));
+
       window.dispatchEvent(new Event('profile-updated'));
-      
     } catch (err: any) {
       setError(err.message || 'Failed to update profile.');
     } finally {
@@ -185,18 +179,19 @@ export function Profile() {
     });
   };
 
+  // ---------- Loading ----------
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto animate-pulse">
-        <div className="flex items-center gap-3 mb-6">
+      <div className="max-w-2xl mx-auto px-4 py-8 animate-pulse space-y-6">
+        <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-neutral-800" />
           <div className="h-8 w-40 bg-neutral-800 rounded" />
         </div>
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 space-y-4">
-          <div className="flex items-center gap-4">
+        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 space-y-6">
+          <div className="flex items-center gap-6">
             <div className="w-20 h-20 rounded-full bg-neutral-800" />
-            <div className="flex-1 space-y-2">
-              <div className="h-5 w-32 bg-neutral-800 rounded" />
+            <div className="space-y-3 flex-1">
+              <div className="h-6 w-32 bg-neutral-800 rounded" />
               <div className="h-4 w-48 bg-neutral-800 rounded" />
             </div>
           </div>
@@ -204,21 +199,26 @@ export function Profile() {
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 bg-neutral-800 rounded" />
-              <div className="h-4 w-32 bg-neutral-800 rounded" />
+              <div className="h-4 w-40 bg-neutral-800 rounded" />
             </div>
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 bg-neutral-800 rounded" />
-              <div className="h-4 w-48 bg-neutral-800 rounded" />
+              <div className="h-4 w-40 bg-neutral-800 rounded" />
             </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-1 h-10 bg-neutral-800 rounded-xl" />
+            <div className="w-24 h-10 bg-neutral-800 rounded-xl" />
           </div>
         </div>
       </div>
     );
   }
 
+  // ---------- Error (no profile) ----------
   if (error && !profile) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-12">
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
           <p className="text-neutral-400">{error}</p>
           <button
@@ -232,21 +232,22 @@ export function Profile() {
     );
   }
 
+  // ---------- Main Profile ----------
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
           <User className="w-5 h-5 text-rose-400" />
         </div>
         <h1 className="text-2xl font-semibold text-white">Your Profile</h1>
       </div>
 
-      {/* Profile Card */}
-      <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6">
-        {/* Avatar */}
-        <div className="flex items-center gap-6 mb-6">
-          <div className="relative">
+      {/* Avatar & Display Name Card */}
+      <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 space-y-5">
+        <div className="flex items-center gap-6">
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
             <div className="w-20 h-20 rounded-full bg-neutral-800 border-2 border-neutral-700 overflow-hidden flex items-center justify-center">
               {avatarPreview ? (
                 <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
@@ -272,6 +273,7 @@ export function Profile() {
             />
           </div>
 
+          {/* Name & Edit */}
           <div className="flex-1 min-w-0">
             {isEditingName ? (
               <div className="flex items-center gap-2">
@@ -302,15 +304,20 @@ export function Profile() {
                 </button>
               </div>
             )}
-            <p className="text-sm text-neutral-500">{profile?.avatar_url ? 'Has avatar' : 'No avatar'}</p>
+            <p className="text-sm text-neutral-500 mt-1">
+              {profile?.avatar_url ? 'Tap the camera to change your photo' : 'Add a profile photo'}
+            </p>
           </div>
         </div>
 
-        {/* User details */}
+        {/* Divider */}
+        <div className="border-t border-neutral-800/50" />
+
+        {/* Details */}
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-3 text-neutral-400">
             <Mail className="w-4 h-4 text-neutral-500" />
-            <span>{email || 'email@example.com'}</span>
+            <span className="truncate">{email || 'No email'}</span>
           </div>
           <div className="flex items-center gap-3 text-neutral-400">
             <Calendar className="w-4 h-4 text-neutral-500" />
@@ -319,7 +326,7 @@ export function Profile() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 mt-6 pt-6 border-t border-neutral-800/50">
+        <div className="flex items-center gap-3 pt-2">
           <button
             onClick={handleSave}
             disabled={updating || (!avatarFile && displayName === profile?.display_name)}
@@ -336,10 +343,15 @@ export function Profile() {
           </button>
         </div>
 
-        {/* Messages */}
-        {error && <p className="text-rose-400 text-sm mt-4">{error}</p>}
-        {success && <p className="text-emerald-400 text-sm mt-4">{success}</p>}
+        {/* Feedback */}
+        {error && <p className="text-rose-400 text-sm">{error}</p>}
+        {success && <p className="text-emerald-400 text-sm">{success}</p>}
       </div>
+
+      {/* Security & Danger Cards */}
+      <ChangePassword />
+      <DeleteRelationship />
+      <DeleteAccount />
     </div>
   );
 }

@@ -462,6 +462,7 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
       if (daysUntilMonthsary < 0) daysUntilMonthsary = 0;
     }
 
+    res.setHeader('Cache-Control', 'no-store');
 
     res.json({
       user: {
@@ -545,6 +546,42 @@ router.patch('/anniversary', async (req: Request, res: Response, next: NextFunct
       message: 'Anniversary updated!',
       anniversary_date: updated.anniversary_date,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/relationships – delete the active relationship
+router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const supabase = createUserClient(req.token!);
+    const userId = req.user!.id;
+
+    // Find the active relationship
+    const { data: relationship, error: relError } = await supabase
+      .from('relationships')
+      .select('id')
+      .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (relError || !relationship) {
+      return res.status(404).json({ error: 'No active relationship found' });
+    }
+
+    // Delete the relationship (the row is removed)
+    const { error: deleteError } = await supabase
+      .from('relationships')
+      .delete()
+      .eq('id', relationship.id);
+
+    if (deleteError) {
+      logger.error('Error deleting relationship', { userId, error: deleteError });
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    logger.info('Relationship deleted', { userId, relationshipId: relationship.id });
+    res.json({ message: 'Relationship deleted' });
   } catch (err) {
     next(err);
   }
