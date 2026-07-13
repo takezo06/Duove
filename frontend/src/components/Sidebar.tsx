@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import {
@@ -73,12 +73,10 @@ export function Sidebar() {
       const mobile = window.innerWidth < MOBILE_BREAKPOINT;
       setIsMobile(mobile);
       if (mobile) {
-        // Force collapsed on mobile
         setIsCollapsed(true);
         setWidth(MIN_WIDTH);
         widthRef.current = MIN_WIDTH;
       } else {
-        // Restore user preference from localStorage
         const savedCollapsed = localStorage.getItem('sidebar-collapsed');
         const savedWidth = localStorage.getItem('sidebar-width');
         if (savedCollapsed !== null) setIsCollapsed(savedCollapsed === 'true');
@@ -287,11 +285,11 @@ export function Sidebar() {
   };
 
   return (
-    <div className="relative flex-shrink-0 h-screen">
-      {/* Tooltip */}
+    <div className="relative flex-shrink-0 h-screen select-none">
+      {/* Tooltip Overlay */}
       {tooltipVisible && shouldShowTooltips && (
         <div
-          className="fixed px-3 py-1.5 bg-neutral-800 text-sm text-neutral-100 rounded-lg shadow-xl border border-neutral-700/70 pointer-events-none z-[200] whitespace-nowrap transition-opacity duration-200"
+          className="fixed px-3 py-1.5 bg-neutral-800 text-sm text-neutral-100 rounded-lg shadow-xl border border-neutral-700/70 pointer-events-none z-[200] whitespace-nowrap"
           style={{
             top: tooltipPosition.top,
             left: tooltipPosition.left,
@@ -304,133 +302,116 @@ export function Sidebar() {
 
       <aside
         ref={sidebarRef}
-        className="flex flex-col h-full bg-neutral-900 border-r border-neutral-800 overflow-x-visible overflow-y-auto transition-all duration-300 ease-in-out"
+        className="flex flex-col h-full bg-neutral-900 border-r border-neutral-800 overflow-x-hidden overflow-y-auto transition-all duration-300 ease-in-out"
         style={{ width: currentWidth }}
       >
-        {/* Logo */}
-        <div className="flex items-center h-16 px-5 border-b border-neutral-800/50 flex-shrink-0 overflow-x-hidden">
-          <div className={`flex items-center gap-3 w-full ${!showText ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 rounded-lg bg-rose-400/10 flex items-center justify-center border border-rose-400/20 flex-shrink-0 transition-transform duration-300 ease-in-out hover:scale-105">
+        {/* Logo Block Frame */}
+        <div className="flex items-center h-16 px-4 border-b border-neutral-800/50 flex-shrink-0 overflow-hidden">
+          <div className={`flex items-center w-full ${!showText ? 'justify-center' : 'justify-start gap-3'}`}>
+            <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 flex-shrink-0 transition-transform duration-300 hover:scale-105">
               <img
                 src="/duove-logo.svg"
                 alt="Duove"
-                className="w-full h-full object-contain"
+                className="w-5 h-5 object-contain"
               />
             </div>
-            <span
-              className={`text-xl font-semibold text-white whitespace-nowrap transition-all duration-300 ease-in-out ${
-                showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
-              }`}
-            >
-              Duove
-            </span>
+            {!isCollapsed && showText && (
+              <span className="text-lg font-bold text-white tracking-wide animate-fade-in">
+                Duove
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-2 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden">
+        {/* Primary Route Lists View Matrix */}
+        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden">
           {navItems.map(({ icon: Icon, label, path }) => {
             const active = isActive(path);
             const isBell = label === 'Notifications';
             return (
-              <a
+              <Link
                 key={label}
-                href={path}
+                to={path}
                 onMouseEnter={(e) => {
                   if (shouldShowTooltips) handleMouseEnter(label, e);
                 }}
                 onMouseLeave={handleMouseLeave}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg 
-                  text-sm font-medium transition-all duration-200 
+                  flex items-center rounded-xl text-sm font-medium transition-all duration-200 group relative
+                  ${!showText ? 'justify-center p-3' : 'justify-start gap-3 px-4 py-3'}
                   ${active 
-                    ? 'bg-neutral-800/70 text-white border-l-2 border-rose-400 font-semibold' 
-                    : 'text-neutral-400 hover:text-white hover:bg-neutral-700/50'
+                    ? 'bg-neutral-800 border-l-2 border-rose-500 text-rose-400 font-semibold shadow-inner' 
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-800/50'
                   }
-                  ${!showText ? 'justify-center' : ''}
-                  group relative
                 `}
               >
-                <div className="relative">
-                  <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${active ? 'text-rose-400 scale-110' : 'group-hover:scale-110'}`} />
+                <div className="relative flex items-center justify-center flex-shrink-0">
+                  <Icon className={`w-5 h-5 transition-all duration-200 ${active ? 'text-rose-400 scale-105' : 'group-hover:scale-105'}`} />
                   {isBell && unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full text-[10px] text-white flex items-center justify-center font-medium">
+                    <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-rose-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold border border-neutral-900">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </div>
-                <span
-                  className={`whitespace-nowrap transition-all duration-300 ease-in-out ${
-                    showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
-                  }`}
-                >
-                  {label}
-                </span>
-                {active && !showText && (
-                  <span className="absolute left-full ml-2 px-2 py-1 bg-rose-400/20 text-rose-400 text-xs rounded border border-rose-400/30 pointer-events-none whitespace-nowrap">
-                    ●
+                
+                {!isCollapsed && showText && (
+                  <span className="whitespace-nowrap truncate animate-fade-in">
+                    {label}
                   </span>
                 )}
-              </a>
+              </Link>
             );
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-3 overflow-x-hidden">
+        {/* User Card & Control Tray Footer Area */}
+        <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-2 overflow-x-hidden bg-neutral-900/40">
           <div
             className={`
-              flex items-center gap-3 px-3 py-2.5 rounded-lg 
-              transition-all duration-200
-              hover:bg-neutral-700/50
-              ${!showText ? 'justify-center' : ''}
+              flex items-center rounded-xl transition-all duration-200 p-2
+              ${!showText ? 'justify-center bg-transparent' : 'justify-start gap-3 bg-transparent hover:bg-neutral-800/50'}
             `}
           >
-            <div className="w-8 h-8 rounded-full bg-rose-400/20 flex items-center justify-center text-rose-400 text-sm font-medium flex-shrink-0 overflow-hidden">
+            <div className="w-9 h-9 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center text-sm font-semibold flex-shrink-0 shadow-inner overflow-hidden">
               {loadingUser ? (
-                '...'
+                <span className="text-xs opacity-50">...</span>
               ) : profileAvatarUrl ? (
                 <img src={profileAvatarUrl} alt={userName} className="w-full h-full object-cover" />
               ) : (
                 userAvatar
               )}
             </div>
-            <div
-              className={`overflow-hidden min-w-0 transition-all duration-300 ease-in-out ${
-                showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'
-              }`}
-            >
-              <p className="text-sm text-white font-medium truncate">
-                {loadingUser ? 'Loading...' : userName || 'User'}
-              </p>
-              <p className="text-xs text-neutral-500 truncate">
-                {loadingUser ? '' : userEmail}
-              </p>
-            </div>
+            {!isCollapsed && showText && (
+              <div className="min-w-0 flex-1 animate-fade-in">
+                <p className="text-sm text-white font-medium truncate">
+                  {loadingUser ? 'Loading...' : userName || 'User'}
+                </p>
+                <p className="text-xs text-neutral-500 truncate mt-0.5">
+                  {loadingUser ? '' : userEmail}
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Collapse button – hidden on mobile */}
+          {/* Controls Trigger Bar Matrix */}
+          <div className={`flex ${!showText ? 'flex-col items-center gap-2 mt-1' : 'items-center justify-between px-1 pt-1'}`}>
             {!isMobile && (
               <button
                 onClick={toggleCollapse}
                 className={`
-                  flex items-center justify-center
-                  w-9 h-9 rounded-lg 
-                  text-neutral-400 hover:text-white hover:bg-neutral-700/50
-                  transition-all duration-200
-                  ${!showText ? 'flex-1' : ''}
+                  flex items-center justify-center w-9 h-9 rounded-xl
+                  text-neutral-500 hover:text-white hover:bg-neutral-800 transition-all duration-150 focus:outline-none
                 `}
+                title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
               >
                 {isCollapsed ? (
-                  <ChevronRight className="w-4 h-4 transition-transform duration-300 hover:translate-x-0.5" />
+                  <ChevronRight className="w-4 h-4 transition-transform hover:translate-x-0.5" />
                 ) : (
-                  <ChevronLeft className="w-4 h-4 transition-transform duration-300 hover:-translate-x-0.5" />
+                  <ChevronLeft className="w-4 h-4 transition-transform hover:-translate-x-0.5" />
                 )}
               </button>
             )}
 
-            {/* Logout button */}
             <button
               onClick={handleLogout}
               onMouseEnter={(e) => {
@@ -438,29 +419,24 @@ export function Sidebar() {
               }}
               onMouseLeave={handleMouseLeave}
               className={`
-                flex items-center justify-center
-                w-9 h-9 rounded-lg 
-                text-neutral-400 hover:text-white hover:bg-neutral-700/50
-                transition-all duration-200
-                ${!showText ? 'flex-1' : ''}
+                flex items-center justify-center w-9 h-9 rounded-xl
+                text-neutral-500 hover:text-rose-400 hover:bg-neutral-800 transition-all duration-150 focus:outline-none
               `}
+              title="Sign Out"
             >
-              <LogOut className="w-4 h-4 transition-transform duration-200 hover:scale-110" />
+              <LogOut className="w-4 h-4 transition-transform hover:scale-105" />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Drag handle – hidden on mobile */}
+      {/* Resize Drag Element strip */}
       {!isMobile && (
         <div
-          className="absolute top-0 right-0 w-2 h-full cursor-col-resize group transition-colors duration-200"
+          className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize group transition-colors duration-200 z-50"
           onMouseDown={handleMouseDown}
         >
-          <div className="w-full h-full bg-transparent group-hover:bg-rose-400/30 group-active:bg-rose-400/40 transition-colors duration-200 rounded-r-sm" />
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <div className="w-0.5 h-8 bg-rose-400/40 rounded-full shadow-lg shadow-rose-400/20" />
-          </div>
+          <div className="w-full h-full bg-transparent group-hover:bg-rose-500/20 group-active:bg-rose-500/40 transition-colors duration-200" />
         </div>
       )}
     </div>
