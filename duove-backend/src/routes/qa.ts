@@ -28,54 +28,46 @@ async function getOrCreateTodayAssignment(
 
   if (assignment) return assignment;
 
-  // 2. Build the base query for available questions
-  let query = supabaseAdmin
+  // 2. Fetch all active questions (optionally filtered by category)
+  let allQuestionsQuery = supabaseAdmin
     .from('qa_questions')
     .select('*')
     .eq('is_active', true);
 
   if (preferredCategoryId) {
-    query = query.eq('category_id', preferredCategoryId);
+    allQuestionsQuery = allQuestionsQuery.eq('category_id', preferredCategoryId);
   }
 
-  // 3. Exclude questions used in the last 10 assignments for this relationship
-  const { data: usedQuestions, error: usedError } = await supabase
+  const { data: allQuestions, error: allError } = await allQuestionsQuery;
+
+  if (allError) throw allError;
+  if (!allQuestions || allQuestions.length === 0) {
+    throw new Error('No questions available');
+  }
+
+  // 3. Fetch recently used question IDs (last 10 assignments)
+  const { data: usedQuestions } = await supabase
     .from('qa_assignments')
     .select('question_id')
     .eq('relationship_id', relationshipId)
     .order('assigned_date', { ascending: false })
     .limit(10);
 
-  const usedIds = usedQuestions?.map((q: any) => q.question_id) || [];
+  const usedIds = new Set(usedQuestions?.map((q: any) => q.question_id) || []);
 
-  if (usedIds.length > 0) {
-    // Exclude them using a simple "not in" array filter
-    query = query.not('id', 'in', usedIds);
+  // 4. Exclude used questions from the pool (in JavaScript)
+  let available = allQuestions.filter((q: any) => !usedIds.has(q.id));
+
+  // If exclusion empties the pool, use the full list (ignore exclusions)
+  if (available.length === 0) {
+    available = allQuestions;
   }
 
-  // 4. Get a random question from the remaining pool
-  const { data: available, error: availError } = await query
-    .order('random()', { ascending: true })
-    .limit(1);
+  // 5. Pick a random question
+  const randomIndex = Math.floor(Math.random() * available.length);
+  const question = available[randomIndex];
 
-  let question;
-  if (availError || !available || available.length === 0) {
-    // Fallback: any active question (ignoring exclusions if pool is small)
-    const { data: fallback, error: fbError } = await supabaseAdmin
-      .from('qa_questions')
-      .select('*')
-      .eq('is_active', true)
-      .order('random()', { ascending: true })
-      .limit(1);
-    if (fbError || !fallback || fallback.length === 0) {
-      throw new Error('No questions available');
-    }
-    question = fallback[0];
-  } else {
-    question = available[0];
-  }
-
-  // 5. Create the assignment
+  // 6. Create the assignment
   const { data: newAssignment, error: insertError } = await supabaseAdmin
     .from('qa_assignments')
     .insert({
@@ -172,9 +164,10 @@ router.get('/current', async (req: Request, res: Response, next: NextFunction) =
       nextQuestionAvailableIn: secondsUntilNext,
       preferredCategoryId: relationship.preferred_category_id,
     });
-  } catch (err) {
-    next(err);
-  }
+    } catch (err) {
+      logger.error('GET /current failed', { error: (err as any).message, stack: (err as any).stack });
+      next(err);
+    }
 });
 
 // GET /api/qa/categories
