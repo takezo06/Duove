@@ -380,14 +380,17 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
 
     // Count letters
     const { count: lettersSent, error: lettersSentError } = await supabase
-      .from('letters')
+      .from('love_letters')
       .select('*', { count: 'exact', head: true })
+      .eq('relationship_id', relationship.id)
       .eq('sender_id', userId);
 
+    // Letters received (sent by the partner in this relationship)
     const { count: lettersReceived, error: lettersReceivedError } = await supabase
-      .from('letters')
+      .from('love_letters')
       .select('*', { count: 'exact', head: true })
-      .eq('recipient_id', userId);
+      .eq('relationship_id', relationship.id)
+      .neq('sender_id', userId);
 
     // ----- Durations -----
     const now = new Date();
