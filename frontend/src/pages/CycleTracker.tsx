@@ -50,7 +50,6 @@ export function CycleTracker() {
   const todayStr = new Date().toISOString().split('T')[0];
   const activeDate = stickyDate || hoveredDate;
 
-  // Refresh if we just logged a new cycle
   useEffect(() => {
     const refreshFlag = localStorage.getItem('cycle-refresh');
     if (refreshFlag) {
@@ -59,7 +58,6 @@ export function CycleTracker() {
     }
   }, []);
 
-  // Fetch symptom for a date – local then API
   const fetchSymptomForDate = async (date: string): Promise<any> => {
     const token = (await supabase.auth.getSession()).data.session?.access_token;
     if (!token) return null;
@@ -74,7 +72,6 @@ export function CycleTracker() {
         params: { from: date, to: date },
       });
       const logs = res.data || [];
-      // Return the first log that matches the date (should be only one)
       return logs.find((log: any) => log.log_date === date) || null;
     } catch (err) {
       console.error('Failed to fetch symptom for popup', err);
@@ -113,7 +110,6 @@ export function CycleTracker() {
     }
   };
 
-  // Popup position logic
   useEffect(() => {
     if (!targetElement) {
       setPopupPosition(null);
@@ -159,7 +155,6 @@ export function CycleTracker() {
     };
   }, [targetElement, popupSymptom]);
 
-  // Outside click closes sticky popup
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
       if (!stickyDate) return;
@@ -175,19 +170,16 @@ export function CycleTracker() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [stickyDate]);
 
-  // Apply custom range
   const applyCustomRange = () => {
     if (customStart && customEnd) {
       fetchData('custom', customStart, customEnd);
     }
   };
 
-  // Tip
   const currentPhase = prediction?.phase || null;
   const dbPhase = currentPhase === 'fertile' ? 'ovulatory' : currentPhase;
   const { tip: dailyTip, loading: tipLoading } = useDailyTip(dbPhase, viewingPartner ? 'partner' : 'self');
 
-  // Cycle day calculation for popup
   const getCycleDayForPopupDate = (dateStr: string): number | null => {
     if (!prediction?.averageCycleLength) return null;
     const avgCycle = prediction.averageCycleLength;
@@ -213,19 +205,25 @@ export function CycleTracker() {
     if (!cycleDay || !prediction) return null;
     const avgCycle = prediction.averageCycleLength || 28;
     const bleeds = prediction.averageBleedingDays || 5;
-    const ovuDay = avgCycle - 14;
-    const fertileStart = ovuDay - 5;
-    const fertileEnd = ovuDay;
+
     if (cycleDay <= bleeds) return 'menstrual';
-    if (cycleDay >= fertileStart && cycleDay <= fertileEnd) return 'fertile';
-    if (cycleDay > fertileEnd && cycleDay < avgCycle) return 'luteal';
-    return 'follicular';
+
+    const remainingDays = avgCycle - bleeds;
+    const follicularDays = Math.ceil(remainingDays / 3);
+    const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
+    const lutealDays = remainingDays - follicularDays - fertileDays;
+
+    const follicularEnd = bleeds + follicularDays;
+    const fertileEnd = follicularEnd + fertileDays;
+
+    if (cycleDay <= follicularEnd) return 'follicular';
+    if (cycleDay <= fertileEnd) return 'fertile';
+    return 'luteal';
   };
 
   const activeCycleDay = activeDate ? getCycleDayForPopupDate(activeDate) : null;
   const activePhaseKey = getPhaseKey(activeCycleDay);
 
-  // ---- RENDER ----
   if (loading) return <CycleSkeleton />;
 
   if (!prediction || !prediction.nextPeriodStart) {
@@ -241,10 +239,7 @@ export function CycleTracker() {
               : 'Start tracking by logging your first cycle.'}
           </p>
           {!viewingPartner && (
-            <Link
-              to="/cycle/log"
-              className="mt-4 inline-block px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition"
-            >
+            <Link to="/cycle/log" className="mt-4 inline-block px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition">
               Log your first cycle
             </Link>
           )}
@@ -266,61 +261,19 @@ export function CycleTracker() {
         popupSymptom={popupSymptom}
         stickyDate={stickyDate}
       />
-
-      <CycleHeader
-        viewingPartner={viewingPartner}
-        partnerName={partnerName}
-        togglePartnerView={togglePartnerView}
-      />
-
+      <CycleHeader viewingPartner={viewingPartner} partnerName={partnerName} togglePartnerView={togglePartnerView} />
       <CycleCircle phase={phase} cycleDay={cycleDay} daysUntilPeriod={daysUntilPeriod} />
-
-      <StatsCards
-        nextPeriodStart={nextPeriodStart}
-        ovulationDay={ovulationDay}
-        fertileWindowStart={fertileWindowStart}
-        fertileWindowEnd={fertileWindowEnd}
-        averageCycleLength={averageCycleLength}
-      />
-
-      <DateRangeSelector
-        range={range}
-        setRange={setRange}
-        showCustom={range === 'custom'}
-        setShowCustom={() => {}}
-        customStart={customStart}
-        setCustomStart={setCustomStart}
-        customEnd={customEnd}
-        setCustomEnd={setCustomEnd}
-        applyCustomRange={applyCustomRange}
-      />
-
-      <CalendarGrid
-        calendar={calendar}
-        range={range}
-        symptomLogs={symptomLogs}
-        lastPeriodStart={lastPeriodStart}
-        prediction={prediction}
-        onDayHover={handleDayHover}
-        onDayClick={handleDayClick}
-        todayStr={todayStr}
-        earliestCycleStart={earliestCycleStart}
-      />
-
+      <StatsCards nextPeriodStart={nextPeriodStart} ovulationDay={ovulationDay} fertileWindowStart={fertileWindowStart} fertileWindowEnd={fertileWindowEnd} averageCycleLength={averageCycleLength} />
+      <DateRangeSelector range={range} setRange={setRange} showCustom={range === 'custom'} setShowCustom={() => {}} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} applyCustomRange={applyCustomRange} />
+      <CalendarGrid calendar={calendar} range={range} symptomLogs={symptomLogs} lastPeriodStart={lastPeriodStart} prediction={prediction} onDayHover={handleDayHover} onDayClick={handleDayClick} todayStr={todayStr} earliestCycleStart={earliestCycleStart} />
       <div className="bg-neutral-800/30 rounded-xl p-3 border border-neutral-700/50 mt-4">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-rose-400" />
           <p className="text-xs font-medium text-white">
-            {viewingPartner
-              ? `Supporting ${partnerName || 'your partner'} during her ${phase} phase`
-              : `Tip for your ${phase} phase`}
+            {viewingPartner ? `Supporting ${partnerName || 'your partner'} during her ${phase} phase` : `Tip for your ${phase} phase`}
           </p>
         </div>
-        {tipLoading ? (
-          <p className="text-xs text-neutral-400 mt-2 animate-pulse">Loading tip...</p>
-        ) : (
-          <p className="text-xs text-neutral-400 mt-2">{dailyTip || 'Listen to your body today.'}</p>
-        )}
+        {tipLoading ? <p className="text-xs text-neutral-400 mt-2 animate-pulse">Loading tip...</p> : <p className="text-xs text-neutral-400 mt-2">{dailyTip || 'Listen to your body today.'}</p>}
       </div>
     </div>
   );

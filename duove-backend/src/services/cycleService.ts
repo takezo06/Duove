@@ -40,15 +40,15 @@ export class CycleEngine {
   // NEW: Average cycle length calculated from intervals between consecutive start dates
   private getAverageCycleLength(): number {
     const starts = this.cycles.map(c => c.start_date).sort();
-    if (starts.length < 2) return 28; // default if not enough data
+    if (starts.length < 2) return 28;
 
     const intervals: number[] = [];
     for (let i = 1; i < starts.length; i++) {
       const prev = new Date(starts[i - 1]);
       const curr = new Date(starts[i]);
       const diff = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-      // Include only realistic cycle lengths (15–50 days)
-      if (diff >= 15 && diff <= 50) intervals.push(diff);
+      // Only use intervals between 21 and 50 days (clinically plausible)
+      if (diff >= 21 && diff <= 50) intervals.push(diff);
     }
 
     if (intervals.length === 0) return 28;
@@ -110,11 +110,23 @@ export class CycleEngine {
 
   // Fertile window = ovulation day - 5 days to ovulation day
   public getFertileWindow(): { start: Date | null; end: Date | null } {
-    const ovu = this.getOvulationDay();
-    if (!ovu) return { start: null, end: null };
-    const start = new Date(ovu);
-    start.setDate(start.getDate() - 5);
-    return { start, end: ovu };
+    const lastStart = this.getLastCycleStart();
+    if (!lastStart) return { start: null, end: null };
+
+    const avg = this.getAverageCycleLength();
+    const bleeds = this.getAverageBleedingDays();
+    const remainingDays = avg - bleeds;
+    const follicularDays = Math.ceil(remainingDays / 3);
+    const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
+
+    const fertileStart = bleeds + follicularDays + 1;
+    const fertileEnd = fertileStart + fertileDays - 1;
+
+    const start = new Date(lastStart);
+    start.setDate(start.getDate() + fertileStart - 1);
+    const end = new Date(lastStart);
+    end.setDate(end.getDate() + fertileEnd - 1);
+    return { start, end };
   }
 
   // Current cycle day = days since last period start + 1
@@ -131,18 +143,23 @@ export class CycleEngine {
     const day = this.getCurrentCycleDay();
     const avgCycle = this.getAverageCycleLength();
     const bleeds = this.getAverageBleedingDays();
-    const ovuDay = avgCycle - 14;
-    const fertileStart = ovuDay - 5;
-    const fertileEnd = ovuDay;
 
-    // If cycle is overdue (> avgCycle), treat as menstrual (new cycle starting)
     if (day > avgCycle) return 'menstrual';
-
     if (day <= bleeds) return 'menstrual';
-    if (day >= fertileStart && day <= fertileEnd) return 'fertile';
-    if (day > fertileEnd && day < avgCycle) return 'luteal';
-    return 'follicular';
+
+    const remainingDays = avgCycle - bleeds;
+    const follicularDays = Math.ceil(remainingDays / 3);
+    const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
+    const lutealDays = remainingDays - follicularDays - fertileDays;
+
+    const follicularEnd = bleeds + follicularDays;
+    const fertileEnd = follicularEnd + fertileDays;
+
+    if (day <= follicularEnd) return 'follicular';
+    if (day <= fertileEnd) return 'fertile';
+    return 'luteal';
   }
+
 
   // Build prediction object used by the frontend
   public getPrediction(): any {
