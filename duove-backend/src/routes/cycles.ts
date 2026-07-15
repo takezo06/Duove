@@ -210,24 +210,33 @@ router.get('/partner/stats', async (req: Request, res: Response, next: NextFunct
     const partnerId = relationship.user_id === userId ? relationship.partner_id : relationship.user_id;
     const supabaseAdmin = createServiceClient();
     const partnerCycles = await getCycleLogs(supabaseAdmin, partnerId);
-    const partnerSymptoms = await getSymptomLogs(supabaseAdmin, partnerId);
 
     const engine = new CycleEngine(partnerCycles);
     const prediction = engine.getPrediction();
     const lastPeriodStart = partnerCycles.length > 0 ? partnerCycles[partnerCycles.length - 1].start_date : null;
 
+    // Read from/to from query; fallback to a wide range if not provided
     const now = new Date();
-    const calendarData = [];
-    for (let i = -7; i <= 7; i++) {
-      const date = new Date(now);
-      date.setDate(now.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
+    const todayStr = now.toISOString().split('T')[0];
+    const fromDate = (req.query.from as string) || new Date(now.setDate(now.getDate() - 30)).toISOString().split('T')[0];
+    const toDate = (req.query.to as string) || prediction.nextPeriodStart || new Date(now.setDate(now.getDate() + 30)).toISOString().split('T')[0];
+
+    const partnerSymptoms = await getSymptomLogs(supabaseAdmin, partnerId, fromDate, toDate);
+
+    // Build calendar for the requested range
+    const startDate = new Date(fromDate);
+    const endDate = new Date(toDate);
+    const calendarData: any[] = [];
+    let current = new Date(startDate);
+    while (current <= endDate) {
+      const dateStr = current.toISOString().split('T')[0];
       const found = partnerSymptoms.find((s: any) => s.log_date === dateStr);
       calendarData.push({
         date: dateStr,
         bleeding: found?.bleeding_intensity ? true : false,
         symptoms: !!found?.physical_symptoms?.length,
       });
+      current.setDate(current.getDate() + 1);
     }
 
     const { data: partnerProfile } = await supabaseAdmin
