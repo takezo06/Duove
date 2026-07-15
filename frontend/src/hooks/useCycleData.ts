@@ -19,7 +19,6 @@ export function useCycleData() {
 
   const fetchData = useCallback(async (rangeOption: RangeOption, start?: string, end?: string) => {
     setLoading(true);
-    // Clear previous data to avoid showing own while loading partner's
     setSymptomLogs([]);
     setCalendar([]);
 
@@ -31,22 +30,7 @@ export function useCycleData() {
         return;
       }
 
-      // 1. Fetch stats (prediction, lastPeriodStart)
-      const statsEndpoint = viewingPartner
-        ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/stats`
-        : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/stats`;
-      const statsRes = await axios.get(statsEndpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const statsData = statsRes.data;
-      setPrediction(statsData.prediction);
-      setLastPeriodStart(statsData.lastPeriodStart || null);
-
-      if (viewingPartner) {
-        setPartnerName(statsData.partnerName || 'Partner');
-      }
-
-      // 2. Compute date range
+      // 1. Compute date range from the selected option
       let fromDate = '';
       let toDate = '';
       const now = new Date();
@@ -72,7 +56,28 @@ export function useCycleData() {
         toDate = end;
       }
 
-      // 3. Fetch symptom logs – use partner endpoint when viewingPartner
+      // 2. Fetch stats – pass from/to so the partner stats endpoint returns a filtered calendar
+      const statsEndpoint = viewingPartner
+        ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/stats`
+        : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/stats`;
+
+      const statsParams: any = {};
+      if (fromDate) statsParams.from = fromDate;
+      if (toDate) statsParams.to = toDate;
+
+      const statsRes = await axios.get(statsEndpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: statsParams,
+      });
+      const statsData = statsRes.data;
+      setPrediction(statsData.prediction);
+      setLastPeriodStart(statsData.lastPeriodStart || null);
+
+      if (viewingPartner) {
+        setPartnerName(statsData.partnerName || 'Partner');
+      }
+
+      // 3. Fetch symptom logs (self or partner) with the same date range
       const symptomsEndpoint = viewingPartner
         ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/symptoms`
         : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`;
@@ -88,7 +93,7 @@ export function useCycleData() {
       }));
       setSymptomLogs(formattedSymptoms);
 
-      // 4. Fetch cycle history – use partner history when viewingPartner
+      // 4. Fetch cycle history (self or partner) – needed for bleeding days and earliest start
       const historyEndpoint = viewingPartner
         ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/history`
         : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/history`;
@@ -98,7 +103,6 @@ export function useCycleData() {
       });
       const allCycles = historyRes.data || [];
 
-      // Earliest cycle start
       if (allCycles.length > 0) {
         const starts = allCycles.map((c: any) => c.start_date).filter(Boolean);
         if (starts.length > 0) {
@@ -107,7 +111,6 @@ export function useCycleData() {
         }
       }
 
-      // Helper: bleeding day check
       const isBleedingDay = (dateStr: string) => {
         return allCycles.some((c: any) => {
           const cStart = c.start_date;
@@ -116,7 +119,7 @@ export function useCycleData() {
         });
       };
 
-      // 5. Build calendar
+      // 5. Build calendar from fromDate to toDate (the stats endpoint may also return a calendar, but we rebuild here to include all details)
       const startDate = new Date(fromDate);
       const endDate = new Date(toDate);
       const calendarDays: any[] = [];
@@ -134,7 +137,7 @@ export function useCycleData() {
         current.setDate(current.getDate() + 1);
       }
 
-      // 6. Extend calendar to show predicted future cycles
+      // 6. Extend calendar with future predicted days (up to next-next period)
       const nextPeriodStart = statsData.prediction?.nextPeriodStart;
       const avgCycle = statsData.prediction?.averageCycleLength || 28;
 
@@ -172,7 +175,7 @@ export function useCycleData() {
   }, [viewingPartner]);
 
   useEffect(() => {
-    setPrediction(null);                 // clear old data immediately
+    setPrediction(null);
     fetchData(range, customStart, customEnd);
   }, [range, viewingPartner, customStart, customEnd]);
 

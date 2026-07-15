@@ -283,19 +283,17 @@ export function CycleTracker() {
         averageCycleLength={averageCycleLength}
       />
 
-      {!viewingPartner && (
-        <DateRangeSelector
-          range={range}
-          setRange={setRange}
-          showCustom={range === 'custom'}
-          setShowCustom={() => {}}
-          customStart={customStart}
-          setCustomStart={setCustomStart}
-          customEnd={customEnd}
-          setCustomEnd={setCustomEnd}
-          applyCustomRange={applyCustomRange}
-        />
-      )}
+      <DateRangeSelector
+        range={range}
+        setRange={setRange}
+        showCustom={range === 'custom'}
+        setShowCustom={() => {}}
+        customStart={customStart}
+        setCustomStart={setCustomStart}
+        customEnd={customEnd}
+        setCustomEnd={setCustomEnd}
+        applyCustomRange={applyCustomRange}
+      />
 
       <CalendarGrid
         calendar={calendar}
