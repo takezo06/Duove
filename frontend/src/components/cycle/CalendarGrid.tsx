@@ -30,16 +30,12 @@ export function CalendarGrid({
   onDayClick,
   todayStr,
 }: CalendarGridProps) {
-  // Compute cycle day for any date, but only if we have data and date is on/after the first known cycle
   const getCycleDayForDate = (dateStr: string): number | null => {
-    // 1. Determine the earliest date we should show dots from
     const threshold = earliestCycleStart || lastPeriodStart;
     if (threshold && dateStr < threshold) return null;
 
-    // 2. If we have no cycle data at all, don't compute anything
     if (!prediction?.averageCycleLength) return null;
 
-    // 3. Find a reference start date
     let referenceStart = lastPeriodStart;
     if (!referenceStart && prediction.cycleDay) {
       const now = new Date();
@@ -64,14 +60,24 @@ export function CalendarGrid({
     if (!prediction || cycleDay <= 0) return null;
     const avgCycle = prediction.averageCycleLength || 28;
     const bleeds = prediction.averageBleedingDays || 5;
-    const ovuDay = avgCycle - 14;
-    const fertileStart = ovuDay - 5;
-    const fertileEnd = ovuDay;
 
+    // Day 1 .. bleeds = menstrual
     if (cycleDay <= bleeds) return 'menstrual';
-    if (cycleDay >= fertileStart && cycleDay <= fertileEnd) return 'fertile';
-    if (cycleDay > fertileEnd && cycleDay < avgCycle) return 'luteal';
-    return 'follicular';
+
+    // Remaining days after bleeding
+    const remainingDays = avgCycle - bleeds;
+    // Divide into 3 roughly equal parts (follicular, fertile, luteal)
+    const follicularDays = Math.ceil(remainingDays / 3);
+    const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
+    // whatever is left goes to luteal
+    const lutealDays = remainingDays - follicularDays - fertileDays;
+
+    const follicularEnd = bleeds + follicularDays;
+    const fertileEnd = follicularEnd + fertileDays;
+
+    if (cycleDay <= follicularEnd) return 'follicular';
+    if (cycleDay <= fertileEnd) return 'fertile';
+    return 'luteal';
   };
 
   const getSymptomForDate = (dateStr: string) => {
