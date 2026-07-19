@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../config/supabase';
+import { createServiceClient } from '../config/supabaseAdmin';
 import { logger } from '../config/logger';
 
 const router = Router();
@@ -37,7 +38,6 @@ router.get('/unread-count', async (req, res, next) => {
 
     const relationshipId = relationship.id;
 
-    // Count unread cravings
     const { count: cravingsCount, error: cravingsError } = await supabase
       .from('cravings')
       .select('*', { count: 'exact', head: true })
@@ -45,7 +45,6 @@ router.get('/unread-count', async (req, res, next) => {
       .neq('user_id', userId)
       .gt('created_at', lastReadAt);
 
-    // Count unread love letters ← FIXED table name
     const { count: lettersCount, error: lettersError } = await supabase
       .from('love_letters')
       .select('*', { count: 'exact', head: true })
@@ -53,7 +52,6 @@ router.get('/unread-count', async (req, res, next) => {
       .neq('sender_id', userId)
       .gt('created_at', lastReadAt);
 
-    // Count unread QA answers
     const { count: qaCount, error: qaError } = await supabase
       .from('qa_answers')
       .select('*', { count: 'exact', head: true })
@@ -98,7 +96,7 @@ router.get('/', async (req, res, next) => {
 
     const { data: relationship, error: relError } = await supabase
       .from('relationships')
-      .select('id')
+      .select('id, user_id, partner_id')
       .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
       .eq('status', 'active')
       .maybeSingle();
@@ -108,6 +106,18 @@ router.get('/', async (req, res, next) => {
     }
 
     const relationshipId = relationship.id;
+    const partnerId = relationship.user_id === userId
+      ? relationship.partner_id
+      : relationship.user_id;
+
+    // ✅ Use service-role client to bypass RLS on profiles
+    const supabaseAdmin = createServiceClient();
+    const { data: partnerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('display_name')
+      .eq('id', partnerId)
+      .maybeSingle();
+    const partnerDisplay = partnerProfile?.display_name || 'Your partner';
 
     // Fetch recent cravings (by partner)
     const { data: cravings, error: cravingsError } = await supabase
@@ -118,7 +128,7 @@ router.get('/', async (req, res, next) => {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Fetch recent love letters (received) ← FIXED table name
+    // Fetch recent love letters (received)
     const { data: letters, error: lettersError } = await supabase
       .from('love_letters')
       .select('id, sender_id, created_at')
@@ -136,7 +146,6 @@ router.get('/', async (req, res, next) => {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Format notifications with links
     const notifications: any[] = [];
 
     cravings?.forEach((c: any) => {
@@ -144,8 +153,8 @@ router.get('/', async (req, res, next) => {
         id: `craving_${c.id}`,
         type: c.fulfilled ? 'craving_fulfilled' : 'craving_added',
         message: c.fulfilled
-          ? `Partner fulfilled a craving: "${c.content}"`
-          : `Partner added a craving: "${c.content}"`,
+          ? `${partnerDisplay} fulfilled a craving: "${c.content}"`
+          : `${partnerDisplay} added a craving: "${c.content}"`,
         created_at: c.created_at,
         link: '/cravings',
         reference_id: c.id,
@@ -156,7 +165,7 @@ router.get('/', async (req, res, next) => {
       notifications.push({
         id: `letter_${l.id}`,
         type: 'letter_received',
-        message: `Partner sent you a letter 💌`,
+        message: `${partnerDisplay} sent you a letter 💌`,
         created_at: l.created_at,
         link: '/letters',
         reference_id: l.id,
@@ -167,14 +176,16 @@ router.get('/', async (req, res, next) => {
       notifications.push({
         id: `qa_${q.id}`,
         type: 'qa_answered',
-        message: `Partner answered the daily Q&A`,
+        message: `${partnerDisplay} answered the daily Q&A`,
         created_at: q.created_at,
         link: '/qa',
         reference_id: q.id,
       });
     });
 
-    notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    notifications.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
     res.json(notifications.slice(0, 50));
   } catch (error) {
