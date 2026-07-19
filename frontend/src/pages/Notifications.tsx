@@ -121,7 +121,7 @@ export function Notifications() {
 
         // Fetch notifications
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/notifications`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/notifications?_t=${Date.now()}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setNotifications(res.data);
