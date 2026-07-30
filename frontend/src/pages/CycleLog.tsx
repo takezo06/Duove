@@ -24,7 +24,7 @@ const PHYSICAL_SYMPTOMS = [
   'cramps', 'bloating', 'headache', 'acne', 'breast tenderness', 'fatigue', 'backache', 'nausea',
 ];
 const MOOD_OPTIONS = ['happy', 'sad', 'anxious', 'irritable', 'energetic', 'moody', 'calm', 'emotional'];
-const DISCHARGE_OPTIONS = ['sticky', 'creamy', 'egg-white', 'watery', 'dry'];
+const DISCHARGE_OPTIONS = ['sticky', 'creamy', 'eggwhite', 'watery', 'dry'];
 const DRIVE_OPTIONS = ['high', 'medium', 'low'];
 const SEX_ACTIVITY = ['unprotected', 'protected', 'masturbation'];
 
