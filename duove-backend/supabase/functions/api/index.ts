@@ -14,11 +14,16 @@ serve(async (req) => {
   }
 
   try {
-    // Parse URL and path
     const url = new URL(req.url);
-    const path = url.pathname.replace(/^\/api/, ""); 
+    // Clean the path: remove any duplicate /api and ensure it starts with /api
+    let path = url.pathname;
+    // Remove leading /api if present
+    path = path.replace(/^\/api/, "");
+    // Remove trailing slash
+    path = path.replace(/\/$/, "");
+    // If empty, set to /health as default
+    if (!path || path === "") path = "/health";
 
-    // Create Supabase client with user's auth
     const authHeader = req.headers.get("Authorization") || "";
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -29,7 +34,14 @@ serve(async (req) => {
       }
     );
 
-    // Get authenticated user
+    // HEALTH CHECK (no auth required)
+    if (path === "/health" && req.method === "GET") {
+      return new Response(JSON.stringify({ status: "ok" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get authenticated user for all other routes
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -38,16 +50,8 @@ serve(async (req) => {
       });
     }
 
-    // 🔥 HEALTH CHECK
-    if (path === "/health" && req.method === "GET") {
-      return new Response(JSON.stringify({ status: "ok" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // 🔥 CYCLES/STATS
-    if (path === "/api/cycles/stats" && req.method === "GET") {
-      // Get active relationship
+    // CYCLES/STATS
+    if (path === "/cycles/stats" && req.method === "GET") {
       const { data: relationship, error: relError } = await supabaseClient
         .from("relationships")
         .select("id")
@@ -62,7 +66,6 @@ serve(async (req) => {
         });
       }
 
-      // Fetch cycle logs
       const { data: cycles, error: cyclesError } = await supabaseClient
         .from("cycle_logs")
         .select("*")
@@ -77,7 +80,6 @@ serve(async (req) => {
         });
       }
 
-      // Calculate average cycle length
       const starts = cycles?.map((c: any) => c.start_date).sort() || [];
       let avgCycleLength = 28;
       if (starts.length >= 2) {
@@ -93,10 +95,7 @@ serve(async (req) => {
         }
       }
 
-      // Get last period start
       const lastPeriodStart = cycles && cycles.length > 0 ? cycles[cycles.length - 1].start_date : null;
-
-      // Predict next period
       let nextPeriodStart = null;
       if (lastPeriodStart) {
         const next = new Date(lastPeriodStart);
@@ -104,7 +103,6 @@ serve(async (req) => {
         nextPeriodStart = next.toISOString().split("T")[0];
       }
 
-      // Calculate current cycle day
       let cycleDay = 1;
       if (lastPeriodStart) {
         const start = new Date(lastPeriodStart);
@@ -112,7 +110,6 @@ serve(async (req) => {
         cycleDay = Math.floor((now.getTime() - start.getTime()) / 86400000) + 1;
       }
 
-      // Get symptoms for last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const { data: symptoms } = await supabaseClient
@@ -121,19 +118,62 @@ serve(async (req) => {
         .eq("user_id", user.id)
         .gte("log_date", thirtyDaysAgo.toISOString().split("T")[0]);
 
-      // Build response
-      const response = {
+      return new Response(JSON.stringify({
         prediction: {
           nextPeriodStart,
           cycleDay,
           averageCycleLength: avgCycleLength,
-          phase: "menstrual", // You'll need your phase logic here
+          phase: "menstrual",
         },
         calendar: symptoms || [],
         lastPeriodStart,
-      };
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-      return new Response(JSON.stringify(response), {
+    // RELATIONSHIPS/STATS
+    if (path === "/relationships/stats" && req.method === "GET") {
+      const { data: relationship, error: relError } = await supabaseClient
+        .from("relationships")
+        .select("*")
+        .or(`user_id.eq.${user.id},partner_id.eq.${user.id}`)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (relError || !relationship) {
+        return new Response(JSON.stringify({ error: "No active relationship found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const partnerId = relationship.user_id === user.id ? relationship.partner_id : relationship.user_id;
+      const { data: partnerProfile } = await supabaseClient
+        .from("profiles")
+        .select("display_name")
+        .eq("id", partnerId)
+        .maybeSingle();
+
+      return new Response(JSON.stringify({
+        relationship,
+        partner: {
+          id: partnerId,
+          display_name: partnerProfile?.display_name || "Partner",
+        },
+        stats: {
+          cravings: 0,
+          letters_sent: 0,
+          letters_received: 0,
+        },
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // NOTIFICATIONS
+    if (path === "/notifications" && req.method === "GET") {
+      return new Response(JSON.stringify([]), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -144,8 +184,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message || "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
