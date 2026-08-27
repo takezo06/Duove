@@ -65,7 +65,10 @@ serve(async (req) => {
 
   const url = new URL(req.url);
   // Path: /relationships/stats -> /stats, etc.
-  const path = url.pathname.replace(/^\/relationships/, "").replace(/\/+$/, "") || "/";
+  let path = url.pathname
+    .replace(/^\/api/, "")
+    .replace(/^\/relationships/, "")
+    .replace(/\/+$/, "") || "/";
 
   async function getActiveRelationship() {
     const { data } = await admin

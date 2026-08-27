@@ -89,7 +89,7 @@ export function Partner() {
       if (!token) throw new Error('Not authenticated');
 
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/stats?_t=${Date.now()}`,
+        `${import.meta.env.VITE_BACKEND_URL}/relationships/stats?_t=${Date.now()}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setStats(res.data);
