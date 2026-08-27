@@ -18,6 +18,23 @@ serve(async (req) => {
   const path = url.pathname.replace(/^\/cravings/, "").replace(/\/+$/, "") || "/";
 
   // GET /cravings
+  // Delete fulfilled cravings older than 24 hours
+  await admin
+    .from("cravings")
+    .delete()
+    .eq("fulfilled", true)
+    .lt("updated_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+  // Then fetch remaining cravings
+  const { data } = await admin
+    .from("cravings")
+    .select("*")
+    .eq("relationship_id", relationshipId)
+    .order("created_at", { ascending: false });
+
+  return new Response(JSON.stringify(data || []), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
   if (path === "/" && req.method === "GET") {
     const relationshipId = url.searchParams.get("relationshipId");
     const { data } = await admin
