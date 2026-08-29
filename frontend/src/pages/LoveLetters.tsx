@@ -26,7 +26,7 @@ export function LoveLetters() {
       if (!token) return;
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/love-letters?id=${highlightId}`,
+          `${import.meta.env.VITE_BACKEND_URL}/love-letters?id=${highlightId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.data && res.data.length > 0) {

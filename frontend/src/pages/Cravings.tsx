@@ -97,7 +97,7 @@ export function Cravings() {
 
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/relationships/me`,
+          `${import.meta.env.VITE_BACKEND_URL}/relationships/me`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.data && res.data.relationship) {
@@ -127,7 +127,7 @@ export function Cravings() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/cravings?relationshipId=${relationshipId}`,
+        `${import.meta.env.VITE_BACKEND_URL}/cravings?relationshipId=${relationshipId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setCravings(res.data);
@@ -149,7 +149,7 @@ export function Cravings() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/cravings`,
+        `${import.meta.env.VITE_BACKEND_URL}/cravings`,
         {
           relationshipId,
           partnerId,
@@ -173,7 +173,7 @@ export function Cravings() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/cravings/${id}/toggle`,
+        `${import.meta.env.VITE_BACKEND_URL}/cravings/${id}/toggle`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -189,7 +189,7 @@ export function Cravings() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.delete(
-        `${import.meta.env.VITE_BACKEND_URL}/api/cravings/${id}`,
+        `${import.meta.env.VITE_BACKEND_URL}/cravings/${id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       await fetchCravings();

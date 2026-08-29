@@ -50,7 +50,7 @@ export function Profile() {
 
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/profile`,
+          `${import.meta.env.VITE_BACKEND_URL}/profile`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -138,7 +138,7 @@ export function Profile() {
       }
 
       const res = await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/profile`,
+        `${import.meta.env.VITE_BACKEND_URL}/profile`,
         updateData,
         { headers: { Authorization: `Bearer ${token}` } }
       );

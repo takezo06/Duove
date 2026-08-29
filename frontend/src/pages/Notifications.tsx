@@ -121,7 +121,7 @@ export function Notifications() {
 
         // Fetch notifications
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/notifications?_t=${Date.now()}`,
+          `${import.meta.env.VITE_BACKEND_URL}/notifications?_t=${Date.now()}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setNotifications(res.data);
@@ -129,7 +129,7 @@ export function Notifications() {
         // Mark as read after fetching
         if (token) {
           await axios.post(
-            `${import.meta.env.VITE_BACKEND_URL}/api/notifications/read`,
+            `${import.meta.env.VITE_BACKEND_URL}/notifications/read`,
             {},
             { headers: { Authorization: `Bearer ${token}` } }
           );

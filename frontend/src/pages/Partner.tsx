@@ -113,7 +113,7 @@ export function Partner() {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) return;
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/pending?_t=${Date.now()}`,
+        `${import.meta.env.VITE_BACKEND_URL}/relationships/pending?_t=${Date.now()}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.data?.invite_code) setInviteCode(res.data.invite_code);
@@ -129,7 +129,7 @@ export function Partner() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       const res = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/invite`,
+        `${import.meta.env.VITE_BACKEND_URL}/relationships/invite`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -146,7 +146,7 @@ export function Partner() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/join`,
+        `${import.meta.env.VITE_BACKEND_URL}/relationships/join`,
         { invite_code: joinCode.trim().toUpperCase() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -171,7 +171,7 @@ export function Partner() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/relationships/anniversary`,
+        `${import.meta.env.VITE_BACKEND_URL}/relationships/anniversary`,
         { anniversary_date: newAnniversaryDate },
         { headers: { Authorization: `Bearer ${token}` } }
       );

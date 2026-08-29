@@ -26,7 +26,7 @@ export function AllLoveLetters() {
       if (!token) return;
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/love-letters?limit=50`,
+          `${import.meta.env.VITE_BACKEND_URL}/love-letters?limit=50`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setLetters(res.data);
@@ -58,7 +58,7 @@ export function AllLoveLetters() {
           const token = (await supabase.auth.getSession()).data.session?.access_token;
           if (!token) return;
           const res = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/api/love-letters?id=${highlightId}`,
+            `${import.meta.env.VITE_BACKEND_URL}/love-letters?id=${highlightId}`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
           if (res.data.length > 0) {

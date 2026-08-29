@@ -63,8 +63,8 @@ export function CycleTracker() {
     if (!token) return null;
 
     const endpoint = viewingPartner
-      ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/symptoms`
-      : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`;
+      ? `${import.meta.env.VITE_BACKEND_URL}/cycles/partner/symptoms`
+      : `${import.meta.env.VITE_BACKEND_URL}/cycles/symptoms`;
 
     try {
       const res = await axios.get(endpoint, {

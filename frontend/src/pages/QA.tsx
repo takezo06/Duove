@@ -39,7 +39,7 @@ export function QA() {
   const fetchCurrent = async () => {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/qa/current`, {
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/qa/current`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCurrent(res.data);
@@ -54,7 +54,7 @@ export function QA() {
   const fetchCategories = async () => {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/qa/categories`, {
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/qa/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCategories(res.data);
@@ -79,7 +79,7 @@ export function QA() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       const res = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/qa/submit`,
+        `${import.meta.env.VITE_BACKEND_URL}/qa/submit`,
         { question_id: current.question.id, answer_text: answerText.trim() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -97,7 +97,7 @@ export function QA() {
     setError(null);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/qa/skip`, {}, {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}//qa/skip`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSuccess('Question skipped. A new one will be assigned.');
@@ -111,7 +111,7 @@ export function QA() {
     setUpdatingCategory(true);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      await axios.patch(`${import.meta.env.VITE_BACKEND_URL}/api/qa/preferred-category`, { category_id: categoryId }, {
+      await axios.patch(`${import.meta.env.VITE_BACKEND_URL}/qa/preferred-category`, { category_id: categoryId }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSelectedCategoryId(categoryId);

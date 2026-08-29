@@ -65,7 +65,7 @@ export function CycleLog() {
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         if (!token) return;
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms?from=${logDate}&to=${logDate}`,
+          `${import.meta.env.VITE_BACKEND_URL}/cycles/symptoms?from=${logDate}&to=${logDate}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.data.length > 0) {
@@ -139,7 +139,7 @@ export function CycleLog() {
       };
 
       await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`,
+        `${import.meta.env.VITE_BACKEND_URL}/cycles/symptoms`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -147,7 +147,7 @@ export function CycleLog() {
       // 2. Save cycle start if checked
       if (isCycleStart) {
         await axios.post(
-          `${import.meta.env.VITE_BACKEND_URL}/api/cycles/log`,
+          `${import.meta.env.VITE_BACKEND_URL}/cycles/log`,
           { start_date: logDate, end_date: cycleEndDate || null },
           { headers: { Authorization: `Bearer ${token}` } }
         );
