@@ -48,8 +48,8 @@ export function QAHistory() {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       const url = cursor
-        ? `${import.meta.env.VITE_BACKEND_URL}/api/qa/history?cursor=${cursor}`
-        : `${import.meta.env.VITE_BACKEND_URL}/api/qa/history`;
+        ? `${import.meta.env.VITE_BACKEND_URL}/qa/history?cursor=${cursor}`
+        : `${import.meta.env.VITE_BACKEND_URL}/qa/history`;
       const res = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });

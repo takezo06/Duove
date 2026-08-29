@@ -36,10 +36,10 @@ export function CycleAnalytics() {
       try {
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         const [symptomsRes, cyclesRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`, {
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/cycles/symptoms`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/cycles/history`, {
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/cycles/history`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

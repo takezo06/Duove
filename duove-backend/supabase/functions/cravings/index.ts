@@ -10,38 +10,33 @@ serve(async (req) => {
   const userId = await getUserId(req);
   if (!userId) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/cravings/, "").replace(/\/+$/, "") || "/";
+  // Remove /cravings prefix, then trailing slashes; default to "/"
+  let path = url.pathname.replace(/^\/cravings/, "").replace(/\/+$/, "") || "/";
 
-  // GET /cravings
-  // Delete fulfilled cravings older than 24 hours
-  await admin
-    .from("cravings")
-    .delete()
-    .eq("fulfilled", true)
-    .lt("updated_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-  // Then fetch remaining cravings
-  const { data } = await admin
-    .from("cravings")
-    .select("*")
-    .eq("relationship_id", relationshipId)
-    .order("created_at", { ascending: false });
-
-  return new Response(JSON.stringify(data || []), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-  if (path === "/" && req.method === "GET") {
+  // ✅ FIXED: GET /cravings
+  if (path === "/cravings" && req.method === "GET") {
     const relationshipId = url.searchParams.get("relationshipId");
-    const { data } = await admin
+
+    // 1) Delete fulfilled cravings older than 24 hours
+    await supabaseAdmin
+      .from("cravings")
+      .delete()
+      .eq("fulfilled", true)
+      .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    // 2) Fetch remaining cravings
+    const { data } = await supabaseAdmin
       .from("cravings")
       .select("*")
       .eq("relationship_id", relationshipId)
       .order("created_at", { ascending: false });
+
     return new Response(JSON.stringify(data || []), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -53,27 +48,42 @@ serve(async (req) => {
     const { relationshipId, partnerId, content, category } = body;
     const { data, error } = await admin
       .from("cravings")
-      .insert({ relationship_id: relationshipId, user_id: userId, partner_id: partnerId, content, category })
-      .select().single();
+      .insert({
+        relationship_id: relationshipId,
+        user_id: userId,
+        partner_id: partnerId,
+        content,
+        category,
+      })
+      .select()
+      .single();
+
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     return new Response(JSON.stringify(data), {
-      status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 201,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   // PATCH /cravings/:id/toggle
   if (path.match(/^\/[\w-]+\/toggle$/) && req.method === "PATCH") {
     const cravingId = path.split("/")[1];
-    const { data: existing } = await admin.from("cravings").select("fulfilled").eq("id", cravingId).single();
+    const { data: existing } = await admin
+      .from("cravings")
+      .select("fulfilled")
+      .eq("id", cravingId)
+      .single();
     const { data } = await admin
       .from("cravings")
       .update({ fulfilled: !existing?.fulfilled })
       .eq("id", cravingId)
-      .select().single();
+      .select()
+      .single();
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -87,6 +97,7 @@ serve(async (req) => {
   }
 
   return new Response(JSON.stringify({ error: "Not found" }), {
-    status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status: 404,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

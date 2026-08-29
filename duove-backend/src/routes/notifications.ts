@@ -1,4 +1,4 @@
-import { Router } from 'express';
+mport { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../config/supabase';
 import { createServiceClient } from '../config/supabaseAdmin';
