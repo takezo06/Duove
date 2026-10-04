@@ -16,22 +16,22 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  // Remove /cravings prefix, then trailing slashes; default to "/"
+  // Remove /cravings prefix; default to "/"
   let path = url.pathname.replace(/^\/cravings/, "").replace(/\/+$/, "") || "/";
 
-  // ✅ FIXED: GET /cravings
-  if (path === "/cravings" && req.method === "GET") {
+  // ✅ GET /cravings
+  if (path === "/" && req.method === "GET") {
     const relationshipId = url.searchParams.get("relationshipId");
 
     // 1) Delete fulfilled cravings older than 24 hours
-    await supabaseAdmin
+    await admin
       .from("cravings")
       .delete()
       .eq("fulfilled", true)
       .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
     // 2) Fetch remaining cravings
-    const { data } = await supabaseAdmin
+    const { data } = await admin
       .from("cravings")
       .select("*")
       .eq("relationship_id", relationshipId)
@@ -46,6 +46,7 @@ serve(async (req) => {
   if (path === "/" && req.method === "POST") {
     const body = await req.json();
     const { relationshipId, partnerId, content, category } = body;
+
     const { data, error } = await admin
       .from("cravings")
       .insert({
@@ -64,6 +65,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
     return new Response(JSON.stringify(data), {
       status: 201,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -78,12 +80,14 @@ serve(async (req) => {
       .select("fulfilled")
       .eq("id", cravingId)
       .single();
+
     const { data } = await admin
       .from("cravings")
       .update({ fulfilled: !existing?.fulfilled })
       .eq("id", cravingId)
       .select()
       .single();
+
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
