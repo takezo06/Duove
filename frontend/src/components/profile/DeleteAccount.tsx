@@ -13,7 +13,7 @@ export function DeleteAccount() {
     setError(null);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/account`, {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/account`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       // Sign out and redirect to login

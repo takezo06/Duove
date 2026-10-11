@@ -5,6 +5,7 @@ import { phaseColors } from './cycle/constants';
 import { relationshipYear } from '../lib/relationshipYear';
 import { Avatar, Badge, CardHeader, focusRing, iconClass, inset, primaryButton, surface } from './Card';
 import { plural } from '../lib/plural';
+import { categoryFor } from '../lib/cravingCategories';
 import {
   Activity,
   ArrowRight,
@@ -325,7 +326,10 @@ export function BentoGrid() {
           <ul className="space-y-2">
             {cravings.map((c) => (
               <li key={c.id} className="flex items-start gap-2.5 text-neutral-200 leading-snug">
-                <span className="w-1.5 h-1.5 mt-2 rounded-full bg-rose-400 shrink-0" aria-hidden />
+                {(() => {
+                  const cat = categoryFor(c.category);
+                  return <cat.icon className={`w-4 h-4 mt-0.5 shrink-0 ${cat.iconColor}`} aria-label={cat.label} />;
+                })()}
                 <span className="line-clamp-2">{c.content}</span>
               </li>
             ))}

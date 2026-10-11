@@ -21,7 +21,7 @@ export function RecentLettersList({ onSelectLetter }: RecentLettersListProps) {
     const token = (await supabase.auth.getSession()).data.session?.access_token;
     if (!token) return;
     try {
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/love-letters?limit=6`, {
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/love-letters?limit=6`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLetters(res.data);
