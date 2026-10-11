@@ -8,25 +8,35 @@ import {
   ListTodo,
   Mail,
   MessageCircleQuestion,
-  User,
   Heart,
   Bell,
-  ChevronLeft,
-  ChevronRight,
   LogOut,
-  UserPlus,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
-const navItems = [
-  { icon: Home, label: 'Dashboard', path: '/' },
-  { icon: Bell, label: 'Notifications', path: '/notifications' },
-  { icon: CalendarDays, label: 'Cycle Tracker', path: '/cycle' },
-  { icon: ListTodo, label: 'Cravings', path: '/cravings' },
-  { icon: Mail, label: 'Love Letters', path: '/letters' },
-  { icon: MessageCircleQuestion, label: 'Daily Q&A', path: '/qa' },
-  { icon: User, label: 'Profile', path: '/profile' },
-  { icon: UserPlus, label: 'Partner', path: '/partner' },
+const navGroups = [
+  {
+    label: null,
+    items: [
+      { icon: Home, label: 'Dashboard', path: '/' },
+      { icon: Bell, label: 'Notifications', path: '/notifications' },
+    ],
+  },
+  {
+    label: 'Together',
+    items: [
+      { icon: MessageCircleQuestion, label: 'Daily Q&A', path: '/qa' },
+      { icon: Mail, label: 'Love Letters', path: '/letters' },
+      { icon: ListTodo, label: 'Cravings', path: '/cravings' },
+      { icon: CalendarDays, label: 'Cycle Tracker', path: '/cycle' },
+      { icon: Heart, label: 'Partner', path: '/partner' },
+    ],
+  },
 ];
+
+const focusRing =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900';
 
 const MIN_WIDTH = 64;
 const MAX_WIDTH = 400;
@@ -236,6 +246,7 @@ export function Sidebar() {
 
   const toggleCollapse = () => {
     if (isMobile) return;
+    handleMouseLeave(); // the button under the cursor unmounts, so mouseleave never fires
     if (isCollapsed) {
       const target = lastExpandedWidth.current >= 120 ? lastExpandedWidth.current : DEFAULT_WIDTH;
       setIsCollapsed(false);
@@ -287,7 +298,7 @@ export function Sidebar() {
   return (
     <div className="relative flex-shrink-0 h-screen select-none">
       {/* Tooltip Overlay */}
-      {tooltipVisible && shouldShowTooltips && (
+      {tooltipVisible && (
         <div
           className="fixed px-3 py-1.5 bg-neutral-800 text-sm text-neutral-100 rounded-lg shadow-xl border border-neutral-700/70 pointer-events-none z-[200] whitespace-nowrap"
           style={{
@@ -305,128 +316,122 @@ export function Sidebar() {
         className="flex flex-col h-full bg-neutral-900 border-r border-neutral-800 overflow-x-hidden overflow-y-auto transition-all duration-300 ease-in-out"
         style={{ width: currentWidth }}
       >
-        {/* Logo Block Frame */}
-        <div className="flex items-center h-16 px-4 border-b border-neutral-800/50 flex-shrink-0 overflow-hidden">
-          <div className={`flex items-center w-full ${!showText ? 'justify-center' : 'justify-start gap-3'}`}>
-            <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 flex-shrink-0 transition-transform duration-300 hover:scale-105">
-              <img
-                src="/duove-logo.svg"
-                alt="Duove"
-                className="w-5 h-5 object-contain"
-              />
-            </div>
-            {!isCollapsed && showText && (
-              <span className="text-lg font-bold text-white tracking-wide animate-fade-in">
-                Duove
-              </span>
-            )}
-          </div>
+        {/* Brand. Collapsed: the logo doubles as the expand button */}
+        <div className={`flex items-center shrink-0 h-[72px] ${showText ? 'px-5 justify-between' : 'justify-center'}`}>
+          {showText ? (
+            <>
+              <Link to="/" className={`flex items-center gap-2.5 rounded-lg ${focusRing}`}>
+                <img src="/duove-logo.svg" alt="" className="w-8 h-8 object-contain" />
+                <span className="text-xl font-bold text-white tracking-tight">Duove</span>
+              </Link>
+              {!isMobile && (
+                <button
+                  onClick={toggleCollapse}
+                  aria-label="Collapse sidebar"
+                  className={`w-8 h-8 flex items-center justify-center rounded-lg text-neutral-500 hover:text-white hover:bg-neutral-800 transition cursor-pointer ${focusRing}`}
+                >
+                  <PanelLeftClose className="w-[18px] h-[18px]" />
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              onClick={toggleCollapse}
+              disabled={isMobile}
+              aria-label="Expand sidebar"
+              onMouseEnter={(e) => !isMobile && handleMouseEnter('Expand sidebar', e)}
+              onMouseLeave={handleMouseLeave}
+              className={`group w-10 h-10 flex items-center justify-center rounded-xl hover:bg-neutral-800 disabled:hover:bg-transparent transition enabled:cursor-pointer ${focusRing}`}
+            >
+              <img src="/duove-logo.svg" alt="Duove" className={`w-8 h-8 object-contain ${isMobile ? '' : 'group-hover:hidden'}`} />
+              {!isMobile && <PanelLeftOpen className="w-[18px] h-[18px] text-white hidden group-hover:block" />}
+            </button>
+          )}
         </div>
 
-        {/* Primary Route Lists View Matrix */}
-        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden">
-          {navItems.map(({ icon: Icon, label, path }) => {
-            const active = isActive(path);
-            const isBell = label === 'Notifications';
-            return (
-              <Link
-                key={label}
-                to={path}
-                onMouseEnter={(e) => {
-                  if (shouldShowTooltips) handleMouseEnter(label, e);
-                }}
-                onMouseLeave={handleMouseLeave}
-                className={`
-                  flex items-center rounded-xl text-sm font-medium transition-all duration-200 group relative
-                  ${!showText ? 'justify-center p-3' : 'justify-start gap-3 px-4 py-3'}
-                  ${active 
-                    ? 'bg-neutral-800 border-l-2 border-rose-500 text-rose-400 font-semibold shadow-inner' 
-                    : 'text-neutral-400 hover:text-white hover:bg-neutral-800/50'
-                  }
-                `}
-              >
-                <div className="relative flex items-center justify-center flex-shrink-0">
-                  <Icon className={`w-5 h-5 transition-all duration-200 ${active ? 'text-rose-400 scale-105' : 'group-hover:scale-105'}`} />
-                  {isBell && unreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-rose-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold border border-neutral-900">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </div>
-                
-                {!isCollapsed && showText && (
-                  <span className="whitespace-nowrap truncate animate-fade-in">
-                    {label}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+        <nav aria-label="Main" className={`flex-1 pb-4 overflow-y-auto overflow-x-hidden ${showText ? 'px-3' : 'px-2'}`}>
+          {navGroups.map((group, gi) => (
+            <div key={gi} className={gi > 0 ? 'mt-6' : ''}>
+              {group.label &&
+                (showText ? (
+                  <p className="px-3 mb-2 text-xs font-medium text-neutral-500">{group.label}</p>
+                ) : (
+                  <div className="mx-auto mb-3 w-6 border-t border-neutral-800" aria-hidden />
+                ))}
+              <ul className="space-y-1">
+                {group.items.map(({ icon: Icon, label, path }) => {
+                  const active = isActive(path);
+                  const badge = path === '/notifications' && unreadCount > 0 ? (unreadCount > 9 ? '9+' : String(unreadCount)) : null;
+                  return (
+                    <li key={path}>
+                      <Link
+                        to={path}
+                        aria-current={active ? 'page' : undefined}
+                        aria-label={showText ? undefined : badge ? `${label}, ${badge} unread` : label}
+                        onMouseEnter={(e) => shouldShowTooltips && handleMouseEnter(label, e)}
+                        onMouseLeave={handleMouseLeave}
+                        className={`flex items-center h-10 rounded-xl text-sm font-medium transition ${focusRing}
+                          ${showText ? 'gap-3 px-3' : 'justify-center'}
+                          ${active ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'}`}
+                      >
+                        <span className="relative shrink-0">
+                          <Icon className={`w-5 h-5 ${active ? 'text-rose-400' : ''}`} aria-hidden />
+                          {badge && !showText && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-neutral-900" aria-hidden />
+                          )}
+                        </span>
+                        {showText && <span className="flex-1 truncate">{label}</span>}
+                        {badge && showText && (
+                          <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-semibold flex items-center justify-center tabular-nums">
+                            {badge}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </nav>
 
-        {/* User Card & Control Tray Footer Area */}
-        <div className="border-t border-neutral-800/50 p-3 flex flex-col gap-2 overflow-x-hidden bg-neutral-900/40">
-          <div
-            className={`
-              flex items-center rounded-xl transition-all duration-200 p-2
-              ${!showText ? 'justify-center bg-transparent' : 'justify-start gap-3 bg-transparent hover:bg-neutral-800/50'}
-            `}
+        {/* Account: card opens Profile, icon signs out */}
+        <div className={`shrink-0 border-t border-neutral-800 p-3 flex gap-1 ${showText ? 'items-center' : 'flex-col items-center'}`}>
+          <Link
+            to="/profile"
+            aria-current={isActive('/profile') ? 'page' : undefined}
+            aria-label={showText ? undefined : `Profile, ${userName || 'you'}`}
+            onMouseEnter={(e) => shouldShowTooltips && handleMouseEnter('Profile', e)}
+            onMouseLeave={handleMouseLeave}
+            className={`flex items-center rounded-xl transition ${focusRing}
+              ${showText ? 'flex-1 min-w-0 gap-3 p-2' : 'p-1'}
+              ${isActive('/profile') ? 'bg-neutral-800' : 'hover:bg-neutral-800/60'}`}
           >
-            <div className="w-9 h-9 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center text-sm font-semibold flex-shrink-0 shadow-inner overflow-hidden">
-              {loadingUser ? (
-                <span className="text-xs opacity-50">...</span>
-              ) : profileAvatarUrl ? (
-                <img src={profileAvatarUrl} alt={userName} className="w-full h-full object-cover" />
+            <span className="w-9 h-9 rounded-full bg-neutral-800 text-rose-400 flex items-center justify-center text-sm font-semibold shrink-0 overflow-hidden">
+              {loadingUser ? null : profileAvatarUrl ? (
+                <img src={profileAvatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
                 userAvatar
               )}
-            </div>
-            {!isCollapsed && showText && (
-              <div className="min-w-0 flex-1 animate-fade-in">
-                <p className="text-sm text-white font-medium truncate">
-                  {loadingUser ? 'Loading...' : userName || 'User'}
-                </p>
-                <p className="text-xs text-neutral-500 truncate mt-0.5">
-                  {loadingUser ? '' : userEmail}
-                </p>
-              </div>
+            </span>
+            {showText && (
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-white truncate">
+                  {loadingUser ? 'Loading…' : userName || 'User'}
+                </span>
+                <span className="block text-xs text-neutral-400 truncate">{loadingUser ? '' : userEmail}</span>
+              </span>
             )}
-          </div>
-
-          {/* Controls Trigger Bar Matrix */}
-          <div className={`flex ${!showText ? 'flex-col items-center gap-2 mt-1' : 'items-center justify-between px-1 pt-1'}`}>
-            {!isMobile && (
-              <button
-                onClick={toggleCollapse}
-                className={`
-                  flex items-center justify-center w-9 h-9 rounded-xl
-                  text-neutral-500 hover:text-white hover:bg-neutral-800 transition-all duration-150 focus:outline-none
-                `}
-                title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="w-4 h-4 transition-transform hover:translate-x-0.5" />
-                ) : (
-                  <ChevronLeft className="w-4 h-4 transition-transform hover:-translate-x-0.5" />
-                )}
-              </button>
-            )}
-
-            <button
-              onClick={handleLogout}
-              onMouseEnter={(e) => {
-                if (shouldShowTooltips) handleMouseEnter('Logout', e);
-              }}
-              onMouseLeave={handleMouseLeave}
-              className={`
-                flex items-center justify-center w-9 h-9 rounded-xl
-                text-neutral-500 hover:text-rose-400 hover:bg-neutral-800 transition-all duration-150 focus:outline-none
-              `}
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4 transition-transform hover:scale-105" />
-            </button>
-          </div>
+          </Link>
+          <button
+            onClick={handleLogout}
+            aria-label="Sign out"
+            onMouseEnter={(e) => handleMouseEnter('Sign out', e)}
+            onMouseLeave={handleMouseLeave}
+            className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-neutral-500 hover:text-rose-400 hover:bg-neutral-800 transition cursor-pointer ${focusRing}`}
+          >
+            <LogOut className="w-[18px] h-[18px]" />
+          </button>
         </div>
       </aside>
 
