@@ -1,5 +1,7 @@
-# machine-local: absolute paths to this machine's graphify install
+node_modules/
+
+# machine-local Claude Code hooks (absolute paths)
 .claude/settings.json
-graphify-out/.graphify_python
-graphify-out/.graphify_root
-graphify-out/cache/
+
+# graphify knowledge graph: local, rebuilt by the post-commit hook
+graphify-out/
