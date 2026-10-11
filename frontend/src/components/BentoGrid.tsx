@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { phaseColors } from './cycle/constants';
 import { relationshipYear } from '../lib/relationshipYear';
+import { Avatar, Badge, CardHeader, focusRing, iconClass, inset, primaryButton, surface } from './Card';
+import { plural } from '../lib/plural';
 import {
   Activity,
   ArrowRight,
@@ -22,57 +24,6 @@ function greetingFor(hour: number) {
 }
 
 const shortDate = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
-// One vocabulary for the whole page
-const focusRing =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950';
-const surface = 'bg-neutral-900 rounded-2xl border border-neutral-800';
-const inset = 'rounded-xl bg-neutral-800/40 border border-neutral-800 px-4 py-3';
-const primaryButton = `inline-flex items-center justify-center gap-2 px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition shadow-lg shadow-rose-500/20 ${focusRing}`;
-
-type Tone = 'rose' | 'emerald' | 'neutral';
-const toneClass: Record<Tone, string> = {
-  rose: 'bg-rose-500/10 border-rose-400/20 text-rose-400',
-  emerald: 'bg-emerald-500/10 border-emerald-400/20 text-emerald-400',
-  neutral: 'bg-neutral-800 border-neutral-700 text-neutral-300',
-};
-
-// Status pill, same shape as the "Connected" pill on the Partner page
-function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium whitespace-nowrap ${toneClass[tone]}`}>
-      {children}
-    </span>
-  );
-}
-
-// Section header used by every card: rose icon + label on the left, status on the right
-function CardHeader({ icon, title, badge }: { icon: ReactNode; title: string; badge?: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 min-h-6">
-      <h2 className="flex items-center gap-2 text-neutral-400 text-sm">
-        {icon}
-        {title}
-      </h2>
-      {badge}
-    </div>
-  );
-}
-
-function Avatar({ src, name }: { src: string | null; name: string }) {
-  const base = 'w-16 h-16 rounded-full ring-4 ring-neutral-900 object-cover shrink-0';
-  return src ? (
-    <img src={src} alt={name} className={base} />
-  ) : (
-    <div
-      aria-label={name}
-      className={`${base} bg-neutral-800 flex items-center justify-center text-xl font-semibold text-rose-400`}
-    >
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
-}
 
 function Tile({
   to,
@@ -100,8 +51,6 @@ function Tile({
     </Link>
   );
 }
-
-const iconClass = 'w-4 h-4 text-rose-400';
 
 export function BentoGrid() {
   const navigate = useNavigate();

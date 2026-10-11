@@ -1,0 +1,54 @@
+import type { ReactNode } from 'react';
+
+// Shared visual vocabulary for Duove pages (dashboard, partner, ...)
+export const focusRing =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950';
+export const surface = 'bg-neutral-900 rounded-2xl border border-neutral-800';
+export const inset = 'rounded-xl bg-neutral-800/40 border border-neutral-800 px-4 py-3';
+export const primaryButton = `inline-flex items-center justify-center gap-2 px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition shadow-lg shadow-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${focusRing}`;
+export const secondaryButton = `inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-sm font-medium transition border border-neutral-700 disabled:opacity-50 cursor-pointer ${focusRing}`;
+export const iconClass = 'w-4 h-4 text-rose-400';
+
+type Tone = 'rose' | 'emerald' | 'neutral';
+const toneClass: Record<Tone, string> = {
+  rose: 'bg-rose-500/10 border-rose-400/20 text-rose-400',
+  emerald: 'bg-emerald-500/10 border-emerald-400/20 text-emerald-400',
+  neutral: 'bg-neutral-800 border-neutral-700 text-neutral-300',
+};
+
+// Status pill: rose = needs you, emerald = done/connected, neutral = info
+export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium whitespace-nowrap ${toneClass[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+// Card header: rose icon + label on the left, optional status on the right
+export function CardHeader({ icon, title, badge }: { icon: ReactNode; title: string; badge?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 min-h-6">
+      <h2 className="flex items-center gap-2 text-neutral-400 text-sm">
+        {icon}
+        {title}
+      </h2>
+      {badge}
+    </div>
+  );
+}
+
+export function Avatar({ src, name, dashed = false }: { src: string | null; name: string; dashed?: boolean }) {
+  const base = 'w-16 h-16 rounded-full ring-4 ring-neutral-900 object-cover shrink-0';
+  if (src) return <img src={src} alt={name} className={base} />;
+  return (
+    <div
+      aria-label={name}
+      className={`${base} flex items-center justify-center text-xl font-semibold ${
+        dashed ? 'bg-neutral-900 border-2 border-dashed border-neutral-700 text-neutral-500' : 'bg-neutral-800 text-rose-400'
+      }`}
+    >
+      {dashed ? '?' : name.charAt(0).toUpperCase()}
+    </div>
+  );
+}

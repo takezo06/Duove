@@ -103,10 +103,10 @@ serve(async (req) => {
       .eq("id", userId)
       .single();
 
-    // Partner profile (display_name, avatar_url)
+    // Partner profile (display_name, avatar_url, created_at)
     const { data: partnerProfile } = await admin
       .from("profiles")
-      .select("display_name, avatar_url")
+      .select("display_name, avatar_url, created_at")
       .eq("id", partnerId)
       .single();
     const partnerDisplay = partnerProfile?.display_name || "Partner";
@@ -229,6 +229,7 @@ serve(async (req) => {
           id: partnerId,
           display_name: partnerDisplay,
           avatar_url: partnerAvatar,
+          account_created: partnerProfile?.created_at ?? null,
         },
         stats: {
           cravings: cravingsCount || 0,
