@@ -8,6 +8,7 @@ export interface DashboardData {
   partnerName: string;
   partnerAvatar: string | null;
   daysTogether: number;
+  since: string | null; // anniversary date, or pairing date if none set
   cycle: {
     phase: string;
     daysUntilPeriod: number;
@@ -39,6 +40,7 @@ export function useDashboardData(): DashboardData {
     partnerName: '',
     partnerAvatar: null,
     daysTogether: 0,
+    since: null,
     cycle: null,
     latestLetter: null,
     currentQuestion: null,
@@ -179,6 +181,7 @@ export function useDashboardData(): DashboardData {
           partnerName,
           partnerAvatar: partnerAvatarUrl,
           daysTogether,
+          since: startDateStr || null,
           cycle: cycleData,
           latestLetter,
           currentQuestion,
