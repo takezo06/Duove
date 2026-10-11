@@ -58,8 +58,8 @@ export function useCycleData() {
 
       // 2. Fetch stats – pass from/to so the partner stats endpoint returns a filtered calendar
       const statsEndpoint = viewingPartner
-        ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/stats`
-        : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/stats`;
+        ? `${import.meta.env.VITE_BACKEND_URL}/cycles/partner/stats`
+        : `${import.meta.env.VITE_BACKEND_URL}/cycles/stats`;
 
       const statsParams: any = {};
       if (fromDate) statsParams.from = fromDate;
@@ -79,8 +79,8 @@ export function useCycleData() {
 
       // 3. Fetch symptom logs (self or partner) with the same date range
       const symptomsEndpoint = viewingPartner
-        ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/symptoms`
-        : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/symptoms`;
+        ? `${import.meta.env.VITE_BACKEND_URL}/cycles/partner/symptoms`
+        : `${import.meta.env.VITE_BACKEND_URL}/cycles/symptoms`;
 
       const symptomsRes = await axios.get(symptomsEndpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -95,8 +95,8 @@ export function useCycleData() {
 
       // 4. Fetch cycle history (self or partner) – needed for bleeding days and earliest start
       const historyEndpoint = viewingPartner
-        ? `${import.meta.env.VITE_BACKEND_URL}/api/cycles/partner/history`
-        : `${import.meta.env.VITE_BACKEND_URL}/api/cycles/history`;
+        ? `${import.meta.env.VITE_BACKEND_URL}/cycles/partner/history`
+        : `${import.meta.env.VITE_BACKEND_URL}/cycles/history`;
 
       const historyRes = await axios.get(historyEndpoint, {
         headers: { Authorization: `Bearer ${token}` },

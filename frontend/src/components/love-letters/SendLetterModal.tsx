@@ -39,10 +39,10 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
 
         // Get partner's name
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/relationships/partner-name`,
+          `${import.meta.env.VITE_BACKEND_URL}/relationships/me`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setRecipientName(res.data.name || 'My love');
+        setRecipientName(res.data.partner?.display_name || 'My love');
       } catch (err) {
         console.error(err);
         setRecipientName('My love');
@@ -57,7 +57,7 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
     setLoading(true);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/love-letters/search-song`, {
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/love-letters/search-song`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { q: searchQuery },
       });
@@ -75,7 +75,7 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/love-letters`,
+        `${import.meta.env.VITE_BACKEND_URL}/love-letters`,
         {
           heading,
           message: body,

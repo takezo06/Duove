@@ -80,7 +80,7 @@ export function useDashboardData(): DashboardData {
 
         // 2. Relationship stats (partner name, id, dates)
         const statsRes = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/relationships/stats`,
+          `${import.meta.env.VITE_BACKEND_URL}/relationships/stats`,
           { headers }
         );
         const stats = statsRes.data;
@@ -105,7 +105,7 @@ export function useDashboardData(): DashboardData {
         let cycleData = null;
         try {
           const cycleRes = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/api/cycles/stats`,
+            `${import.meta.env.VITE_BACKEND_URL}/cycles/stats`,
             { headers }
           );
           const pred = cycleRes.data.prediction;
@@ -124,7 +124,7 @@ export function useDashboardData(): DashboardData {
         let latestLetter = null;
         try {
           const lettersRes = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/api/love-letters?limit=1`,
+            `${import.meta.env.VITE_BACKEND_URL}/love-letters?limit=1`,
             { headers }
           );
           const letters = lettersRes.data;
@@ -142,7 +142,7 @@ export function useDashboardData(): DashboardData {
         let currentQuestion = null;
         try {
           const qaRes = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/api/qa/current`,
+            `${import.meta.env.VITE_BACKEND_URL}/qa/current`,
             { headers }
           );
           const qa = qaRes.data;
@@ -163,7 +163,7 @@ export function useDashboardData(): DashboardData {
           const relId = stats.relationship?.id;
           if (relId) {
             const cravingsRes = await axios.get(
-              `${import.meta.env.VITE_BACKEND_URL}/api/cravings?relationshipId=${relId}`,
+              `${import.meta.env.VITE_BACKEND_URL}/cravings?relationshipId=${relId}`,
               { headers }
             );
             const allCravings = cravingsRes.data || [];

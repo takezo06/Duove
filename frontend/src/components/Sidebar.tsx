@@ -158,7 +158,7 @@ export function Sidebar() {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) return;
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/notifications/unread-count`,
+        `${import.meta.env.VITE_BACKEND_URL}/notifications/unread-count`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setUnreadCount(res.data.count || 0);

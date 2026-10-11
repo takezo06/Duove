@@ -13,7 +13,7 @@ export function DeleteRelationship() {
     setError(null);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/relationships`, {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/relationships`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       // Reload the page to reflect changes

@@ -1,0 +1,76 @@
+// Fake data for the mock preview. Pick a scenario with ?scenario=<name> on first load:
+//   (default) paired couple with activity
+//   empty     paired today, nothing logged yet
+//   unpaired  no relationship (pairing screens)
+export const scenario = new URLSearchParams(location.search).get('scenario') ?? 'default';
+export const paired = scenario !== 'unpaired';
+const empty = scenario === 'empty';
+
+const ago = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
+export const me = { id: 'u1', email: 'jed@duove.app', display_name: 'Jed', avatar_url: 'https://i.pravatar.cc/160?img=12' };
+export const partner = { id: 'p1', display_name: 'Mika', avatar_url: null as string | null };
+
+const pairedAt = empty ? ago(2) : '2025-03-03T09:15:00Z';
+
+export const relationship = {
+  id: 'r1',
+  user_id: me.id,
+  partner_id: partner.id,
+  status: 'active',
+  paired_at: pairedAt,
+  anniversary_date: empty ? null : '2025-02-14',
+};
+
+export const stats = {
+  user: { id: me.id, account_created: '2025-01-14T08:00:00Z', account_age: '' },
+  relationship: {
+    ...relationship,
+    together_duration: '', together_conversion: '', anniversary_duration: '', anniversary_conversion: '',
+    next_anniversary: null, days_until_anniversary: null, next_monthsary: null, days_until_monthsary: null,
+  },
+  partner: { ...partner, account_created: '2025-02-20T11:30:00Z' },
+  stats: empty ? { cravings: 0, letters_sent: 0, letters_received: 0 } : { cravings: 12, letters_sent: 7, letters_received: 9 },
+};
+
+export let cravings = empty
+  ? []
+  : [
+      { id: 'c1', content: 'Spicy ramen from the corner place', category: 'Food', fulfilled: false, user_id: partner.id, created_at: ago(2) },
+      { id: 'c2', content: 'Movie night with the new Ghibli film, blankets and popcorn', category: 'Activity', fulfilled: false, user_id: me.id, created_at: ago(26) },
+      { id: 'c3', content: 'A really long hug after work', category: 'Emotional', fulfilled: false, user_id: partner.id, created_at: ago(80) },
+      { id: 'c4', content: 'That linen shirt from the thrift store', category: 'Material', fulfilled: false, user_id: partner.id, created_at: ago(100) },
+      { id: 'c5', content: 'Strawberry milk', category: 'Food', fulfilled: true, user_id: me.id, created_at: ago(5) },
+    ];
+export const setCravings = (next: typeof cravings) => { cravings = next; };
+
+export const letters = empty
+  ? []
+  : [
+      { id: 'l1', heading: 'For the rainy Tuesday you made better', body: 'You showed up with soup and a terrible umbrella.', sender_id: partner.id, sender_name: 'Mika', recipient_id: me.id, created_at: ago(20), read: false },
+      { id: 'l2', heading: 'Six months of you', body: 'Still my favourite person to sit in silence with.', sender_id: me.id, sender_name: 'Jed', recipient_id: partner.id, created_at: ago(400), read: true },
+    ];
+
+export const cycles = empty ? [] : [
+  { id: 'cy1', user_id: me.id, start_date: day(-54), end_date: day(-50) },
+  { id: 'cy2', user_id: me.id, start_date: day(-26), end_date: day(-22) },
+];
+
+export const prediction = empty ? null : {
+  nextPeriodStart: day(2), nextPeriodEnd: day(6), ovulationDay: day(-12),
+  fertileWindowStart: day(-14), fertileWindowEnd: day(-8),
+  cycleDay: 27, daysUntilPeriod: 2, phase: 'luteal', averageCycleLength: 28, averageBleedingDays: 5,
+};
+
+export const question = empty ? null : {
+  question: { id: 'q1', question_text: 'What is a small habit of mine you secretly love?', category: 'Deep' },
+  yourAnswer: null,
+  partnerAnswer: { id: 'a1', answer_text: 'The way you hum while cooking.', user_id: partner.id },
+};
+
+export const notifications = empty ? [] : [
+  { id: 'n1', type: 'love_letter', title: 'Mika sent you a love letter', message: 'For the rainy Tuesday you made better', read: false, created_at: ago(20) },
+  { id: 'n2', type: 'craving', title: 'Mika added a craving', message: 'Spicy ramen from the corner place', read: false, created_at: ago(2) },
+  { id: 'n3', type: 'qa', title: 'Mika answered today\'s question', message: 'Your turn', read: true, created_at: ago(30) },
+];

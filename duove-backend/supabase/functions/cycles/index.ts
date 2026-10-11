@@ -56,24 +56,47 @@ serve(async (req) => {
     if (lastPeriodStart) {
       cycleDay = Math.floor((Date.now() - new Date(lastPeriodStart).getTime()) / 86400000) + 1;
     }
-    // Phase calculation (simplified but consistent with frontend)
-    const bleeds = 5;
+    // Average bleeding days from logged end dates (same rule as the Express cycleService)
+    const bleedLengths = cycles
+      .filter(c => c.end_date)
+      .map(c => Math.ceil((new Date(c.end_date).getTime() - new Date(c.start_date).getTime()) / 86400000) + 1)
+      .filter(d => d >= 1 && d <= 10);
+    const bleeds = bleedLengths.length ? Math.round(bleedLengths.reduce((a, b) => a + b, 0) / bleedLengths.length) : 5;
+
+    const remainingDays = avgCycleLength - bleeds;
+    const follicularDays = Math.ceil(remainingDays / 3);
+    const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
+    const follicularEnd = bleeds + follicularDays;
+    const fertileEnd = follicularEnd + fertileDays;
+
     let phase = "follicular";
     if (cycleDay > avgCycleLength) phase = "menstrual";
     else if (cycleDay <= bleeds) phase = "menstrual";
-    else {
-      const remainingDays = avgCycleLength - bleeds;
-      const follicularDays = Math.ceil(remainingDays / 3);
-      const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
-      const follicularEnd = bleeds + follicularDays;
-      const fertileEnd = follicularEnd + fertileDays;
-      if (cycleDay <= follicularEnd) phase = "follicular";
-      else if (cycleDay <= fertileEnd) phase = "fertile";
-      else phase = "luteal";
+    else if (cycleDay <= follicularEnd) phase = "follicular";
+    else if (cycleDay <= fertileEnd) phase = "fertile";
+    else phase = "luteal";
+
+    // Dates relative to the last period start (day 1 = lastPeriodStart)
+    const dayOfCycle = (n: number) => {
+      if (!lastPeriodStart) return null;
+      const d = new Date(lastPeriodStart);
+      d.setDate(d.getDate() + n - 1);
+      return d.toISOString().split("T")[0];
+    };
+    const nextPeriodEnd = dayOfCycle(avgCycleLength + bleeds);
+    let daysUntilPeriod: number | null = null;
+    if (nextPeriodStart) {
+      daysUntilPeriod = Math.max(0, Math.ceil((new Date(nextPeriodStart).getTime() - Date.now()) / 86400000));
     }
+
     return {
       nextPeriodStart,
+      nextPeriodEnd,
+      ovulationDay: dayOfCycle(avgCycleLength - 13),
+      fertileWindowStart: dayOfCycle(follicularEnd + 1),
+      fertileWindowEnd: dayOfCycle(fertileEnd),
       cycleDay,
+      daysUntilPeriod,
       averageCycleLength: avgCycleLength,
       averageBleedingDays: bleeds,
       phase,
@@ -198,11 +221,13 @@ serve(async (req) => {
       .from("daily_symptom_logs").select("*").eq("user_id", partnerId)
       .gte("log_date", thirtyDaysAgo.toISOString().split("T")[0]);
     const prediction = computePrediction(cycles || []);
+    const { data: partnerProfile } = await admin
+      .from("profiles").select("display_name").eq("id", partnerId).maybeSingle();
     return new Response(JSON.stringify({
       prediction,
       calendar: symptoms || [],
       lastPeriodStart: cycles?.length ? cycles[cycles.length - 1].start_date : null,
-      partnerName: relationship.partner_name || "Partner",
+      partnerName: partnerProfile?.display_name || "Partner",
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
