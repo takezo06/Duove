@@ -3,23 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import axios from 'axios';
-import {
-  CheckCircle,
-  Circle,
-  Plus,
-  Trash2,
-  Loader2,
-  Sparkles,
-  Users,
-  ArrowRight,
-  Pizza,
-  Film,
-  Heart,
-  ShoppingBag,
-  MoreHorizontal,
-  Filter,
-  ChevronDown,
-} from 'lucide-react';
+import { Avatar, Badge, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Check, Plus, Trash2, Loader2, Pizza, Film, Heart, ShoppingBag, MoreHorizontal } from 'lucide-react';
 
 interface Craving {
   id: string;
@@ -33,21 +18,48 @@ interface Craving {
   archived_at: string | null;
 }
 
+// One color per category, used everywhere that category appears
 const CATEGORIES = [
-  { value: 'Food', icon: Pizza, label: 'Food' },
-  { value: 'Activity', icon: Film, label: 'Activity' },
-  { value: 'Emotional', icon: Heart, label: 'Emotional' },
-  { value: 'Material', icon: ShoppingBag, label: 'Material' },
-  { value: 'Other', icon: MoreHorizontal, label: 'Other' },
+  { value: 'Food', icon: Pizza, label: 'Food', iconColor: 'text-amber-400', tint: 'bg-amber-400/10 border-amber-400/30 text-amber-200' },
+  { value: 'Activity', icon: Film, label: 'Activity', iconColor: 'text-sky-400', tint: 'bg-sky-400/10 border-sky-400/30 text-sky-200' },
+  { value: 'Emotional', icon: Heart, label: 'Emotional', iconColor: 'text-rose-400', tint: 'bg-rose-400/10 border-rose-400/30 text-rose-200' },
+  { value: 'Material', icon: ShoppingBag, label: 'Material', iconColor: 'text-violet-400', tint: 'bg-violet-400/10 border-violet-400/30 text-violet-200' },
+  { value: 'Other', icon: MoreHorizontal, label: 'Other', iconColor: 'text-neutral-400', tint: 'bg-neutral-400/10 border-neutral-400/30 text-neutral-200' },
 ];
+type Category = (typeof CATEGORIES)[number];
+const categoryOf = (c: Craving) => CATEGORIES.find((x) => x.value === (c.category || 'Other')) ?? CATEGORIES[4];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Food: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
-  Activity: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-  Emotional: 'text-rose-400 bg-rose-400/10 border-rose-400/20',
-  Material: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
-  Other: 'text-neutral-400 bg-neutral-400/10 border-neutral-400/20',
-};
+const RELATIONSHIP_ERRORS = ['No active relationship found.', 'Could not fetch relationship details.'];
+
+// "just now", "3h ago", "Yesterday", "Mon", "Mar 3"
+function when(iso: string) {
+  const then = new Date(iso);
+  const mins = Math.floor((Date.now() - then.getTime()) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 24 * 60) return `${Math.floor(mins / 60)}h ago`;
+  const days = Math.floor(mins / (24 * 60));
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return then.toLocaleDateString(undefined, { weekday: 'short' });
+  return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+const chip = (active: boolean, cat?: Category) =>
+  `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition cursor-pointer ${focusRing} ${
+    active
+      ? cat?.tint ?? 'bg-neutral-800 border-neutral-700 text-white'
+      : 'border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+  }`;
+
+// Category pill on each craving: same shape as the selected chip, smaller
+function CategoryPill({ cat }: { cat: Category }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${cat.tint}`}>
+      <cat.icon className={`w-3 h-3 ${cat.iconColor}`} aria-hidden />
+      {cat.label}
+    </span>
+  );
+}
 
 export function Cravings() {
   usePageTitle('Cravings');
@@ -64,9 +76,11 @@ export function Cravings() {
   const [error, setError] = useState<string | null>(null);
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
   const [partnerId, setPartnerId] = useState<string | null>(null);
+  const [partnerName, setPartnerName] = useState('Partner');
   const [userId, setUserId] = useState<string | null>(null);
   const [fetchingRelationship, setFetchingRelationship] = useState(true);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
 
   // Highlight effect
   useEffect(() => {
@@ -102,7 +116,9 @@ export function Cravings() {
         );
         if (res.data && res.data.relationship) {
           setRelationshipId(res.data.relationship.id);
-          setPartnerId(res.data.relationship.partner_id);
+          // partner.id is "the other person"; relationship.partner_id is only right for whoever sent the invite
+          setPartnerId(res.data.partner?.id ?? res.data.relationship.partner_id);
+          if (res.data.partner?.display_name) setPartnerName(res.data.partner.display_name);
         } else {
           setError('No active relationship found.');
         }
@@ -162,7 +178,7 @@ export function Cravings() {
       setNewContent('');
       setSelectedCategory('Other');
     } catch (err: any) {
-      setError(err.response?.status === 429 ? 'Daily craving limit reached (5 per day).' : 'Failed to add craving.');
+      setError(err.response?.status === 429 ? "You've hit today's craving limit. Try again tomorrow." : 'Failed to add craving.');
     } finally {
       setSubmitting(false);
     }
@@ -183,9 +199,9 @@ export function Cravings() {
     }
   };
 
-  // Delete
+  // Delete (confirmed inline, no browser dialog)
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this craving?')) return;
+    setConfirmingDelete(null);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.delete(
@@ -215,201 +231,225 @@ export function Cravings() {
   const filteredCravings = filterCategory
     ? cravings.filter((c) => (c.category || 'Other') === filterCategory)
     : cravings;
+  const open = filteredCravings.filter((c) => !c.fulfilled);
+  const done = filteredCravings.filter((c) => c.fulfilled);
+  const totalOpen = cravings.filter((c) => !c.fulfilled).length;
 
   // Loading skeleton
-  if (fetchingRelationship) {
+  if (fetchingRelationship || loading) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="h-8 w-48 bg-neutral-700/50 rounded-lg animate-pulse" />
-            <div className="h-4 w-32 bg-neutral-700/50 rounded-lg animate-pulse mt-2" />
-          </div>
-        </div>
-        <div className="flex gap-3 mb-8">
-          <div className="flex-1 h-12 bg-neutral-700/50 rounded-xl animate-pulse" />
-          <div className="w-24 h-12 bg-neutral-700/50 rounded-xl animate-pulse" />
-        </div>
+      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
+        <div className={`${surface} h-56 animate-pulse`} />
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex items-center gap-4 bg-neutral-900/50 rounded-2xl border border-neutral-800 p-4 mb-3">
-            <div className="w-5 h-5 rounded-full bg-neutral-700/50 animate-pulse" />
-            <div className="flex-1 h-5 bg-neutral-700/50 rounded-lg animate-pulse" />
-            <div className="w-16 h-4 bg-neutral-700/50 rounded-lg animate-pulse" />
-            <div className="w-8 h-8 bg-neutral-700/50 rounded-lg animate-pulse" />
-          </div>
+          <div key={i} className={`${surface} h-20 animate-pulse`} />
         ))}
       </div>
     );
   }
 
   // No partner
-  if (error === 'No active relationship found.' || error === 'Could not fetch relationship details.') {
+  if (error && RELATIONSHIP_ERRORS.includes(error)) {
     return (
-      <div className="max-w-4xl mx-auto text-center py-16">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8 md:p-12 shadow-xl">
-          <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-400/20">
-            <Users className="w-8 h-8 text-rose-400" />
+      <div className="max-w-4xl mx-auto">
+        <div className={`${surface} p-8 md:p-12 text-center`}>
+          <div className="flex justify-center -space-x-4 mb-5">
+            <Avatar src={null} name="You" />
+            <Avatar src={null} name="Your partner" dashed />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">You're not paired yet</h2>
+          <h1 className="text-2xl font-semibold text-white mb-2">Cravings are for two</h1>
           <p className="text-neutral-400 max-w-md mx-auto">
-            To start sharing cravings, you need to connect with your partner.
+            Connect with your partner to start sharing what you're in the mood for.
           </p>
-          <button
-            onClick={() => navigate('/partner')}
-            className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition shadow-lg shadow-rose-500/20"
-          >
-            Go to Partner Connection
-            <ArrowRight className="w-4 h-4" />
+          <button onClick={() => navigate('/partner')} className={`${primaryButton} mt-6`}>
+            Connect with your partner
           </button>
         </div>
       </div>
     );
   }
 
-  // Main view
-  return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-rose-400" />
-            Cravings Board
-          </h1>
-          <p className="text-neutral-400 text-sm">Share what you're craving or need</p>
-        </div>
-      </div>
-
-      <form onSubmit={handleAddCraving} className="flex flex-col sm:flex-row gap-3 mb-8">
-        <div className="flex-1 flex gap-2">
-          <input
-            type="text"
-            placeholder="Add a craving or request..."
-            value={newContent}
-            onChange={(e) => setNewContent(e.target.value)}
-            className="flex-1 bg-neutral-800/50 text-sm text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-          />
-          <div className="relative min-w-[140px]">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full bg-neutral-800/50 text-sm text-white px-4 py-3 pr-10 rounded-xl border border-neutral-700 appearance-none focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition cursor-pointer hover:bg-neutral-700/30"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat.value} value={cat.value} className="bg-neutral-900 text-white hover:bg-rose-500/20 hover:text-rose-300">
-                  {cat.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
-          </div>
-        </div>
+  const row = (craving: Craving) => {
+    const cat = categoryOf(craving);
+    const mine = craving.user_id === userId;
+    const isHighlighted = highlightedId === craving.id;
+    return (
+      <li
+        key={craving.id}
+        id={`craving-${craving.id}`}
+        className={`${surface} p-4 flex items-start gap-4 transition ${
+          isHighlighted ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-neutral-950' : 'hover:border-neutral-700'
+        }`}
+      >
         <button
-          type="submit"
-          disabled={submitting || !newContent.trim()}
-          className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-rose-500/20 min-w-[100px]"
+          onClick={() => handleToggle(craving.id)}
+          aria-pressed={craving.fulfilled}
+          aria-label={craving.fulfilled ? `Mark "${craving.content}" as not done` : `Mark "${craving.content}" as done`}
+          className={`mt-0.5 w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition cursor-pointer ${focusRing} ${
+            craving.fulfilled ? 'bg-rose-500 border-rose-500' : 'border-neutral-600 hover:border-rose-400'
+          }`}
         >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          Add
+          {craving.fulfilled && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} aria-hidden />}
         </button>
-      </form>
 
-      {cravings.length > 0 && (
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <Filter className="w-4 h-4 text-neutral-500" />
-          <button
-            onClick={() => setFilterCategory(null)}
-            className={`px-3 py-1.5 text-xs rounded-full border transition ${
-              filterCategory === null
-                ? 'bg-rose-500/20 text-rose-400 border-rose-400/30'
-                : 'text-neutral-400 border-neutral-700 hover:border-neutral-600 hover:bg-neutral-800/50'
-            }`}
-          >
-            All
-          </button>
-          {CATEGORIES.map((cat) => (
+        <div className="min-w-0 flex-1">
+          <p className={`break-words ${craving.fulfilled ? 'text-neutral-500 line-through' : 'text-white'}`}>{craving.content}</p>
+          <p className={`mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400 ${craving.fulfilled ? 'opacity-60' : ''}`}>
+            <CategoryPill cat={cat} />
+            <span>
+              {mine ? 'You' : <span className="text-rose-400 font-medium">{partnerName}</span>}
+            </span>
+            <span aria-hidden>·</span>
+            <time dateTime={craving.created_at} title={new Date(craving.created_at).toLocaleString()}>
+              {when(craving.created_at)}
+            </time>
+          </p>
+        </div>
+
+        {mine &&
+          (confirmingDelete === craving.id ? (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleDelete(craving.id)}
+                className={`px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-medium transition cursor-pointer ${focusRing}`}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(null)}
+                className={`px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white text-xs font-medium transition cursor-pointer ${focusRing}`}
+              >
+                Keep
+              </button>
+            </div>
+          ) : (
             <button
-              key={cat.value}
-              onClick={() => setFilterCategory(cat.value)}
-              className={`px-3 py-1.5 text-xs rounded-full border transition flex items-center gap-1.5 ${
-                filterCategory === cat.value
-                  ? 'bg-rose-500/20 text-rose-400 border-rose-400/30'
-                  : 'text-neutral-400 border-neutral-700 hover:border-neutral-600 hover:bg-neutral-800/50'
-              }`}
+              onClick={() => setConfirmingDelete(craving.id)}
+              aria-label={`Delete "${craving.content}"`}
+              className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-neutral-500 hover:text-rose-400 hover:bg-neutral-800 transition cursor-pointer ${focusRing}`}
             >
-              <cat.icon className="w-3 h-3" />
-              {cat.label}
+              <Trash2 className="w-4 h-4" aria-hidden />
             </button>
           ))}
+      </li>
+    );
+  };
+
+  // Main view
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header + add form */}
+      <section className={`${surface} p-6 md:p-8`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Cravings</h1>
+            <p className="text-neutral-400 mt-1">
+              What you and <span className="text-rose-400 font-semibold">{partnerName}</span> are in the mood for.
+            </p>
+          </div>
+          {totalOpen > 0 && <Badge tone="rose">{totalOpen} open</Badge>}
         </div>
+
+        <form onSubmit={handleAddCraving} className="mt-6 pt-6 border-t border-neutral-800">
+          <label htmlFor="new-craving" className="block text-sm text-neutral-400 mb-2">
+            What are you craving?
+          </label>
+          <input
+            id="new-craving"
+            type="text"
+            placeholder="Spicy ramen, a movie night, a long hug..."
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            maxLength={200}
+            className="w-full bg-neutral-800/50 text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
+          />
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div role="radiogroup" aria-label="Category" className="flex flex-wrap gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedCategory === cat.value}
+                  onClick={() => setSelectedCategory(cat.value)}
+                  className={chip(selectedCategory === cat.value, cat)}
+                >
+                  <cat.icon className={`w-3.5 h-3.5 ${cat.iconColor}`} aria-hidden />
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <button type="submit" disabled={submitting || !newContent.trim()} className={`${primaryButton} shrink-0`}>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
+              Add craving
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {error && (
+        <p role="alert" className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+          {error}
+        </p>
       )}
 
-      {filteredCravings.length === 0 ? (
-        <div className="text-center text-neutral-500 py-16 bg-neutral-900/50 rounded-2xl border border-neutral-800/50">
-          <Sparkles className="w-10 h-10 mx-auto mb-3 text-neutral-600" />
-          <p className="text-lg font-medium text-neutral-400">
-            {cravings.length === 0 ? 'No cravings yet' : 'No cravings in this category'}
-          </p>
-          <p className="text-sm text-neutral-600">
-            {cravings.length === 0 ? 'Add one above to get started' : 'Try a different filter'}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredCravings.map((craving) => {
-            const category = craving.category || 'Other';
-            const CategoryIcon = CATEGORIES.find((c) => c.value === category)?.icon || MoreHorizontal;
-            const colorClass = CATEGORY_COLORS[category] || CATEGORY_COLORS.Other;
-            const isHighlighted = highlightedId === craving.id;
-
+      {/* Filters */}
+      {cravings.length > 0 && (
+        <nav aria-label="Filter by category" className="flex flex-wrap gap-2">
+          <button onClick={() => setFilterCategory(null)} aria-pressed={filterCategory === null} className={chip(filterCategory === null)}>
+            All <span className="text-neutral-500 tabular-nums">{cravings.length}</span>
+          </button>
+          {CATEGORIES.map((cat) => {
+            const count = cravings.filter((c) => (c.category || 'Other') === cat.value).length;
+            if (!count) return null;
             return (
-              <div
-                key={craving.id}
-                id={`craving-${craving.id}`}
-                className={`flex items-center gap-4 bg-neutral-900 rounded-2xl border p-4 transition ${
-                  craving.fulfilled ? 'border-neutral-700/30 bg-neutral-900/60' : 'border-neutral-800 hover:border-neutral-700'
-                } ${
-                  isHighlighted
-                    ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-neutral-900 shadow-lg shadow-rose-400/20'
-                    : ''
-                }`}
+              <button
+                key={cat.value}
+                onClick={() => setFilterCategory(cat.value)}
+                aria-pressed={filterCategory === cat.value}
+                className={chip(filterCategory === cat.value, cat)}
               >
-                <button
-                  onClick={() => handleToggle(craving.id)}
-                  className="flex-shrink-0 text-neutral-500 hover:text-rose-400 transition"
-                >
-                  {craving.fulfilled ? (
-                    <CheckCircle className="w-5 h-5 text-rose-400" />
-                  ) : (
-                    <Circle className="w-5 h-5" />
-                  )}
-                </button>
-                <span className={`flex-1 text-sm ${craving.fulfilled ? 'text-neutral-500 line-through' : 'text-white'}`}>
-                  {craving.content}
-                </span>
-                <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border ${colorClass}`}>
-                  <CategoryIcon className="w-3 h-3" />
-                  {category}
-                </span>
-                <span className="text-xs text-neutral-500">
-                  {new Date(craving.created_at).toLocaleDateString()}
-                </span>
-                {craving.user_id === userId && (
-                  <button
-                    onClick={() => handleDelete(craving.id)}
-                    className="text-neutral-500 hover:text-rose-400 transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+                <cat.icon className={`w-3.5 h-3.5 ${cat.iconColor}`} aria-hidden />
+                {cat.label} <span className="text-neutral-500 tabular-nums">{count}</span>
+              </button>
             );
           })}
-        </div>
+        </nav>
       )}
 
-      <p className="text-xs text-neutral-600 text-center mt-6">
-        ✓ Fulfilled cravings automatically disappear after 24 hours.
-      </p>
+      {/* List */}
+      {filteredCravings.length === 0 ? (
+        <div className={`${surface} px-6 py-14 text-center`}>
+          <p className="text-lg font-semibold text-white">
+            {cravings.length === 0 ? 'Nothing on the list yet' : 'Nothing in this category'}
+          </p>
+          <p className="text-neutral-400 mt-1">
+            {cravings.length === 0 ? `Add the first craving and ${partnerName} will see it right away.` : 'Pick another category above.'}
+          </p>
+          {cravings.length > 0 && (
+            <button onClick={() => setFilterCategory(null)} className={`${secondaryButton} mt-5`}>
+              Show all cravings
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {open.length > 0 && (
+            <section>
+              <h2 className="text-sm text-neutral-400 mb-3">Open · {open.length}</h2>
+              <ul className="space-y-3">{open.map(row)}</ul>
+            </section>
+          )}
+          {done.length > 0 && (
+            <section>
+              <h2 className="text-sm text-neutral-400 mb-3">
+                Fulfilled · {done.length}
+                <span className="text-neutral-500"> · cleared after 24 hours</span>
+              </h2>
+              <ul className="space-y-3">{done.map(row)}</ul>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
