@@ -1,16 +1,107 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { phaseColors } from './cycle/constants';
+import { relationshipYear } from '../lib/relationshipYear';
 import {
-  HeartPulse,
-  Sparkles,
-  CheckCircle,
-  Circle,
   Activity,
+  ArrowRight,
+  Check,
+  Heart,
   Mails,
-  Music,
+  MessageCircleQuestion,
   Pizza,
   UserPlus,
 } from 'lucide-react';
+
+function greetingFor(hour: number) {
+  if (hour < 5) return 'Still up';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+const shortDate = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// One vocabulary for the whole page
+const focusRing =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950';
+const surface = 'bg-neutral-900 rounded-2xl border border-neutral-800';
+const inset = 'rounded-xl bg-neutral-800/40 border border-neutral-800 px-4 py-3';
+const primaryButton = `inline-flex items-center justify-center gap-2 px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition shadow-lg shadow-rose-500/20 ${focusRing}`;
+
+type Tone = 'rose' | 'emerald' | 'neutral';
+const toneClass: Record<Tone, string> = {
+  rose: 'bg-rose-500/10 border-rose-400/20 text-rose-400',
+  emerald: 'bg-emerald-500/10 border-emerald-400/20 text-emerald-400',
+  neutral: 'bg-neutral-800 border-neutral-700 text-neutral-300',
+};
+
+// Status pill, same shape as the "Connected" pill on the Partner page
+function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium whitespace-nowrap ${toneClass[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+// Section header used by every card: rose icon + label on the left, status on the right
+function CardHeader({ icon, title, badge }: { icon: ReactNode; title: string; badge?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 min-h-6">
+      <h2 className="flex items-center gap-2 text-neutral-400 text-sm">
+        {icon}
+        {title}
+      </h2>
+      {badge}
+    </div>
+  );
+}
+
+function Avatar({ src, name }: { src: string | null; name: string }) {
+  const base = 'w-16 h-16 rounded-full ring-4 ring-neutral-900 object-cover shrink-0';
+  return src ? (
+    <img src={src} alt={name} className={base} />
+  ) : (
+    <div
+      aria-label={name}
+      className={`${base} bg-neutral-800 flex items-center justify-center text-xl font-semibold text-rose-400`}
+    >
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+function Tile({
+  to,
+  icon,
+  title,
+  badge,
+  action,
+  children,
+}: {
+  to: string;
+  icon: ReactNode;
+  title: string;
+  badge?: ReactNode;
+  action: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link to={to} className={`group ${surface} p-6 flex flex-col hover:border-rose-400/30 transition ${focusRing}`}>
+      <CardHeader icon={icon} title={title} badge={badge} />
+      <div className="flex-1 mt-4">{children}</div>
+      <span className="mt-5 pt-4 border-t border-neutral-800 flex items-center justify-between text-sm font-medium text-neutral-400 group-hover:text-rose-400 transition">
+        {action}
+        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden />
+      </span>
+    </Link>
+  );
+}
+
+const iconClass = 'w-4 h-4 text-rose-400';
 
 export function BentoGrid() {
   const navigate = useNavigate();
@@ -20,6 +111,7 @@ export function BentoGrid() {
     partnerName,
     partnerAvatar,
     daysTogether,
+    since,
     cycle,
     latestLetter,
     currentQuestion,
@@ -28,248 +120,271 @@ export function BentoGrid() {
     error,
   } = useDashboardData();
 
-  const cardClass =
-    'bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 p-5 md:p-6 flex flex-col hover:bg-neutral-800/40 hover:border-rose-400/30 hover:shadow-lg transition-all duration-200';
+  const grid = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6 max-w-6xl mx-auto';
+  const fullRow = 'md:col-span-2 xl:col-span-4';
 
-  // Loading skeleton
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 max-w-7xl mx-auto">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className={`${cardClass} animate-pulse`}>
-            <div className="h-6 w-1/3 bg-neutral-800 rounded mb-2" />
-            <div className="h-4 w-full bg-neutral-800 rounded mb-1" />
-            <div className="h-4 w-2/3 bg-neutral-800 rounded" />
-          </div>
+      <div className={grid} aria-busy="true">
+        <div className={`${fullRow} ${surface} h-80 animate-pulse`} />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className={`${surface} h-56 animate-pulse`} />
         ))}
       </div>
     );
   }
 
-  // Error / no relationship
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8 md:p-12 text-center shadow-xl">
+      <div className="max-w-6xl mx-auto">
+        <div className={`${surface} p-8 md:p-12 text-center`}>
           <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-400/20">
-            <UserPlus className="w-8 h-8 text-rose-400" />
+            <UserPlus className="w-8 h-8 text-rose-400" aria-hidden />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">No active relationship</h2>
+          <h1 className="text-2xl font-semibold text-white mb-2">You're not paired yet</h1>
           <p className="text-neutral-400 max-w-md mx-auto mb-6">{error}</p>
-          <button
-            onClick={() => navigate('/partner')}
-            className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition shadow-lg shadow-rose-500/20"
-          >
-            Go to Partner Connection
+          <button onClick={() => navigate('/partner')} className={`${primaryButton} cursor-pointer`}>
+            Connect with your partner
           </button>
         </div>
       </div>
     );
   }
 
+  const now = new Date();
+  const greeting = greetingFor(now.getHours());
+  const dateLine = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const year = since ? relationshipYear(since) : null;
+  const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
+
+  // Daily question status
+  const q = currentQuestion;
+  const qBadge = !q ? undefined : !q.youAnswered ? (
+    <Badge tone="rose">Your turn</Badge>
+  ) : q.partnerAnswered ? (
+    <Badge tone="emerald">Both answered</Badge>
+  ) : (
+    <Badge tone="neutral">Waiting on {partnerName}</Badge>
+  );
+
+  // Cycle status
+  const phase = cycle ? phaseColors[cycle.phase as keyof typeof phaseColors] : undefined;
+  const cycleLength = cycle ? cycle.cycleDay + Math.max(cycle.daysUntilPeriod, 0) : 0;
+  const cycleProgress = cycle && cycleLength > 0 ? Math.min(100, (cycle.cycleDay / cycleLength) * 100) : 0;
+  const cycleBadge = !cycle ? undefined : cycle.daysUntilPeriod < 0 ? (
+    <Badge tone="rose">{plural(-cycle.daysUntilPeriod, 'day')} late</Badge>
+  ) : cycle.daysUntilPeriod <= 3 ? (
+    <Badge tone="rose">{cycle.daysUntilPeriod === 0 ? 'Period today' : 'Period soon'}</Badge>
+  ) : (
+    <Badge tone="neutral">Day {cycle.cycleDay}</Badge>
+  );
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 max-w-7xl mx-auto">
-      {/* Card 1 – Greeting & Days together */}
-      <div className={`${cardClass} lg:col-span-2`}>
-        <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold text-white">
-              Greetings, {userName}!
+    <div className={grid}>
+      {/* Greeting + year together */}
+      <section className={`${fullRow} ${surface} p-6 md:p-8`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+          <div className="flex -space-x-4">
+            <Avatar src={userAvatar} name={userName} />
+            <Avatar src={partnerAvatar} name={partnerName} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-white">
+              {greeting}, {userName}
+              {greeting === 'Still up' ? '?' : ''}
             </h1>
             <p className="text-neutral-400 text-sm mt-1">
-              Together with {partnerName} for{' '}
-              <span className="text-rose-400 font-medium">{daysTogether} days</span>
+              {dateLine} · <span className="text-white font-medium tabular-nums">{daysTogether} days</span> with {partner}
             </p>
           </div>
-          <div className="flex -space-x-2">
-            {userAvatar ? (
-              <img
-                src={userAvatar}
-                alt={userName}
-                className="w-9 h-9 md:w-10 md:h-10 rounded-full border-2 border-neutral-900 object-cover"
-              />
-            ) : (
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-rose-400/30 border-2 border-neutral-900 flex items-center justify-center text-sm text-white font-medium">
-                {userName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            {partnerAvatar ? (
-              <img
-                src={partnerAvatar}
-                alt={partnerName}
-                className="w-9 h-9 md:w-10 md:h-10 rounded-full border-2 border-neutral-900 object-cover"
-              />
-            ) : (
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-rose-400/30 border-2 border-neutral-900 flex items-center justify-center text-sm text-white font-medium">
-                {partnerName.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
+          <Link
+            to="/partner"
+            className={`group self-start sm:self-center text-sm font-medium text-neutral-400 hover:text-rose-400 transition flex items-center gap-1.5 rounded-lg ${focusRing}`}
+          >
+            Your relationship
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden />
+          </Link>
         </div>
-        <button
-          onClick={() => navigate('/partner')}
-          className="mt-4 w-fit flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-medium text-sm transition-all shadow-[0_0_25px_rgba(251,113,133,0.25)]"
-        >
-          <HeartPulse className="w-4 h-4" />
-          View Relationship
-        </button>
-      </div>
 
-      {/* Card 2 – Daily Question */}
-      <div className={cardClass}>
-        <div className="flex items-center gap-2 text-rose-400 mb-1">
-          <Sparkles className="w-4 h-4" />
-          <span className="text-sm font-medium text-rose-400">Daily Question</span>
-        </div>
-        {currentQuestion ? (
-          <>
-            <p className="text-white text-lg md:text-xl font-medium mt-2 line-clamp-2">
-              {currentQuestion.question_text}
+        {year && (
+          <div className="mt-8 pt-6 border-t border-neutral-800">
+            <CardHeader
+              icon={<Heart className={iconClass} aria-hidden />}
+              title={`Year ${year.yearNumber} together`}
+              badge={<Badge tone="neutral">Month {year.monthOfYear} of 12</Badge>}
+            />
+            <p className="text-lg font-semibold text-white mt-4">
+              {year.isAnniversary ? (
+                <span className="text-rose-400">Happy anniversary, today's the day</span>
+              ) : (
+                <>
+                  <span className="tabular-nums">{plural(year.daysToAnniversary, 'day')}</span> to your anniversary
+                </>
+              )}
             </p>
-            <div className="flex flex-wrap items-center gap-3 md:gap-4 mt-4">
-              <div className="flex items-center gap-2">
-                {currentQuestion.youAnswered ? (
-                  <CheckCircle className="w-4 h-4 text-rose-400" />
-                ) : (
-                  <Circle className="w-4 h-4 text-neutral-600" />
-                )}
-                <span className="text-sm text-neutral-300">
-                  {currentQuestion.youAnswered ? 'You answered' : 'You'}
-                </span>
+
+            {/* Track from this year's anniversary to the next, one dot per monthsary */}
+            <div
+              className="relative h-2 mt-6 rounded-full bg-neutral-800"
+              role="img"
+              aria-label={`Month ${year.monthOfYear} of year ${year.yearNumber}. ${plural(year.daysToAnniversary, 'day')} to your anniversary.`}
+            >
+              <div className="absolute inset-y-0 left-0 rounded-full bg-rose-500" style={{ width: `${year.progress * 100}%` }} />
+              {year.monthsaries.map((t) => (
+                <span
+                  key={t}
+                  className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full ${t <= year.progress ? 'bg-rose-200' : 'bg-neutral-600'}`}
+                  style={{ left: `${t * 100}%` }}
+                />
+              ))}
+              <span
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-neutral-900 border-2 border-rose-500 flex items-center justify-center"
+                style={{ left: `${year.progress * 100}%` }}
+              >
+                <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400" aria-hidden />
+              </span>
+            </div>
+            <div className="flex justify-between mt-3 text-xs text-neutral-400">
+              <span>{shortDate(year.yearStart)}</span>
+              <span>Anniversary · {shortDate(year.yearEnd)}</span>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 mt-5">
+              <div className={inset}>
+                <p className="text-sm text-neutral-400">Next monthsary</p>
+                <p className="text-white font-semibold mt-0.5">
+                  {year.isMonthsary ? (
+                    <span className="text-rose-400">Today. Happy monthsary</span>
+                  ) : (
+                    <>
+                      {shortDate(year.nextMonthsary)}{' '}
+                      <span className="text-neutral-400 font-normal">in {plural(year.daysToMonthsary, 'day')}</span>
+                    </>
+                  )}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                {currentQuestion.partnerAnswered ? (
-                  <CheckCircle className="w-4 h-4 text-rose-400" />
-                ) : (
-                  <Circle className="w-4 h-4 text-neutral-600" />
-                )}
-                <span className="text-sm text-neutral-300">
-                  {currentQuestion.partnerAnswered ? 'Partner answered' : 'Partner'}
-                </span>
+              <div className={inset}>
+                <p className="text-sm text-neutral-400">Together since</p>
+                <p className="text-white font-semibold mt-0.5">
+                  {year.start.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
               </div>
             </div>
-            <button
-              onClick={() => navigate('/qa')}
-              className="mt-4 w-full py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-medium transition"
-            >
-              {currentQuestion.youAnswered ? 'View Answers' : 'Answer Now'}
-            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Daily question */}
+      <Tile
+        to="/qa"
+        icon={<MessageCircleQuestion className={iconClass} aria-hidden />}
+        title="Daily question"
+        badge={qBadge}
+        action={q?.youAnswered ? 'See answers' : q ? 'Answer now' : 'Open Q&A'}
+      >
+        {q ? (
+          <>
+            <p className="text-lg font-semibold text-white leading-snug line-clamp-3">{q.question_text}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm">
+              {[
+                { who: <span className="text-neutral-200">You</span>, key: 'you', done: q.youAnswered },
+                { who: partner, key: 'partner', done: q.partnerAnswered },
+              ].map(({ who, key, done }) => (
+                <span key={key} className="flex items-center gap-1.5">
+                  {done ? (
+                    <Check className="w-4 h-4 text-emerald-400" aria-hidden />
+                  ) : (
+                    <span className="w-3.5 h-3.5 rounded-full border border-neutral-600" aria-hidden />
+                  )}
+                  {who}
+                  <span className="sr-only">{done ? 'answered' : 'has not answered'}</span>
+                </span>
+              ))}
+            </div>
           </>
         ) : (
-          <>
-            <p className="text-neutral-400 text-sm mt-2">No question today yet.</p>
-            <button
-              onClick={() => navigate('/qa')}
-              className="mt-4 w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-sm font-medium transition border border-neutral-700"
-            >
-              Go to Q&A
-            </button>
-          </>
+          <p className="text-neutral-300">No question yet today.</p>
         )}
-      </div>
+      </Tile>
 
-      {/* Card 3 – Cycle Tracker */}
-      <div className={cardClass}>
-        <div className="flex items-center gap-2 text-rose-400 mb-1">
-          <Activity className="w-4 h-4" />
-          <span className="text-sm font-medium text-rose-400">Cycle Tracker</span>
-        </div>
+      {/* Cycle */}
+      <Tile
+        to={cycle ? '/cycle' : '/cycle/log'}
+        icon={<Activity className={iconClass} aria-hidden />}
+        title="Cycle"
+        badge={cycleBadge}
+        action={cycle ? 'Open tracker' : 'Log first cycle'}
+      >
         {cycle ? (
           <>
-            <p className="text-white text-lg md:text-xl font-medium capitalize">
-              {cycle.phase} Phase
+            <p className="flex items-center gap-2 text-lg font-semibold text-white leading-snug">
+              <span className={`w-2.5 h-2.5 rounded-full ${phase?.dot ?? 'bg-neutral-500'}`} aria-hidden />
+              {phase?.label ?? cycle.phase} phase
             </p>
-            <p className="text-neutral-400 text-sm">
-              {cycle.daysUntilPeriod === 0
-                ? 'Period expected today'
-                : `${cycle.daysUntilPeriod} days until flow`}
+            <p className="text-sm text-neutral-400 mt-1">
+              {cycle.daysUntilPeriod > 0
+                ? `Period in ${plural(cycle.daysUntilPeriod, 'day')}`
+                : cycle.daysUntilPeriod === 0
+                  ? 'Period expected today'
+                  : `Period ${plural(-cycle.daysUntilPeriod, 'day')} late`}
             </p>
-            <button
-              onClick={() => navigate('/cycle')}
-              className="mt-4 w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-sm font-medium transition border border-neutral-700"
+            <div
+              className="mt-4 h-1.5 rounded-full bg-neutral-800 overflow-hidden"
+              role="progressbar"
+              aria-label="Cycle progress"
+              aria-valuenow={Math.round(cycleProgress)}
+              aria-valuemin={0}
+              aria-valuemax={100}
             >
-              View Cycle
-            </button>
+              <div className={`h-full rounded-full ${phase?.dot ?? 'bg-neutral-500'}`} style={{ width: `${cycleProgress}%` }} />
+            </div>
           </>
         ) : (
-          <>
-            <p className="text-neutral-400 text-sm">No cycle data yet</p>
-            <button
-              onClick={() => navigate('/cycle/log')}
-              className="mt-4 w-full py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-medium transition"
-            >
-              Log First Cycle
-            </button>
-          </>
+          <p className="text-neutral-300">No cycle data yet.</p>
         )}
-      </div>
+      </Tile>
 
-      {/* Card 4 – Love Letters */}
-      <div className={cardClass}>
-        <div className="flex items-center gap-2 text-rose-400 mb-1">
-          <Mails className="w-4 h-4" />
-          <span className="text-sm font-medium text-rose-400">Love Letters</span>
-        </div>
+      {/* Love letters */}
+      <Tile
+        to="/letters"
+        icon={<Mails className={iconClass} aria-hidden />}
+        title="Love letters"
+        action={latestLetter ? 'Read letters' : 'Write the first one'}
+      >
         {latestLetter ? (
           <>
-            <p className="text-neutral-400 text-sm">Latest from {latestLetter.sender_name}</p>
-            <p className="text-white font-medium mt-1 line-clamp-2">"{latestLetter.heading}"</p>
-            <button
-              onClick={() => navigate('/letters')}
-              className="mt-3 w-full py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-medium transition"
-            >
-              Open Letters
-            </button>
+            <p className="text-lg font-semibold text-white leading-snug line-clamp-2">“{latestLetter.heading}”</p>
+            <p className="text-sm text-neutral-400 mt-1">
+              from{' '}
+              {latestLetter.sender_name === partnerName ? partner : <span className="text-neutral-200">{latestLetter.sender_name}</span>}
+            </p>
           </>
         ) : (
-          <>
-            <p className="text-neutral-400 text-sm">No letters yet</p>
-            <button
-              onClick={() => navigate('/letters')}
-              className="mt-3 w-full py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-medium transition"
-            >
-              Send First Letter
-            </button>
-          </>
+          <p className="text-neutral-300">No letters yet.</p>
         )}
-      </div>
+      </Tile>
 
-      {/* Card 5 – Cravings / Remarks */}
-      <div className={cardClass}>
-        <div className="flex items-center gap-2 text-rose-400 mb-3">
-          <Pizza className="w-4 h-4" />
-          <span className="text-sm font-medium text-rose-400">Remarks & Cravings</span>
-        </div>
+      {/* Cravings */}
+      <Tile
+        to="/cravings"
+        icon={<Pizza className={iconClass} aria-hidden />}
+        title="Cravings"
+        badge={cravings.length > 0 ? <Badge tone="rose">{cravings.length} open</Badge> : undefined}
+        action={cravings.length > 0 ? 'See all cravings' : 'Add a craving'}
+      >
         {cravings.length > 0 ? (
-          <ul className="space-y-2 flex-1">
+          <ul className="space-y-2">
             {cravings.map((c) => (
-              <li key={c.id} className="flex items-center gap-2 text-neutral-300 text-sm">
-                <Circle className="w-3 h-3 text-rose-400/70 flex-shrink-0" />
-                <span className="truncate">{c.content}</span>
+              <li key={c.id} className="flex items-start gap-2.5 text-neutral-200 leading-snug">
+                <span className="w-1.5 h-1.5 mt-2 rounded-full bg-rose-400 shrink-0" aria-hidden />
+                <span className="line-clamp-2">{c.content}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-neutral-500 text-sm flex-1">No active cravings</p>
+          <p className="text-neutral-300">Nothing on the list.</p>
         )}
-        <button
-          onClick={() => navigate('/cravings')}
-          className="mt-3 w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-sm font-medium transition border border-neutral-700"
-        >
-          View Cravings
-        </button>
-      </div>
-
-      {/* Card 6 – Shared Media placeholder */}
-      <div className={cardClass}>
-        <div className="flex items-center gap-2 text-rose-400 mb-1">
-          <Music className="w-4 h-4" />
-          <span className="text-sm font-medium text-rose-400">Shared Media</span>
-        </div>
-        <p className="text-neutral-400 text-sm">Coming soon: photos & playlists.</p>
-        <div className="flex-1" />
-        <p className="text-xs text-neutral-600 mt-3">Stay tuned</p>
-      </div>
+      </Tile>
     </div>
   );
 }
