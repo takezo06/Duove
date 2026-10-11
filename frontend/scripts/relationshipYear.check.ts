@@ -13,6 +13,7 @@ assert.equal(r.daysToMonthsary, 31); assert.equal(r.isAnniversary, false); asser
 r = relationshipYear('2025-03-03T09:15:00.000Z', d('2026-10-12'));
 assert.equal(r.yearNumber, 2); assert.equal(r.monthOfYear, 8);
 assert.equal(r.daysToMonthsary, 22); assert.equal(r.daysToAnniversary, 142);
+assert.equal(r.totalDays, 588);
 
 // Anniversary and monthsary days
 assert.equal(relationshipYear('2025-03-03', d('2026-03-03')).isAnniversary, true);
@@ -22,6 +23,7 @@ assert.equal(r.isMonthsary, true); assert.equal(r.monthOfYear, 3);
 // Jan 31 start: Feb monthsary clamps to the 28th, not March 3
 r = relationshipYear('2026-01-31', d('2026-02-27'));
 assert.equal(r.nextMonthsary.getDate(), 28); assert.equal(r.nextMonthsary.getMonth(), 1);
+assert.equal(r.lastMonthsary.getDate(), 31); assert.equal(r.lastMonthsary.getMonth(), 0);
 assert.equal(relationshipYear('2026-01-31', d('2026-02-28')).isMonthsary, true);
 
 // Track ticks are ordered and inside the year

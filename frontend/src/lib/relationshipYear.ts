@@ -36,6 +36,7 @@ export function relationshipYear(since: string, today = new Date()) {
 
   return {
     start,
+    totalDays: daysBetween(start, now),
     yearStart,
     yearEnd,
     yearNumber: year + 1,
@@ -43,6 +44,7 @@ export function relationshipYear(since: string, today = new Date()) {
     progress: daysBetween(yearStart, now) / yearLength,
     // where each monthsary falls on the year track, 0..1
     monthsaries: Array.from({ length: 11 }, (_, i) => daysBetween(yearStart, addMonths(start, year * 12 + i + 1)) / yearLength),
+    lastMonthsary: addMonths(start, months),
     nextMonthsary,
     daysToMonthsary: daysBetween(now, nextMonthsary),
     daysToAnniversary: daysBetween(now, yearEnd),

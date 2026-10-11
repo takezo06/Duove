@@ -1,22 +1,26 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { relationshipYear } from '../lib/relationshipYear';
+import { plural } from '../lib/plural';
+import { Avatar, Badge, CardHeader, focusRing, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
 import {
   Loader2,
   Heart,
-  Calendar,
   CalendarDays,
-  Clock,
-  User,
-  Edit2,
-  X,
-  Save,
+  CalendarHeart,
+  CalendarClock,
   Copy,
   Check,
   UserPlus,
   Link as LinkIcon,
+  Pizza,
+  Send,
+  Mails,
+  UserRound,
 } from 'lucide-react';
 
 // ---------- Types ----------
@@ -36,24 +40,36 @@ interface Stats {
     days_until_monthsary: number | null;
     status: string;
   };
-  partner: { id: string; display_name: string };
+  partner: { id: string; display_name: string; avatar_url?: string | null; account_created?: string | null };
   stats: { cravings: number; letters_sent: number; letters_received: number };
 }
 
-// ---------- Skeleton ----------
-function SkeletonCard() {
+const longDate = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+const ordinal = (n: number) => n + (['st', 'nd', 'rd'][((((n + 90) % 100) - 10) % 10) - 1] || 'th');
+const monthDay = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+
+// "1 year, 7 months" (or "12 days" in the first month)
+function span(r: ReturnType<typeof relationshipYear>) {
+  const years = r.yearNumber - 1;
+  const months = r.monthOfYear - 1;
+  const parts = [years && plural(years, 'year'), months && plural(months, 'month')].filter(Boolean);
+  return parts.length ? parts.join(', ') : plural(Math.max(r.totalDays, 0), 'day');
+}
+
+const fmt = (n: number) => n.toLocaleString();
+
+// Centered stat: icon + label, big value, supporting line, optional pill or extra content
+function Stat({ icon, label, value, sub, children }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden">
-      <div className="animate-pulse space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-neutral-700 rounded-full" />
-          <div className="h-4 w-24 bg-neutral-700 rounded" />
-        </div>
-        <div className="h-6 w-3/4 bg-neutral-700 rounded" />
-        <div className="h-4 w-1/2 bg-neutral-700 rounded" />
-        <div className="h-3 w-2/3 bg-neutral-700 rounded" />
-      </div>
-    </div>
+    <>
+      <h2 className="flex items-center justify-center gap-2 text-neutral-400 text-sm">
+        {icon}
+        {label}
+      </h2>
+      <p className="text-2xl font-bold text-white mt-3 tabular-nums">{value}</p>
+      {sub && <p className="text-sm text-neutral-400 mt-1">{sub}</p>}
+      {children}
+    </>
   );
 }
 
@@ -61,6 +77,7 @@ export function Partner() {
   usePageTitle('Partner');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [me, setMe] = useState<{ name: string; avatar: string | null }>({ name: 'You', avatar: null });
   const [error, setError] = useState<string | null>(null);
   const [editingAnniversary, setEditingAnniversary] = useState(false);
   const [newAnniversaryDate, setNewAnniversaryDate] = useState('');
@@ -85,6 +102,16 @@ export function Partner() {
         navigate('/login');
         return;
       }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+      setMe({
+        name: profile?.display_name || user.email?.split('@')[0] || 'You',
+        avatar: profile?.avatar_url || null,
+      });
+
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) throw new Error('Not authenticated');
 
@@ -121,6 +148,13 @@ export function Partner() {
   };
 
   useEffect(() => { fetchStats(); fetchPendingInvite(); }, []);
+
+  // Ticks once a second so the Together counters run live
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // ---- Actions ----
   const generateInvite = async () => {
@@ -181,31 +215,21 @@ export function Partner() {
     finally { setUpdatingAnniversary(false); }
   };
 
-  const formatDate = (dateStr: string | null) =>
-    dateStr
-      ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-      : 'Not set';
-
   // ==================== RENDER ====================
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto animate-pulse px-4 py-6">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-neutral-800" />
-            <div>
-              <div className="h-7 w-48 bg-neutral-800 rounded" />
-              <div className="flex items-center gap-2 mt-1">
-                <div className="h-5 w-32 bg-neutral-800 rounded" />
-                <div className="h-5 w-20 bg-neutral-800 rounded-full" />
-              </div>
-            </div>
-          </div>
-          <div className="h-8 w-28 bg-neutral-800 rounded" />
+      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
+        <div className={`${surface} h-36 animate-pulse`} />
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`${surface} h-36 animate-pulse`} />
+          ))}
         </div>
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+        <div className="grid sm:grid-cols-3 gap-4 md:gap-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className={`${surface} h-28 animate-pulse`} />
+          ))}
         </div>
       </div>
     );
@@ -213,11 +237,12 @@ export function Partner() {
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-16 px-4">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
-          <p className="text-neutral-400">{error}</p>
-          <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition">
-            Retry
+      <div className="max-w-4xl mx-auto">
+        <div className={`${surface} p-8 md:p-12 text-center`}>
+          <h1 className="text-2xl font-semibold text-white mb-2">Couldn't load your relationship</h1>
+          <p className="text-neutral-400 mb-6">{error}</p>
+          <button onClick={() => fetchStats()} className={primaryButton}>
+            Try again
           </button>
         </div>
       </div>
@@ -227,231 +252,319 @@ export function Partner() {
   // ==================== PAIRING FLOW ====================
   if (!stats) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-10">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8 md:p-12 shadow-xl text-center">
-          <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-rose-400/20">
-            <UserPlus className="w-8 h-8 text-rose-400" />
+      <div className="max-w-4xl mx-auto space-y-6">
+        <section className={`${surface} p-6 md:p-8 flex flex-col sm:flex-row sm:items-center gap-5`}>
+          <div className="flex -space-x-4">
+            <Avatar src={me.avatar} name={me.name} />
+            <Avatar src={null} name="Your partner" dashed />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">You're not paired yet</h2>
-          <p className="text-neutral-400 max-w-md mx-auto mb-8">
-            Generate an invite code and share it with your partner, or enter a code you received to connect.
-          </p>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Connect with your partner</h1>
+            <p className="text-neutral-400 mt-1">
+              One of you creates a code, the other enters it. Then this page fills up with your story.
+            </p>
+          </div>
+        </section>
 
-          <div className="border border-neutral-800 rounded-2xl p-6 mb-6 bg-neutral-800/20">
-            <h3 className="text-white font-medium mb-4 flex items-center justify-center gap-2">
-              <LinkIcon className="w-4 h-4 text-rose-400" />
-              Create Invite Code
-            </h3>
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+          <section className={`${surface} p-6 flex flex-col`}>
+            <CardHeader icon={<LinkIcon className={iconClass} aria-hidden />} title="Invite your partner" />
             {inviteCode ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-center gap-3">
-                  <span className="text-3xl font-mono font-bold text-rose-400 tracking-widest">{inviteCode}</span>
-                  <button onClick={copyInviteCode} className="p-2 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-neutral-300 hover:text-white transition">
-                    {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              <>
+                <p className="text-neutral-300 mt-4">Send them this code:</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="text-3xl font-mono font-bold text-white tracking-widest">{inviteCode}</span>
+                  <button onClick={copyInviteCode} className={secondaryButton} aria-live="polite">
+                    {copied ? <Check className="w-4 h-4 text-emerald-400" aria-hidden /> : <Copy className="w-4 h-4" aria-hidden />}
+                    {copied ? 'Copied' : 'Copy'}
                   </button>
                 </div>
-                <p className="text-xs text-neutral-500">Share this code with your partner. Once they join, you'll appear here.</p>
-                <button onClick={generateInvite} disabled={generatingInvite} className="text-sm text-rose-400 hover:underline disabled:opacity-50">
-                  Generate new code
+                <p className="text-sm text-neutral-400 mt-3">You'll be connected as soon as they join.</p>
+                <button
+                  onClick={generateInvite}
+                  disabled={generatingInvite}
+                  className={`mt-auto pt-5 self-start text-sm font-medium text-neutral-400 hover:text-rose-400 transition disabled:opacity-50 cursor-pointer rounded ${focusRing}`}
+                >
+                  Create a new code
                 </button>
-              </div>
+              </>
             ) : (
-              <button onClick={generateInvite} disabled={generatingInvite} className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition disabled:opacity-50">
-                {generatingInvite ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Generate Invite Code'}
-              </button>
+              <>
+                <p className="text-neutral-300 mt-4 flex-1">Create a code and send it to your partner.</p>
+                <button onClick={generateInvite} disabled={generatingInvite} className={`${primaryButton} mt-5 w-full`}>
+                  {generatingInvite ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : 'Create invite code'}
+                </button>
+              </>
             )}
-          </div>
+          </section>
 
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex-1 h-px bg-neutral-800" />
-            <span className="text-neutral-600 text-xs font-medium">OR</span>
-            <div className="flex-1 h-px bg-neutral-800" />
-          </div>
-
-          <div className="border border-neutral-800 rounded-2xl p-6 bg-neutral-800/20">
-            <h3 className="text-white font-medium mb-4 flex items-center justify-center gap-2">
-              <UserPlus className="w-4 h-4 text-rose-400" />
-              Join with a Code
-            </h3>
-            <div className="flex gap-3">
+          <section className={`${surface} p-6 flex flex-col`}>
+            <CardHeader icon={<UserPlus className={iconClass} aria-hidden />} title="Join with a code" />
+            <label htmlFor="join-code" className="text-neutral-300 mt-4 flex-1">
+              Got a code from your partner? Enter it here.
+            </label>
+            <div className="flex gap-3 mt-5">
               <input
+                id="join-code"
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="Enter 8‑character code"
+                onKeyDown={(e) => e.key === 'Enter' && joinCode.trim().length === 8 && joinRelationship()}
+                placeholder="8-character code"
                 maxLength={8}
-                className="flex-1 bg-neutral-800/50 text-sm text-white placeholder-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 uppercase"
+                autoComplete="off"
+                className="min-w-0 flex-1 bg-neutral-800/50 font-mono tracking-widest text-white placeholder:tracking-normal placeholder:font-sans placeholder:normal-case placeholder-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 uppercase"
               />
               <button
                 onClick={joinRelationship}
                 disabled={joining || joinCode.trim().length !== 8}
-                className="px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition disabled:opacity-50"
+                className={primaryButton}
               >
-                {joining ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Join'}
+                {joining ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : 'Join'}
               </button>
             </div>
-            {joinError && <p className="text-rose-400 text-sm mt-3">{joinError}</p>}
-          </div>
+          </section>
         </div>
+
+        {joinError && (
+          <p role="alert" className="text-rose-400 text-sm">
+            {joinError}
+          </p>
+        )}
       </div>
     );
   }
 
   // ==================== ACTIVE RELATIONSHIP ====================
   const partnerName = stats.partner.display_name || 'Partner';
-  const cardBase = 'bg-neutral-900 rounded-2xl border border-neutral-800 p-6 relative overflow-hidden hover:border-rose-400/30 transition-all duration-200';
+  const rel = stats.relationship;
+  const together = rel.paired_at ? relationshipYear(rel.paired_at) : null;
+  const anniversary = rel.anniversary_date ? relationshipYear(rel.anniversary_date) : null;
+  // Countdowns follow the same rule as the dashboard: anniversary if set, else pairing date
+  const milestones = anniversary ?? together;
+  const daysSinceAnniversary = anniversary
+    ? Math.round((new Date().setHours(0, 0, 0, 0) - anniversary.yearStart.getTime()) / 86_400_000)
+    : null;
+
+  // Exact time together from the pairing instant
+  const elapsed = rel.paired_at ? Math.max(0, now - new Date(rel.paired_at).getTime()) : 0;
+  const totalSeconds = Math.floor(elapsed / 1000);
+  const units = [
+    { label: 'Weeks', value: Math.floor(totalSeconds / 604_800) },
+    { label: 'Hours', value: Math.floor(totalSeconds / 3_600) },
+    { label: 'Minutes', value: Math.floor(totalSeconds / 60) },
+    { label: 'Seconds', value: totalSeconds },
+  ];
+
+  // How far through the current month (monthsary to monthsary)
+  const monthDays = milestones ? Math.round((milestones.nextMonthsary.getTime() - milestones.lastMonthsary.getTime()) / 86_400_000) : 0;
+  const monthProgress = milestones && monthDays ? Math.min(1, Math.max(0, 1 - milestones.daysToMonthsary / monthDays)) : 0;
+
+  const countdown = (days: number, today: boolean) => (
+    <div className="mt-4">
+      {today ? <Badge tone="rose">Today</Badge> : <Badge tone={days <= 7 ? 'rose' : 'neutral'}>in {plural(days, 'day')}</Badge>}
+    </div>
+  );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
-            <Heart className="w-6 h-6 text-rose-400 fill-rose-400/20" />
+      <section className={`${surface} p-6 md:p-8`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+          <div className="flex -space-x-4">
+            <Avatar src={me.avatar} name={me.name} />
+            <Avatar src={stats.partner.avatar_url ?? null} name={partnerName} />
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-white">Your Relationship</h1>
-            <p className="text-neutral-400 text-sm flex items-center gap-2 mt-0.5">
-              with <span className="text-rose-400 font-medium">{partnerName}</span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-emerald-400 text-xs font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Connected
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="text-2xl md:text-3xl font-bold text-white">
+                You &amp; <span className="text-rose-400">{partnerName}</span>
+              </h1>
+              <Badge tone="emerald">Connected</Badge>
+            </div>
+            <p className="text-neutral-400 text-sm mt-1">
+              {together ? `Paired on ${longDate(together.start)}` : 'Paired'}
+            </p>
+          </div>
+          {!editingAnniversary && (
+            <button onClick={() => setEditingAnniversary(true)} className={`${secondaryButton} self-start sm:self-center`}>
+              <CalendarHeart className="w-4 h-4 text-rose-400" aria-hidden />
+              {rel.anniversary_date ? 'Edit anniversary' : 'Set anniversary'}
+            </button>
+          )}
+        </div>
+
+        {editingAnniversary && (
+          <form
+            className="mt-6 pt-6 border-t border-neutral-800"
+            onSubmit={(e) => {
+              e.preventDefault();
+              updateAnniversary();
+            }}
+          >
+            <label htmlFor="anniversary" className="block text-sm text-neutral-400 mb-2">
+              Your anniversary date
+            </label>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                id="anniversary"
+                type="date"
+                autoFocus
+                value={newAnniversaryDate}
+                onChange={(e) => setNewAnniversaryDate(e.target.value)}
+                className="flex-1 bg-neutral-800/50 text-white px-4 py-2.5 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 [color-scheme:dark]"
+              />
+              <div className="flex gap-3">
+                <button type="submit" disabled={updatingAnniversary || !newAnniversaryDate} className={`${primaryButton} flex-1`}>
+                  {updatingAnniversary && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingAnniversary(false)} className={`${secondaryButton} flex-1`}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+      </section>
+
+      {/* Together, counted live */}
+      <section className={`${surface} p-6 md:p-8 text-center`}>
+        <h2 className="flex items-center justify-center gap-2 text-neutral-400 text-sm">
+          <Heart className={iconClass} aria-hidden />
+          Together
+        </h2>
+        {together ? (
+          <>
+            <p className="text-4xl md:text-5xl font-bold text-white mt-3 tabular-nums">
+              {fmt(Math.floor(totalSeconds / 86_400))} <span className="text-2xl md:text-3xl font-semibold text-neutral-300">days</span>
+            </p>
+            <p className="text-neutral-400 mt-2">
+              {span(together)} since {longDate(together.start)}
+            </p>
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+              {units.map((u) => (
+                <div key={u.label} className="rounded-xl bg-neutral-800/40 border border-neutral-800 px-3 py-4">
+                  <dd className="text-lg md:text-xl font-semibold text-white tabular-nums">{fmt(u.value)}</dd>
+                  <dt className="text-xs text-neutral-400 mt-1">{u.label}</dt>
+                </div>
+              ))}
+            </dl>
+          </>
+        ) : (
+          <p className="text-2xl font-bold text-white mt-3">Just started</p>
+        )}
+      </section>
+
+      {/* Milestones */}
+      <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+        <section className={`${surface} p-6 text-center flex flex-col`}>
+          {anniversary && daysSinceAnniversary !== null && daysSinceAnniversary >= 0 ? (
+            <Stat
+              icon={<CalendarDays className={iconClass} aria-hidden />}
+              label="Since your anniversary"
+              value={plural(daysSinceAnniversary, 'day')}
+              sub={`Celebrated every ${monthDay(anniversary.start)}`}
+            >
+              <div className="mt-4">
+                <Badge tone="neutral">Year {anniversary.yearNumber}</Badge>
+              </div>
+            </Stat>
+          ) : anniversary ? (
+            <Stat
+              icon={<CalendarDays className={iconClass} aria-hidden />}
+              label="Since your anniversary"
+              value="Coming up"
+              sub={`Starts ${longDate(anniversary.start)}`}
+            />
+          ) : (
+            <Stat icon={<CalendarDays className={iconClass} aria-hidden />} label="Since your anniversary" value="Not set">
+              <button
+                onClick={() => setEditingAnniversary(true)}
+                className={`mt-3 mx-auto text-sm font-medium text-rose-400 hover:text-rose-300 transition cursor-pointer rounded ${focusRing}`}
+              >
+                Set your anniversary date
+              </button>
+            </Stat>
+          )}
+        </section>
+
+        <section className={`${surface} p-6 text-center`}>
+          {milestones ? (
+            <Stat
+              icon={<CalendarHeart className={iconClass} aria-hidden />}
+              label="Next anniversary"
+              value={monthDay(milestones.isAnniversary ? milestones.yearStart : milestones.yearEnd)}
+              sub={milestones.isAnniversary ? 'Happy anniversary' : `Your ${ordinal(milestones.yearNumber)} anniversary · ${milestones.yearEnd.getFullYear()}`}
+            >
+              {countdown(milestones.daysToAnniversary, milestones.isAnniversary)}
+            </Stat>
+          ) : (
+            <Stat icon={<CalendarHeart className={iconClass} aria-hidden />} label="Next anniversary" value="Not set" />
+          )}
+        </section>
+
+        <section className={`${surface} p-6 text-center`}>
+          {milestones ? (
+            <Stat
+              icon={<CalendarClock className={iconClass} aria-hidden />}
+              label="Next monthsary"
+              value={monthDay(milestones.isMonthsary ? new Date() : milestones.nextMonthsary)}
+              sub={milestones.isMonthsary ? 'Happy monthsary' : `Every month on day ${milestones.start.getDate()}`}
+            >
+              <div
+                className="mt-4 h-1.5 rounded-full bg-neutral-800 overflow-hidden"
+                role="progressbar"
+                aria-label="Progress to next monthsary"
+                aria-valuenow={Math.round(monthProgress * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div className="h-full rounded-full bg-rose-500" style={{ width: `${monthProgress * 100}%` }} />
+              </div>
+              {countdown(milestones.daysToMonthsary, milestones.isMonthsary)}
+            </Stat>
+          ) : (
+            <Stat icon={<CalendarClock className={iconClass} aria-hidden />} label="Next monthsary" value="Not available" />
+          )}
+        </section>
+      </div>
+
+      {/* Activity */}
+      <div className="grid grid-cols-3 gap-3 md:gap-6">
+        {[
+          { to: '/cravings', icon: Pizza, label: 'Cravings', value: stats.stats.cravings },
+          { to: '/letters', icon: Send, label: 'Letters sent', value: stats.stats.letters_sent },
+          { to: '/letters', icon: Mails, label: 'Letters received', value: stats.stats.letters_received },
+        ].map(({ to, icon: Icon, label, value }) => (
+          <Link
+            key={label}
+            to={to}
+            className={`group ${surface} px-3 py-5 md:p-6 text-center hover:border-rose-400/30 transition ${focusRing}`}
+          >
+            <Icon className={`${iconClass} mx-auto`} aria-hidden />
+            <p className="text-2xl md:text-3xl font-bold text-white mt-3 tabular-nums">{fmt(value)}</p>
+            <p className="text-xs md:text-sm text-neutral-400 group-hover:text-rose-400 transition mt-1">{label}</p>
+          </Link>
+        ))}
+      </div>
+      {/* Accounts */}
+      <footer className="rounded-2xl border border-neutral-800 bg-neutral-900/50 px-5 py-4 flex flex-col sm:flex-row sm:justify-between gap-2 text-sm text-neutral-400">
+        {[
+          { who: 'You', created: stats.user.account_created, highlight: false },
+          { who: partnerName, created: stats.partner.account_created, highlight: true },
+        ]
+          .filter((a) => a.created)
+          .map((a) => (
+            <p key={a.who} className="flex items-center gap-2">
+              <UserRound className="w-4 h-4 text-neutral-500 shrink-0" aria-hidden />
+              <span>
+                <span className={a.highlight ? 'text-rose-400 font-medium' : 'text-neutral-200 font-medium'}>{a.who}</span>
+                {' '}joined Duove on <span className="text-neutral-200">{longDate(new Date(a.created!))}</span>
               </span>
             </p>
-          </div>
-        </div>
-        <button onClick={() => setEditingAnniversary(true)} className="text-xs text-neutral-400 hover:text-rose-400 transition flex items-center gap-1.5">
-          <Edit2 className="w-3.5 h-3.5" />
-          {stats.relationship.anniversary_date ? 'Edit anniversary' : 'Set anniversary'}
-        </button>
-      </div>
-
-      {/* Stats Grid – 2x2 */}
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-        <div className={cardBase}>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
-              <Heart className="w-4 h-4 text-rose-400" />
-              Together
-            </div>
-            <p className="text-2xl font-semibold text-white leading-tight">{stats.relationship.together_duration}</p>
-            <p className="text-sm text-rose-400/80 font-medium mt-1.5">Since {formatDate(stats.relationship.paired_at)}</p>
-            {stats.relationship.together_conversion && (
-              <p className="text-sm text-rose-400/60 font-mono mt-1.5">{stats.relationship.together_conversion}</p>
-            )}
-          </div>
-        </div>
-
-        <div className={cardBase}>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
-              <CalendarDays className="w-4 h-4 text-rose-400" />
-              Since Anniversary
-            </div>
-            <p className="text-2xl font-semibold text-white leading-tight">{stats.relationship.anniversary_duration}</p>
-            <p className="text-sm text-rose-400/80 font-medium mt-1.5">
-              {stats.relationship.anniversary_date ? `Anniversary: ${formatDate(stats.relationship.anniversary_date)}` : 'No anniversary date set'}
-            </p>
-            {stats.relationship.anniversary_conversion && (
-              <p className="text-sm text-rose-400/60 font-mono mt-1.5">{stats.relationship.anniversary_conversion}</p>
-            )}
-          </div>
-        </div>
-
-        <div className={cardBase}>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
-              <Calendar className="w-4 h-4 text-rose-400" />
-              Next Anniversary
-            </div>
-            <p className="text-2xl font-semibold text-white leading-tight">
-              {stats.relationship.next_anniversary ? formatDate(stats.relationship.next_anniversary) : 'Not set'}
-            </p>
-            {stats.relationship.days_until_anniversary !== null && (
-              <p className="text-sm text-rose-400/80 font-medium mt-1.5">
-                {stats.relationship.days_until_anniversary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_anniversary} day${stats.relationship.days_until_anniversary > 1 ? 's' : ''} to go`}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className={cardBase}>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 text-neutral-400 text-sm mb-2">
-              <Calendar className="w-4 h-4 text-rose-400" />
-              Next Monthsary
-            </div>
-            <p className="text-2xl font-semibold text-white leading-tight">
-              {stats.relationship.next_monthsary ? formatDate(stats.relationship.next_monthsary) : 'Not available'}
-            </p>
-            {stats.relationship.days_until_monthsary !== null && (
-              <p className="text-sm text-rose-400/80 font-medium mt-1.5">
-                {stats.relationship.days_until_monthsary === 0 ? '🎉 Today!' : `${stats.relationship.days_until_monthsary} day${stats.relationship.days_until_monthsary > 1 ? 's' : ''} to go`}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center hover:bg-neutral-900/70 transition">
-          <p className="text-2xl font-semibold text-white">{stats.stats.cravings}</p>
-          <p className="text-xs text-neutral-500 mt-1">Cravings</p>
-        </div>
-        <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center hover:bg-neutral-900/70 transition">
-          <p className="text-2xl font-semibold text-white">{stats.stats.letters_sent}</p>
-          <p className="text-xs text-neutral-500 mt-1">Letters Sent</p>
-        </div>
-        <div className="bg-neutral-900/50 rounded-xl border border-neutral-800/50 p-4 text-center hover:bg-neutral-900/70 transition">
-          <p className="text-2xl font-semibold text-white">{stats.stats.letters_received}</p>
-          <p className="text-xs text-neutral-500 mt-1">Letters Received</p>
-        </div>
-      </div>
-
-      {/* Anniversary Editor */}
-      {editingAnniversary && (
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-medium">Set Your Anniversary Date</h3>
-            <button onClick={() => setEditingAnniversary(false)} className="text-neutral-400 hover:text-white transition">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex gap-3">
-            <input
-              type="date"
-              value={newAnniversaryDate}
-              onChange={(e) => setNewAnniversaryDate(e.target.value)}
-              className="flex-1 bg-neutral-800/50 text-sm text-white px-4 py-2.5 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50"
-            />
-            <button
-              onClick={updateAnniversary}
-              disabled={updatingAnniversary || !newAnniversaryDate}
-              className="px-6 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition flex items-center gap-2 disabled:opacity-50"
-            >
-              {updatingAnniversary ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="bg-neutral-900/50 rounded-2xl border border-neutral-800/50 p-4 flex flex-wrap items-center justify-between text-sm text-neutral-400">
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-neutral-500" />
-          <span>Account age: <span className="text-white">{stats.user.account_age}</span></span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-neutral-500" />
-          <span>Paired since: <span className="text-white">{formatDate(stats.relationship.paired_at)}</span></span>
-        </div>
-      </div>
+          ))}
+      </footer>
     </div>
   );
 }
