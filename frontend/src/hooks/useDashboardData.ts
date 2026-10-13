@@ -143,14 +143,14 @@ export function useDashboardData(): DashboardData {
         try {
           const qaRes = await axios.get(
             `${import.meta.env.VITE_BACKEND_URL}/qa/current`,
-            { headers }
+            { headers, params: { tz: Intl.DateTimeFormat().resolvedOptions().timeZone } }
           );
           const qa = qaRes.data;
           if (qa && qa.question) {
             currentQuestion = {
               question_text: qa.question.question_text,
               youAnswered: !!qa.yourAnswer,
-              partnerAnswered: !!qa.partnerAnswer,
+              partnerAnswered: !!qa.partnerAnswered,
             };
           }
         } catch (e) {

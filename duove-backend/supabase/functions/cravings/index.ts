@@ -23,12 +23,12 @@ serve(async (req) => {
   if (path === "/" && req.method === "GET") {
     const relationshipId = url.searchParams.get("relationshipId");
 
-    // 1) Delete fulfilled cravings older than 24 hours
+    // 1) Delete cravings marked done more than 24 hours ago
     await admin
       .from("cravings")
       .delete()
       .eq("fulfilled", true)
-      .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      .lt("fulfilled_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
     // 2) Fetch remaining cravings
     const { data } = await admin
@@ -83,7 +83,10 @@ serve(async (req) => {
 
     const { data } = await admin
       .from("cravings")
-      .update({ fulfilled: !existing?.fulfilled })
+      .update({
+        fulfilled: !existing?.fulfilled,
+        fulfilled_at: existing?.fulfilled ? null : new Date().toISOString(),
+      })
       .eq("id", cravingId)
       .select()
       .single();
