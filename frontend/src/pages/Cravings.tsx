@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import axios from 'axios';
-import { Avatar, Badge, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, CategoryPill, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { Check, Plus, Trash2, Loader2 } from 'lucide-react';
 import { CATEGORIES, categoryFor, type Category } from '../lib/cravingCategories';
 
@@ -42,16 +42,6 @@ const chip = (active: boolean, cat?: Category) =>
       ? cat?.tint ?? 'bg-neutral-800 border-neutral-700 text-white'
       : 'border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
   }`;
-
-// Category pill on each craving: same shape as the selected chip, smaller
-function CategoryPill({ cat }: { cat: Category }) {
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${cat.tint}`}>
-      <cat.icon className={`w-3 h-3 ${cat.iconColor}`} aria-hidden />
-      {cat.label}
-    </span>
-  );
-}
 
 export function Cravings() {
   usePageTitle('Cravings');

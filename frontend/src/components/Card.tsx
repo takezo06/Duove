@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { Category } from '../lib/cravingCategories';
 
 // Shared visual vocabulary for Duove pages (dashboard, partner, ...)
 export const focusRing =
@@ -50,5 +51,15 @@ export function Avatar({ src, name, dashed = false }: { src: string | null; name
     >
       {dashed ? '?' : name.charAt(0).toUpperCase()}
     </div>
+  );
+}
+
+// Category pill on each craving: same shape as the selected chip, smaller
+export function CategoryPill({ cat }: { cat: Category }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${cat.tint}`}>
+      <cat.icon className={`w-3 h-3 ${cat.iconColor}`} aria-hidden />
+      {cat.label}
+    </span>
   );
 }
