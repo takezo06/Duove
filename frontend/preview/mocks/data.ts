@@ -70,7 +70,8 @@ export const question = empty ? null : {
 };
 
 export const notifications = empty ? [] : [
-  { id: 'n1', type: 'love_letter', title: 'Mika sent you a love letter', message: 'For the rainy Tuesday you made better', read: false, created_at: ago(20) },
-  { id: 'n2', type: 'craving', title: 'Mika added a craving', message: 'Spicy ramen from the corner place', read: false, created_at: ago(2) },
-  { id: 'n3', type: 'qa', title: 'Mika answered today\'s question', message: 'Your turn', read: true, created_at: ago(30) },
+  { id: 'n1', type: 'letter_received', message: 'Mika sent you a letter', created_at: ago(0.3), link: '/letters', reference_id: 'l1', read: false },
+  { id: 'n2', type: 'craving_added', message: 'Mika added a craving: "Spicy ramen from the corner place"', created_at: ago(2), link: '/cravings', reference_id: 'c1', read: false },
+  { id: 'n3', type: 'craving_fulfilled', message: 'Mika fulfilled a craving: "Strawberry milk"', created_at: ago(30), link: '/cravings', reference_id: 'c5', read: true },
+  { id: 'n4', type: 'craving_added', message: 'Mika added a craving: "A really long hug after work"', created_at: ago(80), link: '/cravings', reference_id: 'c3', read: true },
 ];

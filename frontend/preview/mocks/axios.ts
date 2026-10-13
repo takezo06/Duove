@@ -22,7 +22,7 @@ async function get(url: string): Promise<Res> {
     return ok({ prediction: d.prediction, calendar: [], lastPeriodStart: d.cycles.at(-1)?.start_date ?? null, partnerName: d.partner.display_name });
   if (path.startsWith('/cycles/')) return ok([]);
   if (path === '/notifications/unread-count') return ok({ count: d.notifications.filter((n) => !n.read).length });
-  if (path === '/notifications') return ok(d.notifications);
+  if (path === '/notifications') return d.paired ? ok(d.notifications) : notFound();
   if (path === '/profile') return ok({ ...d.me });
   console.warn('[mock axios] unmocked GET', path);
   return ok({});

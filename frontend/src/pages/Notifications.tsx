@@ -3,16 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
-import {
-  Loader2,
-  Heart,
-  Pizza,
-  CheckCircle,
-  Mail,
-  MessageCircle,
-  Sparkles,
-  ArrowRight,
-} from 'lucide-react';
+import { Avatar, Badge, CategoryPill, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { categoryFor } from '../lib/cravingCategories';
+import { plural } from '../lib/plural';
+import { ArrowRight, Check, ListPlus, Mail, MessageCircle, Bell } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -23,89 +17,58 @@ interface Notification {
   reference_id: string;
 }
 
-function SkeletonNotification() {
-  return (
-    <div className="flex items-center gap-4 bg-neutral-900 rounded-2xl border border-neutral-800 p-4 animate-pulse cursor-pointer">
-      <div className="w-10 h-10 rounded-full bg-neutral-700/50 flex-shrink-0" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-3/4 bg-neutral-700/50 rounded" />
-        <div className="h-3 w-1/3 bg-neutral-700/50 rounded" />
-      </div>
-    </div>
-  );
+const NO_RELATIONSHIP = 'No active relationship found.';
+
+// "just now", "3h ago", "Yesterday", "Mon", "Mar 3"
+function when(iso: string) {
+  const then = new Date(iso);
+  const mins = Math.floor((Date.now() - then.getTime()) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 24 * 60) return `${Math.floor(mins / 60)}h ago`;
+  const days = Math.floor(mins / (24 * 60));
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return then.toLocaleDateString(undefined, { weekday: 'short' });
+  return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-function timeAgo(dateString: string): string {
-  const now = new Date();
-  const past = new Date(dateString);
-  const diffMs = now.getTime() - past.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return past.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+function dayLabel(iso: string) {
+  const d = new Date(iso).toDateString();
+  if (d === new Date().toDateString()) return 'Today';
+  if (d === new Date(Date.now() - 86_400_000).toDateString()) return 'Yesterday';
+  return new Date(iso).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-function groupNotifications(notifications: Notification[]) {
-  const groups: { [key: string]: Notification[] } = {};
-  const today = new Date().toDateString();
-
-  notifications.forEach((n) => {
-    const date = new Date(n.created_at);
-    let key = date.toDateString();
-    if (key === today) key = 'Today';
-    else if (key === new Date(Date.now() - 86400000).toDateString()) key = 'Yesterday';
-    else key = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(n);
-  });
-  return groups;
-}
-
-const notificationIcon = (type: string) => {
-  switch (type) {
-    case 'craving_added':
-      return <Pizza className="w-5 h-5 text-amber-400" />;
-    case 'craving_fulfilled':
-      return <CheckCircle className="w-5 h-5 text-emerald-400" />;
-    case 'letter_received':
-      return <Mail className="w-5 h-5 text-rose-400" />;
-    case 'qa_answered':
-      return <MessageCircle className="w-5 h-5 text-blue-400" />;
-    default:
-      return <Heart className="w-5 h-5 text-neutral-500" />;
+function groupByDay(items: Notification[]) {
+  const groups = new Map<string, Notification[]>();
+  for (const n of items) {
+    const key = dayLabel(n.created_at);
+    groups.set(key, [...(groups.get(key) ?? []), n]);
   }
+  return [...groups];
+}
+
+const typeMeta = {
+  craving_added: { icon: ListPlus, color: 'text-neutral-300', action: 'See craving' },
+  craving_fulfilled: { icon: Check, color: 'text-emerald-400', action: 'See craving' },
+  letter_received: { icon: Mail, color: 'text-rose-400', action: 'Read letter' },
+  qa_answered: { icon: MessageCircle, color: 'text-neutral-300', action: 'See answer' },
 };
 
-const notificationBg = (type: string) => {
-  switch (type) {
-    case 'craving_added':
-      return 'bg-amber-400/10 border-amber-400/20';
-    case 'craving_fulfilled':
-      return 'bg-emerald-400/10 border-emerald-400/20';
-    case 'letter_received':
-      return 'bg-rose-400/10 border-rose-400/20';
-    case 'qa_answered':
-      return 'bg-blue-400/10 border-blue-400/20';
-    default:
-      return 'bg-neutral-800/50 border-neutral-700/50';
-  }
-};
+// 'Mika added a craving: "Spicy ramen"' -> headline + quoted craving on its own line
+function splitMessage(message: string) {
+  const m = message.match(/^(.*?): "(.*)"$/);
+  return m ? { headline: m[1], quote: m[2] } : { headline: message, quote: null };
+}
 
 export function Notifications() {
   usePageTitle('Notifications');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
+  const [partner, setPartner] = useState<{ display_name: string } | null>(null);
+  const [categoryById, setCategoryById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -119,12 +82,23 @@ export function Notifications() {
 
         const token = (await supabase.auth.getSession()).data.session?.access_token;
 
-        // Fetch notifications
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/notifications?_t=${Date.now()}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const api = (path: string) =>
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+        // Extras only decorate the list; the page still works if they fail
+        const extra = (path: string) => api(path).then((r) => r.data).catch(() => null);
+
+        // Unread count must be read before marking everything read below
+        const [res, unreadRes, rel, cravings] = await Promise.all([
+          api(`/notifications?_t=${Date.now()}`),
+          extra('/notifications/unread-count'),
+          extra('/relationships/me'),
+          extra('/cravings'),
+        ]);
         setNotifications(res.data);
+        setUnread(unreadRes?.count ?? 0);
+        setPartner(rel?.partner ?? null);
+        if (Array.isArray(cravings))
+          setCategoryById(Object.fromEntries(cravings.map((c: { id: string; category: string }) => [c.id, c.category])));
 
         // Mark as read after fetching
         if (token) {
@@ -138,11 +112,7 @@ export function Notifications() {
         }
       } catch (err: any) {
         console.error('Error fetching notifications:', err);
-        if (err.response?.status === 404) {
-          setError('No active relationship found.');
-        } else {
-          setError('Failed to load notifications.');
-        }
+        setError(err.response?.status === 404 ? NO_RELATIONSHIP : "Couldn't load your notifications.");
       } finally {
         setLoading(false);
       }
@@ -151,106 +121,142 @@ export function Notifications() {
     fetchNotifications();
   }, [navigate]);
 
-  const handleNotificationClick = (notification: Notification) => {
-    navigate(notification.link, { state: { highlightId: notification.reference_id } });
-  };
-
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-neutral-800 animate-pulse" />
-          <div className="h-8 w-40 bg-neutral-800 rounded animate-pulse" />
-        </div>
-        <div className="space-y-4">
-          <SkeletonNotification />
-          <SkeletonNotification />
-          <SkeletonNotification />
-          <SkeletonNotification />
-          <SkeletonNotification />
-        </div>
+      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
+        <div className={`${surface} h-32 animate-pulse`} />
+        <div className={`${surface} h-64 animate-pulse`} />
       </div>
     );
   }
 
-  if (error) {
+  if (error === NO_RELATIONSHIP) {
     return (
-      <div className="max-w-3xl mx-auto text-center py-12">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
-          <p className="text-neutral-400">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition"
-          >
-            Retry
+      <div className="max-w-4xl mx-auto">
+        <div className={`${surface} p-8 md:p-12 text-center`}>
+          <div className="flex justify-center -space-x-4 mb-5">
+            <Avatar src={null} name="You" />
+            <Avatar src={null} name="Your partner" dashed />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Nothing to hear about yet</h1>
+          <p className="text-neutral-400 max-w-md mx-auto">
+            Once you connect with your partner, their letters and cravings show up here.
+          </p>
+          <button onClick={() => navigate('/partner')} className={`${primaryButton} mt-6`}>
+            Connect with your partner
           </button>
         </div>
       </div>
     );
   }
 
-  if (notifications.length === 0) {
-    return (
-      <div className="max-w-3xl mx-auto text-center py-16">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-12 shadow-xl">
-          <div className="w-16 h-16 bg-rose-400/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-400/20">
-            <Sparkles className="w-8 h-8 text-rose-400" />
-          </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">All caught up ✨</h2>
-          <p className="text-neutral-400 max-w-md mx-auto">
-            No notifications yet. We'll let you know when your partner does something sweet.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const grouped = groupNotifications(notifications);
+  const partnerName = partner?.display_name || 'your partner';
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
-          <Heart className="w-5 h-5 text-rose-400 fill-rose-400/20" />
+    <div className="max-w-4xl mx-auto space-y-6">
+      <section className={`${surface} p-6 md:p-8`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Notifications</h1>
+            <p className="text-neutral-400 mt-1">
+              What <span className="text-rose-400 font-semibold">{partnerName}</span> has been up to lately.
+            </p>
+          </div>
+          {unread > 0 ? (
+            <Badge tone="rose">{unread.toLocaleString()} new</Badge>
+          ) : (
+            notifications.length > 0 && <Badge tone="emerald">All caught up</Badge>
+          )}
         </div>
-        <h1 className="text-2xl font-semibold text-white">Notifications</h1>
-      </div>
 
-      <div className="space-y-6">
-        {Object.entries(grouped).map(([date, items]) => (
-          <div key={date}>
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
-                {date}
-              </span>
-              <div className="flex-1 h-px bg-neutral-800/50" />
-            </div>
+        {error && (
+          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+            <p role="alert" className="text-sm text-rose-300">{error}</p>
+            <button onClick={() => window.location.reload()} className={secondaryButton}>
+              Try again
+            </button>
+          </div>
+        )}
 
-            <div className="space-y-3">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleNotificationClick(item)}
-                  className="flex items-center gap-4 bg-neutral-900 rounded-2xl border border-neutral-800 p-4 hover:border-neutral-700 hover:bg-neutral-800/50 transition-all duration-200 cursor-pointer group"
-                >
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border flex-shrink-0 ${notificationBg(
-                      item.type
-                    )}`}
-                  >
-                    {notificationIcon(item.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-neutral-300">{item.message}</p>
-                    <p className="text-xs text-neutral-500 mt-0.5">{timeAgo(item.created_at)}</p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-neutral-600 group-hover:text-rose-400 transition-colors" />
-                </div>
-              ))}
+        {!error && notifications.length === 0 && (
+          <div className="mt-6 pt-6 border-t border-neutral-800">
+            <p className="text-neutral-200">Quiet so far.</p>
+            <p className="text-sm text-neutral-400 mt-1">
+              When {partnerName} sends a letter or adds a craving, it lands here. Why not go first?
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button onClick={() => navigate('/letters')} className={primaryButton}>
+                {partner ? `Write ${partnerName} a letter` : 'Write a letter'}
+              </button>
+              <button onClick={() => navigate('/cravings')} className={secondaryButton}>
+                Add a craving
+              </button>
             </div>
           </div>
-        ))}
-      </div>
+        )}
+
+      </section>
+
+      {groupByDay(notifications).map(([day, items]) => {
+        const offset = notifications.indexOf(items[0]);
+        return (
+          <section key={day} aria-label={day}>
+            <h2 className="flex items-baseline justify-between text-sm px-1 mb-2">
+              <span className="font-semibold text-white">{day}</span>
+              <span className="text-neutral-400">{plural(items.length, 'update')}</span>
+            </h2>
+            <ul className={`${surface} p-2`}>
+              {items.map((item, i) => {
+                const { icon: TypeIcon, color, action } = typeMeta[item.type] ?? { icon: Bell, color: 'text-neutral-300', action: 'Open' };
+                const cat = item.type.startsWith('craving') && categoryById[item.reference_id]
+                  ? categoryFor(categoryById[item.reference_id])
+                  : null;
+                const Icon = item.type === 'craving_added' && cat ? cat.icon : TypeIcon;
+                const iconColor = item.type === 'craving_added' && cat ? cat.iconColor : color;
+                const isNew = offset + i < unread;
+                const { headline, quote } = splitMessage(item.message);
+                const last = i === items.length - 1;
+                return (
+                  <li key={item.id} className="relative">
+                    {/* Thread line joining this update to the next one of the day */}
+                    {!last && <span className="absolute left-[33px] top-14 bottom-0 w-px bg-neutral-800" aria-hidden />}
+                    <button
+                      onClick={() => navigate(item.link, { state: { highlightId: item.reference_id } })}
+                      className={`group w-full text-left flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl hover:bg-neutral-800/50 transition cursor-pointer ${focusRing}`}
+                    >
+                      <span className="relative z-10 w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0">
+                        <Icon className={`w-4 h-4 ${iconColor}`} aria-hidden />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-neutral-200">{headline}</span>
+                          {isNew && <Badge tone="rose">New</Badge>}
+                        </span>
+                        {quote && (
+                          <span className="block mt-2 text-lg font-semibold text-white break-words">{quote}</span>
+                        )}
+                        <span className="mt-2 flex flex-wrap items-center gap-2">
+                          {cat && <CategoryPill cat={cat} />}
+                          <time dateTime={item.created_at} className="sm:hidden text-sm text-neutral-400 tabular-nums">
+                            {when(item.created_at)}
+                          </time>
+                          <span className="inline-flex items-center gap-1 text-sm text-neutral-400 group-hover:text-rose-400 transition">
+                            {action}
+                            <ArrowRight className="w-3.5 h-3.5 transition group-hover:translate-x-0.5" aria-hidden />
+                          </span>
+                        </span>
+                      </span>
+                      <time dateTime={item.created_at} className="hidden sm:block text-sm text-neutral-400 tabular-nums whitespace-nowrap mt-1.5">
+                        {when(item.created_at)}
+                      </time>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
     </div>
   );
 }

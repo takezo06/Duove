@@ -165,7 +165,7 @@ router.get('/', async (req, res, next) => {
       notifications.push({
         id: `letter_${l.id}`,
         type: 'letter_received',
-        message: `${partnerDisplay} sent you a letter 💌`,
+        message: `${partnerDisplay} sent you a letter`,
         created_at: l.created_at,
         link: '/letters',
         reference_id: l.id,
