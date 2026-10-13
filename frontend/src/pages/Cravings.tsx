@@ -425,13 +425,16 @@ export function Cravings() {
             <section>
               <h2 className="text-sm text-neutral-400 mb-3">
                 Fulfilled · {done.length}
-                <span className="text-neutral-500"> · cleared after 24 hours</span>
               </h2>
               <ul className="space-y-3">{done.map(row)}</ul>
             </section>
           )}
         </>
       )}
+
+      <p className="text-xs text-neutral-400 text-center">
+        Cravings marked as done will be deleted after 24 hours.
+      </p>
     </div>
   );
 }

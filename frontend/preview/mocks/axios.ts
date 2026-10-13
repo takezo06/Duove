@@ -16,7 +16,7 @@ async function get(url: string): Promise<Res> {
   if (path === '/cravings') return ok(d.cravings);
   if (path === '/love-letters') return ok(d.letters);
   if (path === '/qa/current') return ok(d.question);
-  if (path === '/qa/history') return ok([]);
+  if (path === '/qa/history') return ok({ items: d.qaHistory, hasMore: false, nextCursor: null });
   if (path === '/qa/categories') return ok([]);
   if (path === '/cycles/stats' || path === '/cycles/partner/stats')
     return ok({ prediction: d.prediction, calendar: [], lastPeriodStart: d.cycles.at(-1)?.start_date ?? null, partnerName: d.partner.display_name });
@@ -30,7 +30,7 @@ async function get(url: string): Promise<Res> {
 
 async function patch(url: string): Promise<Res> {
   const m = pathOf(url).match(/^\/cravings\/(.+)\/toggle$/);
-  if (m) d.setCravings(d.cravings.map((c) => (c.id === m[1] ? { ...c, fulfilled: !c.fulfilled } : c)));
+  if (m) d.setCravings(d.cravings.map((c) => (c.id === m[1] ? { ...c, fulfilled: !c.fulfilled, fulfilled_at: c.fulfilled ? null : new Date().toISOString() } : c)));
   return ok({});
 }
 

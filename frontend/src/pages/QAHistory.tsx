@@ -1,18 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
-import {
-  Loader2,
-  Calendar,
-  MessageCircle,
-  User,
-  Eye,
-  Clock,
-  CheckCircle,
-  Sparkles,
-} from 'lucide-react';
+import { Loader2, MessageCircle } from 'lucide-react';
+import { Avatar, Badge, focusRing, inset, primaryButton, secondaryButton, surface } from '../components/Card';
+import { plural } from '../lib/plural';
 
 interface HistoryItem {
   id: string;
@@ -28,10 +21,35 @@ interface HistoryItem {
     submitted_at: string;
   } | null;
   partner_answer: {
-    answer_text: string;
+    answer_text: string | null;
     submitted_at: string;
   } | null;
   both_answered: boolean;
+}
+
+type Person = { name: string; avatar: string | null };
+
+// assigned_date is a plain local date; parse it as local midnight, not UTC
+const localDay = (d: string) => new Date(`${d}T00:00:00`);
+const todayKey = () => new Date().toLocaleDateString('en-CA');
+
+function relativeDay(d: string) {
+  const days = Math.round((localDay(todayKey()).getTime() - localDay(d).getTime()) / 86_400_000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return `${plural(days, 'day')} ago`;
+}
+
+// Consecutive items grouped under "October 2026"-style headings (items arrive newest first)
+function groupByMonth(items: HistoryItem[]) {
+  const groups: [string, HistoryItem[]][] = [];
+  for (const item of items) {
+    const month = localDay(item.assigned_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const last = groups[groups.length - 1];
+    if (last?.[0] === month) last[1].push(item);
+    else groups.push([month, [item]]);
+  }
+  return groups;
 }
 
 export function QAHistory() {
@@ -42,9 +60,12 @@ export function QAHistory() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [me, setMe] = useState<Person>({ name: 'You', avatar: null });
+  const [partner, setPartner] = useState<Person | null>(null);
   const navigate = useNavigate();
 
   const fetchHistory = async (cursor?: string) => {
+    setError(null);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       const url = cursor
@@ -62,8 +83,7 @@ export function QAHistory() {
       setHasMore(more);
       setNextCursor(next);
     } catch (err: any) {
-      console.error('Error fetching history:', err);
-      setError('Failed to load history.');
+      setError(err.response?.data?.error || "Couldn't load your past questions.");
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -77,10 +97,21 @@ export function QAHistory() {
         navigate('/login');
         return;
       }
-      await fetchHistory();
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      // Names and avatars only decorate the page; the history still shows if they fail
+      const [{ data: profile }, stats] = await Promise.all([
+        supabase.from('profiles').select('display_name, avatar_url').eq('id', user.id).maybeSingle(),
+        axios
+          .get(`${import.meta.env.VITE_BACKEND_URL}/relationships/stats`, { headers: { Authorization: `Bearer ${token}` } })
+          .then((r) => r.data)
+          .catch(() => null),
+        fetchHistory(),
+      ]);
+      setMe({ name: profile?.display_name || 'You', avatar: profile?.avatar_url || null });
+      if (stats?.partner) setPartner({ name: stats.partner.display_name, avatar: stats.partner.avatar_url ?? null });
     };
     init();
-  }, []);
+  }, [navigate]);
 
   const loadMore = () => {
     if (nextCursor && !loadingMore) {
@@ -89,146 +120,138 @@ export function QAHistory() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'Yesterday';
-    return `${days} days ago`;
-  };
-
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto animate-pulse">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-neutral-800" />
-          <div className="h-8 w-40 bg-neutral-800 rounded" />
-        </div>
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 mb-4 space-y-3">
-            <div className="h-4 w-32 bg-neutral-800 rounded" />
-            <div className="h-6 w-3/4 bg-neutral-800 rounded" />
-            <div className="flex gap-4">
-              <div className="h-4 w-1/4 bg-neutral-800 rounded" />
-              <div className="h-4 w-1/4 bg-neutral-800 rounded" />
-            </div>
-          </div>
-        ))}
+      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
+        <div className={`${surface} h-40 animate-pulse`} />
+        <div className={`${surface} h-48 animate-pulse`} />
+        <div className={`${surface} h-48 animate-pulse`} />
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="max-w-4xl mx-auto text-center py-12">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
-          <p className="text-neutral-400">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const partnerName = partner?.name || 'your partner';
+  const together = items.filter((i) => i.both_answered).length;
+  const today = todayKey();
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
-          <Sparkles className="w-5 h-5 text-rose-400" />
+    <div className="max-w-4xl mx-auto space-y-6">
+      <section className={`${surface} p-6 md:p-8`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex -space-x-3">
+            <Avatar src={me.avatar} name={me.name} />
+            {partner ? <Avatar src={partner.avatar} name={partner.name} /> : <Avatar src={null} name="Your partner" dashed />}
+          </div>
+          <Link to="/qa" className={`${secondaryButton} hover:border-rose-400/40 hover:text-white`}>
+            <MessageCircle className="w-4 h-4 text-rose-400" aria-hidden />
+            Today's question
+          </Link>
         </div>
-        <h1 className="text-2xl font-semibold text-white">Q&A History</h1>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="text-center py-16 bg-neutral-900/50 rounded-2xl border border-neutral-800/50">
-          <p className="text-neutral-400">No past Q&A yet.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-white">Q&A history</h1>
+          {together > 0 && <Badge tone="emerald">{plural(together, 'question')} answered together</Badge>}
         </div>
-      ) : (
-        <div className="space-y-4">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 hover:border-neutral-700 transition"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-sm text-neutral-400">
-                  <Calendar className="w-4 h-4" />
-                  <span>{formatDate(item.assigned_date)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  {item.both_answered ? (
-                    <span className="text-emerald-400 flex items-center gap-1">
-                      <CheckCircle className="w-4 h-4" />
-                      Both answered
-                    </span>
-                  ) : (
-                    <span className="text-neutral-500 flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      {item.your_answer ? 'You answered' : 'Waiting'}
-                    </span>
-                  )}
-                </div>
-              </div>
+        <p className="text-neutral-400 mt-1">
+          Every question you and <span className="text-rose-400 font-semibold">{partnerName}</span> have been asked, and what you both said.
+        </p>
 
-              <p className="text-white font-medium text-lg mt-1">{item.question.question_text}</p>
+        {error && (
+          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+            <p role="alert" className="text-sm text-rose-300">{error}</p>
+            <button onClick={() => fetchHistory()} className={secondaryButton}>
+              Try again
+            </button>
+          </div>
+        )}
 
-              <div className="grid md:grid-cols-2 gap-4 mt-4">
-                {/* Your answer */}
-                <div className="bg-neutral-800/30 rounded-xl p-3">
-                  <p className="text-xs text-neutral-500 flex items-center gap-1">
-                    <User className="w-3 h-3" /> You
-                  </p>
-                  {item.your_answer ? (
-                    <p className="text-sm text-white mt-1">{item.your_answer.answer_text}</p>
-                  ) : (
-                    <p className="text-sm text-neutral-500 italic">Not answered</p>
-                  )}
-                </div>
+        {!error && items.length === 0 && (
+          <div className="mt-6 pt-6 border-t border-neutral-800">
+            <p className="text-neutral-200">No questions yet.</p>
+            <p className="text-sm text-neutral-400 mt-1">
+              Answer today's question and it shows up here, next to what {partnerName} says.
+            </p>
+            <Link to="/qa" className={`${primaryButton} mt-4`}>
+              Answer today's question
+            </Link>
+          </div>
+        )}
+      </section>
 
-                {/* Partner answer */}
-                <div className="bg-neutral-800/30 rounded-xl p-3">
-                  <p className="text-xs text-neutral-500 flex items-center gap-1">
-                    <User className="w-3 h-3" /> Partner
-                  </p>
-                  {item.partner_answer && item.revealed_at ? (
-                    <p className="text-sm text-white mt-1">{item.partner_answer.answer_text}</p>
-                  ) : item.partner_answer && !item.revealed_at ? (
-                    <p className="text-sm text-rose-400/60 italic">Waiting for reveal...</p>
-                  ) : (
-                    <p className="text-sm text-neutral-500 italic">Not answered</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {hasMore && (
-            <div className="text-center mt-6">
-              <button
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="px-6 py-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-400/30 text-rose-400 rounded-xl font-medium transition flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
+      {groupByMonth(items).map(([month, group]) => (
+        <section key={month} aria-label={month} className="space-y-3">
+          <h2 className="flex items-baseline justify-between text-sm px-1">
+            <span className="font-semibold text-white">{month}</span>
+            <span className="text-neutral-400">{plural(group.length, 'question')}</span>
+          </h2>
+          {group.map((item) => {
+            const isToday = item.assigned_date === today;
+            const date = localDay(item.assigned_date);
+            const partnerText = item.partner_answer?.answer_text;
+            return (
+              <article
+                key={item.id}
+                className={`${surface} p-5 md:p-6 transition hover:border-rose-400/30`}
               >
-                {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load more'}
-              </button>
-            </div>
-          )}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <time dateTime={item.assigned_date} className="text-sm text-neutral-400">
+                    {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    <span aria-hidden> · </span>
+                    {relativeDay(item.assigned_date)}
+                  </time>
+                  {item.both_answered ? (
+                    <Badge tone="emerald">Both answered</Badge>
+                  ) : isToday && !item.your_answer ? (
+                    <Badge tone="rose">Your turn</Badge>
+                  ) : item.your_answer ? (
+                    <Badge tone="neutral">{isToday ? `Waiting on ${partnerName}` : `${partnerName} didn't answer`}</Badge>
+                  ) : (
+                    <Badge tone="neutral">{item.partner_answer ? `Only ${partnerName} answered` : 'Neither of you answered'}</Badge>
+                  )}
+                </div>
+
+                <p className="text-lg font-bold text-white mt-2 break-words">{item.question.question_text}</p>
+
+                <div className="grid md:grid-cols-2 gap-3 mt-4">
+                  <div className={inset}>
+                    <p className="text-xs text-neutral-400">You</p>
+                    {item.your_answer ? (
+                      <p className="text-sm text-neutral-200 mt-1 break-words">{item.your_answer.answer_text}</p>
+                    ) : (
+                      <p className="text-sm text-neutral-400 mt-1">No answer</p>
+                    )}
+                  </div>
+                  <div className={inset}>
+                    <p className="text-xs text-rose-400 font-medium">{partner?.name || 'Partner'}</p>
+                    {partnerText ? (
+                      <p className="text-sm text-neutral-200 mt-1 break-words">{partnerText}</p>
+                    ) : item.partner_answer ? (
+                      <p className="text-sm text-neutral-400 mt-1">Answered. Yours unlocks theirs.</p>
+                    ) : (
+                      <p className="text-sm text-neutral-400 mt-1">No answer</p>
+                    )}
+                  </div>
+                </div>
+
+                {isToday && !item.your_answer && (
+                  <Link to="/qa" className={`mt-4 inline-flex items-center gap-1 text-sm text-rose-400 hover:text-rose-300 rounded ${focusRing}`}>
+                    Answer it now →
+                  </Link>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      ))}
+
+      {hasMore && (
+        <div className="text-center">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className={`${secondaryButton} min-w-32 hover:border-rose-400/40 hover:text-white`}
+          >
+            {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" aria-label="Loading" /> : 'Load more'}
+          </button>
         </div>
       )}
     </div>

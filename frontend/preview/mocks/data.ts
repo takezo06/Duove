@@ -66,8 +66,29 @@ export const prediction = empty ? null : {
 export const question = empty ? null : {
   question: { id: 'q1', question_text: 'What is a small habit of mine you secretly love?', category: 'Deep' },
   yourAnswer: null,
-  partnerAnswer: { id: 'a1', answer_text: 'The way you hum while cooking.', user_id: partner.id },
+  partnerAnswer: null,
+  partnerAnswered: true,
+  bothAnswered: false,
+  revealed: false,
+  partnerName: partner.display_name,
+  nextQuestionAvailableIn: 6 * 3600 + 42 * 60,
+  preferredCategoryId: null,
 };
+
+const qa = (id: string, offset: number, text: string, mine: string | null, theirs: string | null) => ({
+  id, assigned_date: day(offset), revealed_at: mine && theirs ? ago(-offset * 24) : null,
+  question: { id: `q-${id}`, question_text: text, category_id: 'c' },
+  your_answer: mine && { answer_text: mine, submitted_at: ago(-offset * 24) },
+  partner_answer: theirs && { answer_text: mine ? theirs : null, submitted_at: ago(-offset * 24) },
+  both_answered: !!(mine && theirs),
+});
+
+export const qaHistory = empty ? [] : [
+  qa('h1', 0, 'What is a small habit of mine you secretly love?', null, 'The way you hum while cooking.'),
+  qa('h2', -1, 'Where would you take me for a perfect lazy Sunday?', 'The bookstore café, then a nap.', 'Pancakes at home, no phones until noon.'),
+  qa('h3', -2, 'What song reminds you of us?', 'Anything from that road trip playlist.', null),
+  qa('h4', -40, 'What did you think of me the first time we met?', 'That you laughed louder than anyone in the room.', 'You looked like you were about to say something smart.'),
+];
 
 export const notifications = empty ? [] : [
   { id: 'n1', type: 'letter_received', message: 'Mika sent you a letter', created_at: ago(0.3), link: '/letters', reference_id: 'l1', read: false },

@@ -49,6 +49,7 @@ CREATE TABLE public.cravings (
   partner_id uuid NOT NULL,
   content text NOT NULL,
   fulfilled boolean DEFAULT false,
+  fulfilled_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT cravings_pkey PRIMARY KEY (id),
   CONSTRAINT cravings_relationship_id_fkey FOREIGN KEY (relationship_id) REFERENCES public.relationships(id) ON DELETE CASCADE,

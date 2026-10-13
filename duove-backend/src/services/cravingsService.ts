@@ -9,6 +9,7 @@ export interface Craving {
   content: string;
   category: string;
   fulfilled: boolean;
+  fulfilled_at: string | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -84,6 +85,7 @@ export async function toggleCraving(
     .from('cravings')
     .update({ 
       fulfilled: !existing.fulfilled,
+      fulfilled_at: existing.fulfilled ? null : new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
     .eq('id', cravingId)

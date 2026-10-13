@@ -6,6 +6,7 @@ interface QADeckProps {
   questionId: string;
   yourAnswer: string | null;
   partnerAnswer: string | null;
+  partnerAnswered: boolean;
   revealed: boolean;
   partnerName: string;
   nextQuestionAvailableIn: number;
@@ -17,6 +18,7 @@ export function QADeck({
   questionId,
   yourAnswer,
   partnerAnswer,
+  partnerAnswered,
   revealed,
   partnerName,
   nextQuestionAvailableIn,
@@ -91,15 +93,13 @@ export function QADeck({
             </p>
           </div>
           <div className="bg-neutral-800/50 rounded-xl p-3 text-center">
-            {partnerAnswer ? (
+            {partnerAnswered ? (
               <CheckCircle className="w-5 h-5 mx-auto text-emerald-400" />
-            ) : revealed ? (
-              <Clock className="w-5 h-5 mx-auto text-rose-400" />
             ) : (
-              <Clock className="w-5 h-5 mx-auto text-neutral-500" />
+              <Clock className="w-5 h-5 mx-auto text-neutral-400" />
             )}
             <p className="text-xs text-neutral-400 mt-1">
-              {partnerAnswer ? `${partnerName} answered` : revealed ? 'Revealing...' : 'Waiting'}
+              {partnerAnswered ? `${partnerName} answered` : 'Waiting'}
             </p>
           </div>
         </div>
