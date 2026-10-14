@@ -28,7 +28,7 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
 
   return (
     <article>
-      <p className="text-sm text-neutral-400 pr-10 lg:pr-0">
+      <p className="text-sm text-neutral-400 pr-10">
         {mine ? <>You to {partner}</> : <>{partner} to you</>}
         <span aria-hidden> · </span>
         <time dateTime={letter.created_at}>

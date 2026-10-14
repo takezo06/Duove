@@ -45,6 +45,13 @@ export let cravings = empty
     ];
 export const setCravings = (next: typeof cravings) => { cravings = next; };
 
+const OLDER_HEADINGS = [
+  'Postcard from the night train', 'Things I forgot to say at the airport', 'Our first grocery run', 'You, at 2am, explaining black holes',
+  'The bench by the river', 'A list of your laughs', 'Sorry about the burnt pancakes', 'What I want for us next year',
+  'The day the power went out', 'Your terrible, perfect playlist', 'Notes from the waiting room', 'Happy almost-anniversary',
+  'The rain on Sunday', 'Why I kept the ticket stub',
+];
+
 export let letters = empty
   ? []
   : [
@@ -53,6 +60,20 @@ export let letters = empty
       { id: 'l4', heading: 'Things I noticed about you this week', message: 'You hum when you cook. You always leave the last dumpling for me. You fall asleep mid-sentence.', sender_id: partner.id, sender_name: 'Mika', recipient_name: 'Jed', recipient_id: me.id, created_at: ago(300), read: true },
       { id: 'l2', heading: 'Six months of you', message: 'Still my favourite person to sit in silence with.', sender_id: me.id, sender_name: 'Jed', recipient_name: 'Mika', recipient_id: partner.id, created_at: ago(900), read: true, spotify_track_id: '3n3Ppam7vgaVa1iaRUc9Lp', spotify_track_name: 'Mr. Brightside', spotify_artist_name: 'The Killers' },
       { id: 'l5', heading: 'Before your big exam', message: 'You have studied more than anyone I know. Go in there and be brilliant. Dinner is on me after.', sender_id: partner.id, sender_name: 'M.', recipient_name: 'My favourite nerd', recipient_id: me.id, created_at: ago(1500), read: true },
+      ...Array.from({ length: 40 }, (_, i) => {
+        const mine = i % 3 === 1;
+        return {
+          id: `lx${i}`,
+          heading: OLDER_HEADINGS[i % OLDER_HEADINGS.length],
+          message: 'I found this in my notes app and wanted you to have it properly, on paper, or as close as we can get.',
+          sender_id: mine ? me.id : partner.id,
+          sender_name: mine ? 'Jed' : 'Mika',
+          recipient_name: mine ? 'Mika' : 'Jed',
+          recipient_id: mine ? partner.id : me.id,
+          created_at: ago(1700 + i * 170),
+          read: true,
+        };
+      }),
     ];
 
 export const setLetters = (next: typeof letters) => { letters = next; };

@@ -1,4 +1,4 @@
-import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import type { Category } from '../lib/cravingCategories';
 
@@ -84,6 +84,7 @@ export function CategoryPill({ cat }: { cat: Category }) {
 }
 
 // Dialog shell: overlay, panel, close button. Escape and an overlay click close it.
+// Focus moves into the panel on open and back to whatever opened it on close.
 export function Modal({ label, onClose, wide = false, className = '', children }: {
   label: string;
   onClose: () => void;
@@ -97,14 +98,23 @@ export function Modal({ label, onClose, wide = false, className = '', children }
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    panel.current?.focus();
+    return () => opener?.focus();
+  }, []);
+
   return (
     <div onClick={onClose} className={`fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 p-4 ${className}`}>
       <div
+        ref={panel}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
-        className={`${surface} shadow-2xl w-full ${wide ? 'max-w-xl' : 'max-w-md'} p-6 relative max-h-[90vh] overflow-y-auto`}
+        className={`${surface} shadow-2xl w-full ${wide ? 'max-w-xl' : 'max-w-md'} p-6 relative max-h-[90vh] overflow-y-auto focus:outline-none`}
       >
         <button onClick={onClose} aria-label="Close" className={`absolute top-3 right-3 p-2.5 rounded-lg text-neutral-400 hover:text-white transition cursor-pointer ${focusRing}`}>
           <X className="w-5 h-5" aria-hidden />

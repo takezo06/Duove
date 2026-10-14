@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { Music, PenLine } from 'lucide-react';
+import { Mails, Music, PenLine } from 'lucide-react';
 import { Avatar, Chip, Modal, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
 import { SendLetterModal } from '../components/love-letters/SendLetterModal';
@@ -10,6 +10,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
 import { plural } from '../lib/plural';
 import { when } from '../lib/when';
+import { groupByDate } from '../lib/groupByDate';
 
 type Filter = 'all' | 'received' | 'sent';
 
@@ -17,7 +18,7 @@ export function LoveLetters() {
   usePageTitle('Love Letters');
   const navigate = useNavigate();
   const location = useLocation();
-  const highlightId = (location.state as { highlightId?: string } | null)?.highlightId;
+  const { highlightId, compose } = (location.state as { highlightId?: string; compose?: boolean } | null) ?? {};
 
   const [letters, setLetters] = useState<Letter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,7 @@ export function LoveLetters() {
   const [filter, setFilter] = useState<Filter>('all');
   // A notification deep link opens its letter straight away
   const [selectedId, setSelectedId] = useState<string | null>(highlightId ?? null);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(Boolean(compose));
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -95,13 +96,7 @@ export function LoveLetters() {
   const reading = selected ?? shown[0];
   const index = reading ? shown.indexOf(reading) : -1;
 
-  const groups: { label: string; items: Letter[] }[] = [];
-  for (const l of shown) {
-    const label = new Date(l.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    const last = groups[groups.length - 1];
-    if (last?.label === label) last.items.push(l);
-    else groups.push({ label, items: [l] });
-  }
+  const groups = groupByDate(shown, { month: 'long', year: 'numeric' });
 
   const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
   const filters: { value: Filter; label: string; count: number }[] = [
@@ -133,10 +128,16 @@ export function LoveLetters() {
             </p>
           </div>
           {letters.length > 0 && (
-            <button onClick={() => setComposing(true)} className={`${primaryButton} shrink-0`}>
-              <PenLine className="w-4 h-4" aria-hidden />
-              Write a letter
-            </button>
+            <div className="flex flex-wrap gap-3 shrink-0">
+              <Link to="/letters/all" className={secondaryButton}>
+                <Mails className="w-4 h-4" aria-hidden />
+                All letters
+              </Link>
+              <button onClick={() => setComposing(true)} className={primaryButton}>
+                <PenLine className="w-4 h-4" aria-hidden />
+                Write a letter
+              </button>
+            </div>
           )}
         </div>
 
