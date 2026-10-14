@@ -1,3 +1,11 @@
+// "today", "yesterday", "3 days ago": for sentences, where when() reads oddly
+export function daysAgo(iso: string) {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return `${days} days ago`;
+}
+
 // "just now", "3h ago", "Yesterday", "Mon", "Mar 3"
 export function when(iso: string) {
   const then = new Date(iso);

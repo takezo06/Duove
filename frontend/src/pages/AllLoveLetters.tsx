@@ -23,7 +23,7 @@ async function fetchLetters(before?: string): Promise<Letter[]> {
 }
 
 export function AllLoveLetters() {
-  usePageTitle('All Letters');
+  usePageTitle('Envelope Box');
   const [letters, setLetters] = useState<Letter[]>([]);
   const [meId, setMeId] = useState('');
   const [partnerName, setPartnerName] = useState('your partner');
@@ -31,6 +31,7 @@ export function AllLoveLetters() {
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -42,11 +43,16 @@ export function AllLoveLetters() {
     const load = async () => {
       try {
         const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const [{ data: { user } }, rel, page] = await Promise.all([
+        const headers = { Authorization: `Bearer ${token}` };
+        const [{ data: { user } }, rel, page, stats] = await Promise.all([
           supabase.auth.getUser(),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/relationships/me`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/relationships/me`, { headers }),
           fetchLetters(),
+          // the total is a nice-to-have; the box works without it
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/relationships/stats`, { headers }).catch(() => null),
         ]);
+        const totals = stats?.data?.stats;
+        if (totals) setTotal(totals.letters_sent + totals.letters_received);
         setMeId(user?.id ?? '');
         setPartnerName(rel.data?.partner?.display_name || 'your partner');
         setLetters(page);
@@ -129,12 +135,22 @@ export function AllLoveLetters() {
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5 motion-reduce:transform-none" aria-hidden />
           Love letters
         </Link>
-        <h1 className="mt-1 text-2xl md:text-3xl font-bold text-white">All letters</h1>
-        <p className="text-neutral-400 mt-1">
+        <div className="mt-1 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white leading-tight">The envelope box</h1>
+            <p className="text-neutral-400 mt-2 text-lg">
           {letters.length > 0
-            ? <>Every letter between you and {partner}. Tap one to open it.</>
+            ? <>Every letter you and {partner} have sent. Tap one to open it.</>
             : <>Letters you and {partner} send each other end up here.</>}
-        </p>
+            </p>
+          </div>
+          {!!total && (
+            <p className="shrink-0 sm:text-right">
+              <span className="block text-4xl md:text-5xl font-bold text-rose-400 tabular-nums">{total.toLocaleString()}</span>
+              <span className="text-sm text-neutral-400">{total === 1 ? 'letter' : 'letters'} kept</span>
+            </p>
+          )}
+        </div>
 
         {error && (
           <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
@@ -158,7 +174,10 @@ export function AllLoveLetters() {
 
       {groupByDate(letters, { year: 'numeric' }).map((g) => (
         <section key={g.label}>
-          <h2 className="text-sm font-semibold text-white px-1 mb-3">{g.label}</h2>
+          <div className="flex items-center gap-4 mb-5">
+            <h2 className="text-3xl md:text-4xl font-bold text-white tabular-nums">{g.label}</h2>
+            <span aria-hidden className="h-px flex-1 bg-neutral-800" />
+          </div>
           <ul className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {g.items.map((l) => (
               <li key={l.id}>

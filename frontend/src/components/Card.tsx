@@ -10,6 +10,8 @@ export const inset = 'rounded-xl bg-neutral-800/40 border border-neutral-800 px-
 export const primaryButton = `inline-flex items-center justify-center gap-2 px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition shadow-lg shadow-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${focusRing}`;
 export const secondaryButton = `inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-sm font-medium transition border border-neutral-700 disabled:opacity-50 cursor-pointer ${focusRing}`;
 export const iconClass = 'w-4 h-4 text-rose-400';
+// The primary action when it sits on a rose-600 block (white button, rose label)
+export const inverseButton = 'inline-flex items-center justify-center gap-2 px-5 py-3 bg-white hover:bg-rose-50 text-rose-700 rounded-xl font-semibold transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-rose-600';
 export const iconButton = `w-10 h-10 shrink-0 flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400 ${focusRing}`;
 // A row you tap to open and tap again to close (aria-pressed). Pair with toggleRowOn or toggleRowOff;
 // headings inside take group-hover:text-rose-400 while off.
@@ -75,6 +77,20 @@ export function Chip({ active, cat, className = '', ...props }: ButtonHTMLAttrib
           : 'border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
       } ${className}`}
     />
+  );
+}
+
+// Wax seal: the sender's initial. Rose when the partner sent it, neutral when you did.
+export function Seal({ name, partner, className = '' }: { name: string; partner: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold ${
+        partner ? 'bg-rose-500 text-white' : 'bg-neutral-700 text-neutral-200'
+      } ${className}`}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
   );
 }
 

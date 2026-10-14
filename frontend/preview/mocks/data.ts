@@ -31,7 +31,12 @@ export const stats = {
     next_anniversary: null, days_until_anniversary: null, next_monthsary: null, days_until_monthsary: null,
   },
   partner: { ...partner, account_created: '2025-02-20T11:30:00Z' },
-  stats: empty ? { cravings: 0, letters_sent: 0, letters_received: 0 } : { cravings: 12, letters_sent: 7, letters_received: 9 },
+  stats: {
+    cravings: empty ? 0 : 12,
+    // counted from the mock letters below so every page agrees
+    get letters_sent() { return letters.filter((l) => l.sender_id === me.id).length; },
+    get letters_received() { return letters.filter((l) => l.sender_id !== me.id).length; },
+  },
 };
 
 export let cravings = empty
