@@ -3,9 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import axios from 'axios';
-import { Avatar, Badge, CategoryPill, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, CategoryPill, Chip, field, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { Check, Plus, Trash2, Loader2 } from 'lucide-react';
-import { CATEGORIES, categoryFor, type Category } from '../lib/cravingCategories';
+import { CATEGORIES, categoryFor } from '../lib/cravingCategories';
+import { when } from '../lib/when';
 
 interface Craving {
   id: string;
@@ -22,26 +23,6 @@ interface Craving {
 const categoryOf = (c: Craving) => categoryFor(c.category);
 
 const RELATIONSHIP_ERRORS = ['No active relationship found.', 'Could not fetch relationship details.'];
-
-// "just now", "3h ago", "Yesterday", "Mon", "Mar 3"
-function when(iso: string) {
-  const then = new Date(iso);
-  const mins = Math.floor((Date.now() - then.getTime()) / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 24 * 60) return `${Math.floor(mins / 60)}h ago`;
-  const days = Math.floor(mins / (24 * 60));
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return then.toLocaleDateString(undefined, { weekday: 'short' });
-  return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-}
-
-const chip = (active: boolean, cat?: Category) =>
-  `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition cursor-pointer ${focusRing} ${
-    active
-      ? cat?.tint ?? 'bg-neutral-800 border-neutral-700 text-white'
-      : 'border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
-  }`;
 
 export function Cravings() {
   usePageTitle('Cravings');
@@ -342,22 +323,23 @@ export function Cravings() {
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
             maxLength={200}
-            className="w-full bg-neutral-800/50 text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
+            className={field}
           />
           <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div role="radiogroup" aria-label="Category" className="flex flex-wrap gap-2">
               {CATEGORIES.map((cat) => (
-                <button
+                <Chip
                   key={cat.value}
                   type="button"
                   role="radio"
                   aria-checked={selectedCategory === cat.value}
                   onClick={() => setSelectedCategory(cat.value)}
-                  className={chip(selectedCategory === cat.value, cat)}
+                  active={selectedCategory === cat.value}
+                  cat={cat}
                 >
                   <cat.icon className={`w-3.5 h-3.5 ${cat.iconColor}`} aria-hidden />
                   {cat.label}
-                </button>
+                </Chip>
               ))}
             </div>
             <button type="submit" disabled={submitting || !newContent.trim()} className={`${primaryButton} shrink-0`}>
@@ -377,22 +359,23 @@ export function Cravings() {
       {/* Filters */}
       {cravings.length > 0 && (
         <nav aria-label="Filter by category" className="flex flex-wrap gap-2">
-          <button onClick={() => setFilterCategory(null)} aria-pressed={filterCategory === null} className={chip(filterCategory === null)}>
+          <Chip onClick={() => setFilterCategory(null)} aria-pressed={filterCategory === null} active={filterCategory === null}>
             All <span className="text-neutral-500 tabular-nums">{cravings.length}</span>
-          </button>
+          </Chip>
           {CATEGORIES.map((cat) => {
             const count = cravings.filter((c) => (c.category || 'Other') === cat.value).length;
             if (!count) return null;
             return (
-              <button
+              <Chip
                 key={cat.value}
                 onClick={() => setFilterCategory(cat.value)}
                 aria-pressed={filterCategory === cat.value}
-                className={chip(filterCategory === cat.value, cat)}
+                active={filterCategory === cat.value}
+                cat={cat}
               >
                 <cat.icon className={`w-3.5 h-3.5 ${cat.iconColor}`} aria-hidden />
                 {cat.label} <span className="text-neutral-500 tabular-nums">{count}</span>
-              </button>
+              </Chip>
             );
           })}
         </nav>
