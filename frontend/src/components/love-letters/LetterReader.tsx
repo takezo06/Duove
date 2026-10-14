@@ -28,9 +28,9 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
 
   return (
     <article>
-      <div className="flex items-start gap-4 md:gap-6 pr-10">
+      <div className="flex items-start gap-4 pr-10">
         <Stamp name={letter.sender_name || (mine ? 'You' : partnerName)} partner={!mine} date={letter.created_at} />
-        <div className="min-w-0 pt-1">
+        <div className="min-w-0">
           <p className="text-sm text-neutral-400">
             {mine ? <>You to {partner}</> : <>{partner} to you</>}
             <span aria-hidden> · </span>
@@ -38,23 +38,23 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
               {new Date(letter.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
             </time>
           </p>
-          <h2 className="mt-2 text-2xl md:text-4xl font-bold text-white leading-tight break-words">{letter.heading}</h2>
+          <h2 className="mt-1 text-xl font-bold text-white leading-snug break-words">{letter.heading}</h2>
         </div>
       </div>
 
-      <div className="mt-8 max-w-prose text-lg text-neutral-200 leading-relaxed break-words">
+      <div className="mt-6 max-w-prose text-neutral-200 leading-relaxed break-words">
         {letter.recipient_name && <p className="text-rose-400 font-semibold">{letter.recipient_name},</p>}
-        <p className="mt-5 whitespace-pre-wrap">{letter.message}</p>
+        <p className="mt-4 whitespace-pre-wrap">{letter.message}</p>
         {letter.sender_name && (
-          <div className="mt-10 flex flex-col items-end">
-            <span aria-hidden className="w-12 h-px bg-rose-400/60" />
-            <p className="mt-3 text-2xl font-semibold text-white">{letter.sender_name}</p>
+          <div className="mt-6 flex flex-col items-end">
+            <span aria-hidden className="w-10 h-px bg-rose-400/60" />
+            <p className="mt-2 font-semibold text-white">{letter.sender_name}</p>
           </div>
         )}
       </div>
 
       {letter.spotify_track_id && (
-        <div className="mt-8 pt-6 border-t border-neutral-800">
+        <div className="mt-6 pt-6 border-t border-neutral-800">
           <CardHeader
             icon={<Music className={iconClass} aria-hidden />}
             title={mine ? 'The song you added' : `${partnerName} added a song`}
@@ -72,7 +72,7 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
       )}
 
       {(onNewer || onOlder) && (
-        <nav aria-label="More letters" className="mt-8 pt-6 border-t border-neutral-800 flex justify-between gap-3">
+        <nav aria-label="More letters" className="mt-6 pt-6 border-t border-neutral-800 flex justify-between gap-3">
           <button onClick={onNewer} disabled={!onNewer} className={secondaryButton}>
             <ArrowLeft className="w-4 h-4" aria-hidden />
             Newer
@@ -93,12 +93,12 @@ function Stamp({ name, partner, date }: { name: string; partner: boolean; date: 
   return (
     <div
       aria-hidden
-      className={`w-16 h-20 md:w-20 md:h-24 shrink-0 -rotate-3 rounded-lg flex flex-col items-center justify-center outline-2 outline-dashed [outline-offset:-5px] ${
+      className={`w-14 h-16 shrink-0 -rotate-3 rounded-lg flex flex-col items-center justify-center outline-2 outline-dashed [outline-offset:-5px] ${
         partner ? 'bg-rose-600 text-white outline-white/50' : 'bg-neutral-800 text-neutral-200 outline-neutral-600'
       }`}
     >
-      <span className="text-3xl md:text-4xl font-bold leading-none">{name.charAt(0).toUpperCase()}</span>
-      <span className="mt-1.5 text-xs font-medium tabular-nums">
+      <span className="text-xl font-bold leading-none">{name.charAt(0).toUpperCase()}</span>
+      <span className="mt-1 text-xs font-medium tabular-nums">
         {new Date(date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
       </span>
     </div>
