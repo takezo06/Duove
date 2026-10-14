@@ -17,6 +17,10 @@ serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/love-letters/, "").replace(/\/+$/, "") || "/";
 
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
   async function getActiveRelationship() {
     const { data } = await admin
       .from("relationships")
@@ -27,17 +31,11 @@ serve(async (req) => {
     return data;
   }
 
-  function getPartnerId(rel: any) {
-    return rel.user_id === userId ? rel.partner_id : rel.user_id;
-  }
-
   // GET /love-letters
   if (path === "/" && req.method === "GET") {
     const relationship = await getActiveRelationship();
-    if (!relationship) {
-      return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const limit = parseInt(url.searchParams.get("limit") || "20");
+    if (!relationship) return json([]);
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "20") || 20, 1), 100);
     const letterId = url.searchParams.get("id");
     let query;
     if (letterId) {
@@ -46,44 +44,44 @@ serve(async (req) => {
       query = admin.from("love_letters").select("*").eq("relationship_id", relationship.id)
         .order("created_at", { ascending: false }).limit(limit);
     }
-    const { data } = await query;
-    return new Response(JSON.stringify(data || []), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const { data, error } = await query;
+    if (error) return json({ error: error.message }, 500);
+    return json(data || []);
   }
 
   // POST /love-letters
   if (path === "/" && req.method === "POST") {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return json({ error: "Invalid request body" }, 400);
+    const heading = text(body.heading, 120);
+    const message = text(body.message, 5000);
+    if (!heading || !message) return json({ error: "A letter needs a heading and a message" }, 400);
     const relationship = await getActiveRelationship();
+    if (!relationship) return json({ error: "Pair with your partner before sending letters" }, 400);
+    // Only known columns: spreading the body let unknown keys fail the whole insert.
     const { data, error } = await admin
       .from("love_letters")
-      .insert({ ...body, relationship_id: relationship?.id, sender_id: userId })
+      .insert({
+        relationship_id: relationship.id,
+        sender_id: userId,
+        heading,
+        message,
+        recipient_name: text(body.recipient_name, 80) || "My love",
+        sender_name: text(body.sender_name, 80) || null,
+        spotify_track_id: text(body.spotify_track_id, 64) || null,
+        spotify_track_name: text(body.spotify_track_name, 200) || null,
+        spotify_artist_name: text(body.spotify_artist_name, 200) || null,
+        spotify_album_art: text(body.spotify_album_art, 500) || null,
+      })
       .select().single();
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    // Notify partner
-    const partnerId = getPartnerId(relationship);
-    await admin.from("notifications").insert({
-      user_id: partnerId,
-      type: "love_letter",
-      title: `${body.sender_name || "Partner"} sent you a love letter`,
-      message: body.heading || "You have a new love letter!",
-      data: { letter_id: data.id },
-      read: false,
-      created_at: new Date().toISOString(),
-    });
-    return new Response(JSON.stringify(data), {
-      status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (error) return json({ error: error.message }, 500);
+    return json(data, 201);
   }
 
   // GET /love-letters/search-song
   if (path === "/search-song" && req.method === "GET") {
-    const q = url.searchParams.get("q");
+    const q = url.searchParams.get("q")?.trim();
+    if (!q) return json([]);
     const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
       headers: {
@@ -92,23 +90,21 @@ serve(async (req) => {
       },
       body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
     });
+    if (!tokenRes.ok) return json({ error: "Song search is unavailable right now" }, 502);
     const spotifyData = await tokenRes.json();
     const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`, {
       headers: { Authorization: `Bearer ${spotifyData.access_token}` }
     });
+    if (!searchRes.ok) return json({ error: "Song search is unavailable right now" }, 502);
     const searchData = await searchRes.json();
-    const tracks = searchData.tracks?.items.map((item) => ({
+    const tracks = searchData.tracks?.items.map((item: any) => ({
       id: item.id,
       name: item.name,
-      artist: item.artists.map(a => a.name).join(", "),
+      artist: item.artists.map((a: any) => a.name).join(", "),
       albumArt: item.album.images[0]?.url || "",
     })) || [];
-    return new Response(JSON.stringify(tracks), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(tracks);
   }
 
-  return new Response(JSON.stringify({ error: "Not found" }), {
-    status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return json({ error: "Not found" }, 404);
 });
