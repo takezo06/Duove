@@ -1,118 +1,251 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { Heart, Plus, Sparkles } from 'lucide-react';
-import { RecentLettersList } from '../components/love-letters/RecentLettersList';
+import { Music, PenLine } from 'lucide-react';
+import { Avatar, Chip, Modal, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
 import { SendLetterModal } from '../components/love-letters/SendLetterModal';
-import { LetterDetailModal } from '../components/love-letters/LetterDetailModal';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { apiError } from '../lib/apiError';
+import { plural } from '../lib/plural';
+import { when } from '../lib/when';
+
+type Filter = 'all' | 'received' | 'sent';
 
 export function LoveLetters() {
   usePageTitle('Love Letters');
-  const [showModal, setShowModal] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedLetter, setSelectedLetter] = useState<any | null>(null);
+  const navigate = useNavigate();
   const location = useLocation();
+  const highlightId = (location.state as { highlightId?: string } | null)?.highlightId;
 
-  // Highlight and display a specific letter when arriving from a deep-linked notification
+  const [letters, setLetters] = useState<Letter[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [unpaired, setUnpaired] = useState(false);
+  const [me, setMe] = useState({ id: '', name: '' });
+  const [partnerName, setPartnerName] = useState('your partner');
+  const [filter, setFilter] = useState<Filter>('all');
+  // A notification deep link opens its letter straight away
+  const [selectedId, setSelectedId] = useState<string | null>(highlightId ?? null);
+  const [composing, setComposing] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
-    const state = location.state as { highlightId?: string } | null;
-    const highlightId = state?.highlightId;
-    if (!highlightId) return;
-
-    const fetchLetter = async () => {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      if (!token) return;
+    const load = async () => {
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/love-letters?id=${highlightId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.data && res.data.length > 0) {
-          setSelectedLetter(res.data[0]);
-          
-          // Clear history state window frame gracefully so it won't pop up again on page refreshes
-          window.history.replaceState({}, document.title);
-        }
+        const { data: { user } } = await supabase.auth.getUser();
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        const headers = { Authorization: `Bearer ${token}` };
+        // ponytail: newest 100 only (the backend cap); add paging when a couple outgrows it
+        const [rel, list, profile] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/relationships/me`, { headers }),
+          axios.get(`${import.meta.env.VITE_BACKEND_URL}/love-letters?limit=100`, { headers }),
+          supabase.from('profiles').select('display_name').eq('id', user?.id ?? '').single(),
+        ]);
+        if (!rel.data?.relationship) { setUnpaired(true); return; }
+        setPartnerName(rel.data.partner?.display_name || 'your partner');
+        setMe({ id: user?.id ?? '', name: profile.data?.display_name ?? '' });
+        setLetters(list.data);
       } catch (err) {
-        console.error('Failed to fetch highlighted letter', err);
+        if ((err as { response?: { status?: number } }).response?.status === 404) setUnpaired(true);
+        else setError(apiError(err, "Couldn't load your letters. Try again."));
+      } finally {
+        setLoading(false);
       }
     };
+    load();
+  }, [attempt]);
 
-    fetchLetter();
-  }, [location.key]);
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6" aria-busy="true">
+        <div className={`${surface} h-36 animate-pulse`} />
+        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6">
+          <div className={`${surface} h-96 animate-pulse`} />
+          <div className={`${surface} h-96 animate-pulse hidden lg:block`} />
+        </div>
+      </div>
+    );
+  }
 
-  const handleLetterSent = () => {
-    setRefreshKey(prev => prev + 1);
-  };
+  if (unpaired) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className={`${surface} p-8 md:p-12 text-center`}>
+          <div className="flex justify-center -space-x-4 mb-5">
+            <Avatar src={null} name="You" />
+            <Avatar src={null} name="Your partner" dashed />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Letters need someone to read them</h1>
+          <p className="text-neutral-400 max-w-md mx-auto">Connect with your partner to start writing to each other.</p>
+          <button onClick={() => navigate('/partner')} className={`${primaryButton} mt-6`}>
+            Connect with your partner
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isMine = (l: Letter) => l.sender_id === me.id;
+  const sentCount = letters.filter(isMine).length;
+  const shown = letters.filter((l) => filter === 'all' || (filter === 'sent') === isMine(l));
+  const selected = shown.find((l) => l.id === selectedId) ?? null;
+  // The side pane always has something open; the phone modal only opens on a tap
+  const reading = selected ?? shown[0];
+  const index = reading ? shown.indexOf(reading) : -1;
+
+  const groups: { label: string; items: Letter[] }[] = [];
+  for (const l of shown) {
+    const label = new Date(l.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const last = groups[groups.length - 1];
+    if (last?.label === label) last.items.push(l);
+    else groups.push({ label, items: [l] });
+  }
+
+  const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
+  const filters: { value: Filter; label: string; count: number }[] = [
+    { value: 'all', label: 'All', count: letters.length },
+    { value: 'received', label: `From ${partnerName}`, count: letters.length - sentCount },
+    { value: 'sent', label: 'From you', count: sentCount },
+  ];
+
+  const reader = (letter: Letter) => (
+    <LetterReader
+      letter={letter}
+      mine={isMine(letter)}
+      partnerName={partnerName}
+      onNewer={index > 0 ? () => setSelectedId(shown[index - 1].id) : undefined}
+      onOlder={index < shown.length - 1 ? () => setSelectedId(shown[index + 1].id) : undefined}
+    />
+  );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
-      {/* View Header Matrix */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-white flex items-center gap-2.5">
-            <Heart className="w-6 h-6 text-rose-400 fill-rose-400/10" />
-            Love Letters
-          </h1>
-          <p className="text-sm text-neutral-400 mt-1">
-            Your shared archive of digital keepsakes, lyrics, and letters.
-          </p>
-        </div>
-        
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 active:scale-[0.98] text-white rounded-xl flex items-center gap-2 font-medium shadow-lg shadow-rose-500/20 transition-all duration-200"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          New Letter
-        </button>
-      </div>
-
-      <div className="space-y-8">
-        {/* Actionable Hero Prompt Banner */}
-        <button
-          onClick={() => setShowModal(true)}
-          className="w-full text-left relative overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-900 to-rose-950/10 border border-neutral-800 hover:border-rose-500/30 rounded-2xl p-6 shadow-xl transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/40"
-        >
-          <div className="absolute right-6 top-1/2 -translate-y-1/2 text-neutral-800 group-hover:text-rose-500/20 group-hover:scale-110 transition-all duration-300 pointer-events-none">
-            <Sparkles className="w-20 h-20" />
-          </div>
-          <div className="relative z-10 max-w-xl pr-16">
-            <p className="text-white text-lg font-medium group-hover:text-rose-400 transition-colors duration-200 flex items-center gap-2">
-              Want to send some love?
-              <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                Click to write
-              </span>
-            </p>
-            <p className="text-neutral-400 text-sm mt-1.5 leading-relaxed">
-              Write a thoughtful message, link a snapshot of a special Spotify song track, and seamlessly ship it straight over into your partner's dynamic mailbox tray.
+    <div className="max-w-6xl mx-auto space-y-6">
+      <section className={`${surface} p-6 md:p-8`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Love letters</h1>
+            <p className="text-neutral-400 mt-1">
+              {letters.length > 0
+                ? <>{plural(letters.length, 'letter')} between you and {partner}, newest first.</>
+                : <>Everything you and {partner} write to each other lives here.</>}
             </p>
           </div>
-        </button>
-
-        {/* Dynamic List Render Matrix */}
-        <div className="space-y-4">
-          <RecentLettersList 
-            key={refreshKey} 
-            onSelectLetter={(letter: any) => setSelectedLetter(letter)} 
-          />
+          {letters.length > 0 && (
+            <button onClick={() => setComposing(true)} className={`${primaryButton} shrink-0`}>
+              <PenLine className="w-4 h-4" aria-hidden />
+              Write a letter
+            </button>
+          )}
         </div>
-      </div>
 
-      {/* Action Workspace Dialog Modals */}
-      {showModal && (
-        <SendLetterModal
-          onClose={() => setShowModal(false)}
-          onSent={handleLetterSent}
-        />
+        {letters.length === 0 && !error && (
+          <div className="mt-6 pt-6 border-t border-neutral-800">
+            <p className="text-neutral-200">No letters yet.</p>
+            <p className="text-sm text-neutral-400 mt-1">Write the first one and {partnerName} will see it right away.</p>
+            <button onClick={() => setComposing(true)} className={`${primaryButton} mt-5`}>
+              <PenLine className="w-4 h-4" aria-hidden />
+              Write a letter
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+            <p role="alert" className="text-sm text-rose-300">{error}</p>
+            <button onClick={() => { setError(''); setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>Try again</button>
+          </div>
+        )}
+      </section>
+
+      {letters.length > 0 && (
+        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start">
+          <div className="space-y-5 min-w-0">
+            <nav aria-label="Filter letters" className="flex flex-wrap gap-2">
+              {filters.map((f) => (
+                <Chip key={f.value} onClick={() => setFilter(f.value)} aria-pressed={filter === f.value} active={filter === f.value}>
+                  {f.label} <span className="text-neutral-500 tabular-nums">{f.count}</span>
+                </Chip>
+              ))}
+            </nav>
+
+            {shown.length === 0 ? (
+              <div className={`${surface} px-6 py-14 text-center`}>
+                <p className="text-lg font-semibold text-white">
+                  {filter === 'sent' ? "You haven't written one yet" : `Nothing from ${partnerName} yet`}
+                </p>
+                <button onClick={() => setFilter('all')} className={`${secondaryButton} mt-5`}>Show all letters</button>
+              </div>
+            ) : (
+              groups.map((g) => (
+                <section key={g.label}>
+                  <h2 className="flex items-baseline justify-between text-sm px-1 mb-2">
+                    <span className="font-semibold text-white">{g.label}</span>
+                    <span className="text-neutral-400 tabular-nums">{plural(g.items.length, 'letter')}</span>
+                  </h2>
+                  <ul className={`${surface} p-2 space-y-1`}>
+                    {g.items.map((l) => {
+                      const open = l.id === reading?.id;
+                      return (
+                        <li key={l.id}>
+                          <button
+                            onClick={() => setSelectedId(l.id)}
+                            aria-current={open ? 'true' : undefined}
+                            className={`w-full text-left p-3 md:p-4 rounded-xl transition cursor-pointer ${focusRing} ${
+                              open ? 'lg:bg-neutral-800 hover:bg-neutral-800/50' : 'hover:bg-neutral-800/50'
+                            }`}
+                          >
+                            <span className="flex items-baseline justify-between gap-3 text-xs text-neutral-400">
+                              {isMine(l) ? <span>You</span> : <span className="text-rose-400 font-medium">{partnerName}</span>}
+                              <time dateTime={l.created_at} title={new Date(l.created_at).toLocaleString()} className="shrink-0">
+                                {when(l.created_at)}
+                              </time>
+                            </span>
+                            <span className="mt-1 font-semibold text-white leading-snug line-clamp-2 break-words">{l.heading}</span>
+                            <span className="mt-1 text-sm text-neutral-400 line-clamp-1 break-words">{l.message}</span>
+                            {l.spotify_track_name && (
+                              <span className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400 min-w-0">
+                                <Music className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                                <span className="truncate">
+                                  {l.spotify_track_name}{l.spotify_artist_name && ` · ${l.spotify_artist_name}`}
+                                </span>
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))
+            )}
+          </div>
+
+          {reading && (
+            <div className={`hidden lg:block sticky top-0 ${surface} p-6 md:p-8 max-h-[calc(100vh-3rem)] overflow-y-auto`}>
+              {reader(reading)}
+            </div>
+          )}
+        </div>
       )}
 
-      {selectedLetter && (
-        <LetterDetailModal
-          letter={selectedLetter}
-          onClose={() => setSelectedLetter(null)}
+      {selected && (
+        <Modal label={selected.heading} onClose={() => setSelectedId(null)} wide className="lg:hidden">
+          {reader(selected)}
+        </Modal>
+      )}
+
+      {composing && (
+        <SendLetterModal
+          myName={me.name}
+          partnerName={partnerName}
+          onClose={() => setComposing(false)}
+          onSent={(letter) => {
+            setLetters((prev) => [letter, ...prev]);
+            setFilter('all');
+            setSelectedId(letter.id);
+          }}
         />
       )}
     </div>

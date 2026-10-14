@@ -1,64 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import axios from 'axios';
-import { X, Music, Send, Heart } from 'lucide-react';
-import { focusRing } from '../Card';
+import { X, Search, Send, Loader2 } from 'lucide-react';
+import { Modal, field, focusRing, iconButton, inset, primaryButton, secondaryButton } from '../Card';
 import { apiError } from '../../lib/apiError';
+import type { Letter } from './LetterReader';
 
-interface SendLetterModalProps {
-  onClose: () => void;
-  onSent: () => void;
+interface Track {
+  id: string;
+  name: string;
+  artist: string;
+  albumArt: string;
 }
 
-export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
+interface SendLetterModalProps {
+  myName: string;
+  partnerName: string;
+  onClose: () => void;
+  onSent: (letter: Letter) => void;
+}
+
+export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLetterModalProps) {
+  const [recipientName, setRecipientName] = useState(partnerName);
+  const [senderName, setSenderName] = useState(myName);
   const [heading, setHeading] = useState('');
   const [body, setBody] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [senderName, setSenderName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedSong, setSelectedSong] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<Track[]>([]);
+  const [selectedSong, setSelectedSong] = useState<Track | null>(null);
+  const [searching, setSearching] = useState(false);
   const [sending, setSending] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [sendError, setSendError] = useState('');
   const canSend = heading.trim() !== '' && body.trim() !== '' && !sending;
 
-  // Fetch user's display name and partner's name
-  useEffect(() => {
-    const fetchNames = async () => {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      if (!token) return;
-      try {
-        // Get user's own profile
-        const { data: { user } } = await supabase.auth.getUser();
-        const userId = user?.id;
-        if (userId) {
-          const { data: myProfile } = await supabase
-            .from('profiles')
-            .select('display_name')
-            .eq('id', userId)
-            .single();
-          setSenderName(myProfile?.display_name || '');
-        }
-
-        // Get partner's name
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/relationships/me`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setRecipientName(res.data.partner?.display_name || 'My love');
-      } catch (err) {
-        console.error(err);
-        setRecipientName('My love');
-      }
-    };
-    fetchNames();
-  }, []);
-
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    setLoading(true);
+    setSearching(true);
     setSearchError('');
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -71,17 +49,18 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
     } catch (err) {
       setSearchError(apiError(err, "Couldn't search songs. Try again."));
     } finally {
-      setLoading(false);
+      setSearching(false);
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!canSend) return;
     setSending(true);
     setSendError('');
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      await axios.post(
+      const res = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/love-letters`,
         {
           heading,
@@ -95,7 +74,7 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      onSent();
+      onSent(res.data);
       onClose();
     } catch (err) {
       setSendError(apiError(err, "Your letter didn't send. Try again."));
@@ -105,137 +84,107 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} aria-label="Close" className={`absolute top-3 right-3 p-2.5 rounded-lg text-neutral-400 hover:text-white ${focusRing}`}>
-          <X className="w-5 h-5" aria-hidden />
-        </button>
+    <Modal label={`Write to ${partnerName}`} onClose={onClose} wide>
+      <h2 className="text-xl font-bold text-white pr-10">Write to {partnerName}</h2>
 
-        <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-          <Heart className="w-5 h-5 text-rose-400" />
-          New Letter
-        </h2>
-
-        {/* To */}
-        <div className="mb-4">
-          <label htmlFor="letter-to" className="text-sm text-neutral-400 mb-1 block">To</label>
-          <input
-            type="text"
-            id="letter-to"
-            value={recipientName}
-            onChange={(e) => setRecipientName(e.target.value)}
-            className="w-full bg-neutral-800 text-white rounded-lg px-3 py-2 border border-neutral-700 focus:border-rose-400 outline-none"
-          />
+      <form onSubmit={handleSend} className="mt-6 space-y-4">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="letter-to" className="block text-sm text-neutral-400 mb-2">To</label>
+            <input id="letter-to" type="text" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} maxLength={80} className={field} />
+          </div>
+          <div>
+            <label htmlFor="letter-from" className="block text-sm text-neutral-400 mb-2">Signed</label>
+            <input id="letter-from" type="text" value={senderName} onChange={(e) => setSenderName(e.target.value)} maxLength={80} placeholder="Your name or nickname" className={field} />
+          </div>
         </div>
 
-        {/* Heading */}
-        <div className="mb-4">
-          <label htmlFor="letter-heading" className="text-sm text-neutral-400 mb-1 block">Heading</label>
+        <div>
+          <label htmlFor="letter-heading" className="block text-sm text-neutral-400 mb-2">Heading</label>
           <input
-            type="text"
             id="letter-heading"
+            type="text"
             value={heading}
             onChange={(e) => setHeading(e.target.value)}
-            placeholder="e.g. My favorite memory with you..."
-            className="w-full bg-neutral-800 text-white rounded-lg px-3 py-2 border border-neutral-700 focus:border-rose-400 outline-none"
+            maxLength={120}
+            placeholder="My favorite memory with you"
+            className={field}
           />
         </div>
 
-        {/* Body */}
-        <div className="mb-4">
-          <label htmlFor="letter-message" className="text-sm text-neutral-400 mb-1 block">Message</label>
+        <div>
+          <label htmlFor="letter-message" className="block text-sm text-neutral-400 mb-2">Letter</label>
           <textarea
             id="letter-message"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Write your heart out..."
-            className="w-full bg-neutral-800 text-white rounded-lg px-3 py-2 resize-none h-28 border border-neutral-700 focus:border-rose-400 outline-none"
+            maxLength={5000}
+            placeholder={`Dear ${partnerName},`}
+            className={`${field} h-48 md:h-64 resize-y leading-relaxed`}
           />
         </div>
 
-        {/* From */}
-        <div className="mb-4">
-          <label htmlFor="letter-from" className="text-sm text-neutral-400 mb-1 block">From</label>
-          <input
-            type="text"
-            id="letter-from"
-            value={senderName}
-            onChange={(e) => setSenderName(e.target.value)}
-            placeholder="Your name or nickname"
-            className="w-full bg-neutral-800 text-white rounded-lg px-3 py-2 border border-neutral-700 focus:border-rose-400 outline-none"
-          />
-        </div>
-
-        {/* Song search */}
-        <div className="mb-4">
-          <label className="text-sm text-neutral-400 mb-1 block">Attach a song (optional)</label>
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-              aria-label="Search Spotify"
-              placeholder="Search Spotify..."
-              className="flex-1 bg-neutral-800 text-white rounded-lg px-3 py-2 border border-neutral-700 focus:border-rose-400 outline-none"
-            />
-            <button
-              onClick={handleSearch}
-              disabled={loading || !searchQuery.trim()}
-              aria-label="Search songs"
-              className={`px-3 py-2 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg disabled:opacity-50 ${focusRing}`}
-            >
-              <Music className="w-4 h-4" aria-hidden />
-            </button>
-          </div>
-
-          {searchError && <p role="alert" className="text-sm text-rose-300 mb-2">{searchError}</p>}
-
-          {searchResults.length > 0 && (
-            <div className="max-h-36 overflow-y-auto space-y-2">
-              {searchResults.map((track) => (
-                <button
-                  key={track.id}
-                  onClick={() => { setSelectedSong(track); setSearchResults([]); setSearchQuery(''); }}
-                  className={`w-full flex items-center gap-2 p-2 rounded-lg text-left hover:bg-neutral-800 ${
-                    selectedSong?.id === track.id ? 'bg-neutral-800 border border-rose-400' : ''
-                  }`}
-                >
-                  {track.albumArt && <img src={track.albumArt} alt="" className="w-8 h-8 rounded" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs truncate">{track.name}</p>
-                    <p className="text-neutral-400 text-xs truncate">{track.artist}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {selectedSong && (
-            <div className="flex items-center gap-2 bg-neutral-800 rounded-lg p-2 mt-2">
-              {selectedSong.albumArt && <img src={selectedSong.albumArt} alt="" className="w-8 h-8 rounded" />}
-              <div className="flex-1">
-                <p className="text-white text-sm font-medium">{selectedSong.name}</p>
-                <p className="text-neutral-400 text-xs">{selectedSong.artist}</p>
+        <div>
+          <label htmlFor="letter-song" className="block text-sm text-neutral-400 mb-2">Add a song (optional)</label>
+          {selectedSong ? (
+            <div className={`${inset} flex items-center gap-3`}>
+              {selectedSong.albumArt && <img src={selectedSong.albumArt} alt="" className="w-10 h-10 rounded-lg" />}
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-medium truncate">{selectedSong.name}</p>
+                <p className="text-neutral-400 text-xs truncate">{selectedSong.artist}</p>
               </div>
-              <button onClick={() => setSelectedSong(null)} aria-label="Remove song" className={`p-2 rounded-lg text-neutral-400 hover:text-white ${focusRing}`}>
+              <button type="button" onClick={() => setSelectedSong(null)} aria-label="Remove song" className={iconButton}>
                 <X className="w-4 h-4" aria-hidden />
               </button>
             </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                id="letter-song"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } }}
+                placeholder="Search Spotify"
+                className={field}
+              />
+              <button type="button" onClick={handleSearch} disabled={searching || !searchQuery.trim()} className={`${secondaryButton} shrink-0`}>
+                {searching ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Search className="w-4 h-4" aria-hidden />}
+                Search
+              </button>
+            </div>
+          )}
+
+          {searchError && <p role="alert" className="mt-2 text-sm text-rose-300">{searchError}</p>}
+
+          {!selectedSong && searchResults.length > 0 && (
+            <ul className="mt-2 max-h-48 overflow-y-auto space-y-1">
+              {searchResults.map((track) => (
+                <li key={track.id}>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedSong(track); setSearchResults([]); setSearchQuery(''); }}
+                    className={`w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-neutral-800/50 transition cursor-pointer ${focusRing}`}
+                  >
+                    {track.albumArt && <img src={track.albumArt} alt="" className="w-10 h-10 rounded-lg" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm truncate">{track.name}</p>
+                      <p className="text-neutral-400 text-xs truncate">{track.artist}</p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 
-        {sendError && <p role="alert" className="text-sm text-rose-300 mb-3">{sendError}</p>}
+        {sendError && <p role="alert" className="text-sm text-rose-300">{sendError}</p>}
 
-        <button
-          onClick={handleSend}
-          disabled={!canSend}
-          className="w-full py-3 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-lg flex items-center justify-center gap-2 transition"
-        >
-          <Send className="w-4 h-4" aria-hidden />
-          {sending ? 'Sending...' : 'Send Letter'}
+        <button type="submit" disabled={!canSend} className={`${primaryButton} w-full`}>
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
+          {sending ? 'Sending...' : 'Send letter'}
         </button>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

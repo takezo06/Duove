@@ -4,7 +4,7 @@ The reference for every UI change. Paths are relative to `frontend/`.
 
 **Feel:** dark, warm, personal. A shared journal for two people, not a SaaS dashboard.
 
-**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
+**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `pages/LoveLetters.tsx` (list + reading pane), `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
 
 **Deliberate choices.** These are intentional. Do not "fix" them, even if a generic design skill suggests it:
 - **Dark-only.** No light theme.
@@ -29,17 +29,20 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `CardHeader` | Rose icon + `text-sm text-neutral-400` label, badge on the right | The top line of every summary card |
 | `Avatar` | 64px circle with `ring-4 ring-neutral-900`; `dashed` = missing partner | Profile pictures |
 | `CategoryPill` | Craving category pill (icon + label in the category tint) | Wherever a craving's category appears |
+| `iconButton` | 40px square, `rounded-lg`, `neutral-400` icon that turns white on a `neutral-800` hover | Every icon-only button (add an `aria-label`) |
+| `field` | The input style in section 7 | Every text input and textarea |
+| `Chip` | A `<button>` chip: `active`, optional `cat` for the category tint | Filters (`aria-pressed`) and single choice (`role="radio"`) |
+| `Modal` | Overlay, panel, close button, Escape and overlay click to close. `wide` gives `max-w-xl` | Every dialog |
 
 Helpers:
 - `src/lib/plural.ts`: `plural(3, 'day')` gives "3 days". Never write `day(s)`.
 - `src/lib/relationshipYear.ts`: all anniversary, monthsary and day-count math. Verify changes with `node frontend/scripts/relationshipYear.check.ts` (from the repo root).
 - `src/lib/cravingCategories.ts`: `CATEGORIES` and `categoryFor()` give each category's icon, `iconColor` and `tint`.
 - `src/lib/apiError.ts`: `apiError(err, fallback)` returns the backend's `{ error }` message or the fallback.
+- `src/lib/when.ts`: `when(iso)` gives relative times ("3h ago", "Yesterday", "Mon", "3 Mar").
 - `components/cycle/constants.ts`: `phaseColors` for cycle phases.
 
-**Adding a new shared style:** add it to `Card.tsx` (styles and components) or `src/lib/` (logic) the first time a second file needs it, then import it everywhere. Two candidates are waiting to move there:
-- The `chip()` helper in `Cravings.tsx`.
-- The `when()` relative-time helper, which is duplicated in `Cravings.tsx` and `Notifications.tsx`.
+**Adding a new shared style:** add it to `Card.tsx` (styles and components) or `src/lib/` (logic) the first time a second file needs it, then import it everywhere. `Card.tsx` may only export strings and components (fast refresh), so a style that takes arguments becomes a component, like `Chip`.
 
 **Do not use** `src/components/ui/*` (unused shadcn leftovers), the shadcn color tokens in `tailwind.config.js` (`bg-primary`, `border-border`, `bg-card` and so on; the CSS variables behind them are not defined, so they render broken), or `src/App.css` (unused Vite template).
 
@@ -154,7 +157,7 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 
 | Element | Classes |
 |---|---|
-| Page root | `max-w-4xl mx-auto space-y-6` (Dashboard: `max-w-6xl`) |
+| Page root | `max-w-4xl mx-auto space-y-6` (Dashboard and Love letters: `max-w-6xl`) |
 | Card grids | `grid md:grid-cols-2 gap-4 md:gap-6` (3-up stats: `md:grid-cols-3`; Dashboard: `grid-cols-1 md:grid-cols-2 xl:grid-cols-4`) |
 | Dense number row (3 small stats) | `grid grid-cols-3 gap-3 md:gap-6` |
 
@@ -221,7 +224,7 @@ Never `rounded-md`, `rounded-sm` or `rounded-3xl`.
 | Primary | `primaryButton`. One per view, placed after the inputs it submits. Add `w-full` only in narrow cards or forms. |
 | Secondary | `secondaryButton` for Cancel, Copy, Try again, Load more, and the header action. |
 | Text action | `text-sm font-medium text-neutral-400 hover:text-rose-400 transition rounded ${focusRing}`, plus `ArrowRight w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none`. Rose variant for a call to action inside a stat: `text-rose-400 hover:text-rose-300`. |
-| Icon button | `w-10 h-10 flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer ${focusRing}` with a `w-4 h-4` or `w-5 h-5` icon and an `aria-label`. Destructive icon: `hover:text-rose-400`. |
+| Icon button | `iconButton` with a `w-4 h-4` or `w-5 h-5` icon and an `aria-label`. Destructive icon: `hover:text-rose-400`. |
 | Inline confirm | Delete: `px-3 py-2 min-h-10 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium`. Keep: same size, `text-neutral-400 hover:text-white`. Never `window.confirm`. |
 
 - **Loading:** `Loader2 w-4 h-4 animate-spin` replaces the leading icon, and the label stays or becomes the "-ing" verb ("Saving..."). Disable the button while busy.
@@ -239,11 +242,11 @@ focus:border-transparent transition
 - Date inputs add `[color-scheme:dark]`. Code inputs add `font-mono tracking-widest uppercase` (placeholder back to `font-sans normal-case tracking-normal`).
 - Every input has a `<label htmlFor>` (or an `aria-label` when there is no visible label).
 - Enter submits single-line forms (wrap them in a `<form>`).
-- When a second file needs this input style, add it to `Card.tsx` as `field` and use that instead.
+- Use `field` from `Card.tsx`; never re-type it.
 
 ### Chips (filters and single choice)
 
-Use `chip(active, cat?)` from `Cravings.tsx`:
+Use `Chip` from `Card.tsx` (`active`, optional `cat`, plus any button props):
 - Base: `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm`.
 - Inactive: `border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700`.
 - Active: the category `tint`, or `bg-neutral-800 border-neutral-700 text-white`.
@@ -258,6 +261,7 @@ Single choice uses `role="radiogroup"`/`radio` with `aria-checked`. Filters use 
 
 - **Row cards:** `${surface} p-4 flex items-start gap-4 transition hover:border-neutral-700` inside `ul.space-y-3`.
 - **Grouped timeline:** one `${surface} p-2` per day, rows `p-3 md:p-4 rounded-xl hover:bg-neutral-800/50`. The leading icon is a 36px circle (`w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700`) with an optional `w-px bg-neutral-800` thread line.
+- **Reader (list + open item):** for content people read in full (letters). Below `lg` it is the list alone, and a tap opens the item in a `wide` `Modal` (`className="lg:hidden"`). From `lg` up it is `grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start`: the grouped list on the left, and a `sticky top-0 ${surface} p-6 md:p-8 max-h-[calc(100vh-3rem)] overflow-y-auto` pane on the right that always shows the newest item until one is picked. The open row gets `lg:bg-neutral-800` and `aria-current`. The pane ends with Newer and Older `secondaryButton`s. See `LoveLetters.tsx`.
 - **Meta row:** `mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400`, items separated by `<span aria-hidden>·</span>`, with `<time dateTime title>`.
 
 ### Progress
@@ -267,6 +271,9 @@ Single choice uses `role="radiogroup"`/`radio` with `aria-checked`. Filters use 
 - The year track on the dashboard is the larger `h-2` version, with monthsary dots and a heart marker.
 
 ### Modals
+
+Use `Modal` from `Card.tsx`. It renders the parts below. Pass `wide` (`max-w-xl`) for writing or reading long text.
+
 
 - **Overlay:** `fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 p-4`. No blur.
 - **Panel:** `${surface} shadow-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto`.
@@ -352,16 +359,12 @@ This is older code that breaks the rules above. Fix it when you touch the file, 
 | File | Problem | Fix |
 |---|---|---|
 | `layouts/ProtectedLayout.tsx` (loader) | Gradients, gradient text, blurred glow, `animate-ping`, undefined `animate-fade-in` / `animate-infinite-loading`, `tracking-wider` | Plain `neutral-950` screen with the logo and a skeleton or simple spinner |
-| `pages/LoveLetters.tsx` | Gradient banner, `Sparkles`, hand-typed primary button, `active:scale`, icon heading, filler copy, page `px-4 py-8` | Header card (title + personal subtitle + `primaryButton` "Write a letter"), drop the banner |
-| `components/love-letters/EnvelopeCard.tsx` | Hover lift and scale, glow shadows, uppercase tracked label, `font-serif`, `♥` glyph, `text-[10px]` | Keep the envelope idea but make it static, with sizes of at least `text-xs` and no lift |
-| `components/love-letters/LetterDetailModal.tsx` | `backdrop-blur`, `font-serif`, uppercase mono label, gradient | Modal spec (section 7), sans text |
-| `components/love-letters/SendLetterModal.tsx` | `bg-black/60` overlay, `rounded-lg` inputs, hand-typed primary | Modal and input spec, `primaryButton` |
-| `components/love-letters/SkeletonCard.tsx`, `components/qa/QACategoryModal.tsx` | `backdrop-blur` overlays | Modal overlay spec |
+| `components/qa/QACategoryModal.tsx` | `backdrop-blur` overlay | `Modal` |
 | `pages/Profile.tsx` + `components/profile/*` | Icon-in-square heading, `red-*` danger buttons, hand-typed buttons, `text-neutral-500` text, unlabelled icon buttons, page `px-4 py-8`, `max-w-2xl` | Header card with `Avatar`, rose destructive buttons with inline confirm, primitives |
 | `pages/QA.tsx` + `components/qa/*` | `Sparkles`, `max-w-lg` page, hand-typed buttons, `rounded` skeleton bars | `max-w-4xl` page with a header card, primitives |
 | `pages/CycleTracker.tsx` + `components/cycle/*` | `Sparkles` tip, blur in `CycleCircle`, hand-typed buttons, em dashes in `StatsCards` | Primitives, `CardHeader`, no em dashes |
 | `pages/CycleLog.tsx`, `pages/CycleAnalytics.tsx` | `red-*` error box, `max-w-2xl`, page padding, em dashes | Error-box spec, `max-w-4xl` |
-| `pages/AllLoveLetters.tsx`, `pages/NotFound.tsx` | Page padding, icon-in-square, `shadow-xl` card, hand-typed primary | Centered state card spec, primitives |
+| `pages/NotFound.tsx` | Page padding, icon-in-square, `shadow-xl` card, hand-typed primary | Centered state card spec, primitives |
 | `pages/Login.tsx`, `pages/Signup.tsx` | `rounded-lg` inputs and buttons, hand-typed primary, logo in a tinted square | Input and button spec (auth pages keep their centered `max-w-md` layout) |
 | `pages/Cravings.tsx` | List headings use `mb-3` without the white label. Delete/Keep buttons are 28px tall. The trash button is 32px. | Section-heading spec, inline-confirm and icon-button sizes |
 | `components/Sidebar.tsx` | Collapse and sign-out buttons are 32 to 36px | `w-10 h-10` |

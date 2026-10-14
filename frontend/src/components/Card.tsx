@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 import type { Category } from '../lib/cravingCategories';
 
 // Shared visual vocabulary for Duove pages (dashboard, partner, ...)
@@ -9,6 +10,10 @@ export const inset = 'rounded-xl bg-neutral-800/40 border border-neutral-800 px-
 export const primaryButton = `inline-flex items-center justify-center gap-2 px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition shadow-lg shadow-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${focusRing}`;
 export const secondaryButton = `inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-sm font-medium transition border border-neutral-700 disabled:opacity-50 cursor-pointer ${focusRing}`;
 export const iconClass = 'w-4 h-4 text-rose-400';
+export const iconButton = `w-10 h-10 shrink-0 flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400 ${focusRing}`;
+export const field =
+  'w-full bg-neutral-800/50 text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition';
+
 
 type Tone = 'rose' | 'emerald' | 'neutral';
 const toneClass: Record<Tone, string> = {
@@ -54,6 +59,20 @@ export function Avatar({ src, name, dashed = false }: { src: string | null; name
   );
 }
 
+// Filter or single-choice chip; an active category chip takes the category tint
+export function Chip({ active, cat, className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { active: boolean; cat?: Category }) {
+  return (
+    <button
+      {...props}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition cursor-pointer ${focusRing} ${
+        active
+          ? cat?.tint ?? 'bg-neutral-800 border-neutral-700 text-white'
+          : 'border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+      } ${className}`}
+    />
+  );
+}
+
 // Category pill on each craving: same shape as the selected chip, smaller
 export function CategoryPill({ cat }: { cat: Category }) {
   return (
@@ -61,5 +80,37 @@ export function CategoryPill({ cat }: { cat: Category }) {
       <cat.icon className={`w-3 h-3 ${cat.iconColor}`} aria-hidden />
       {cat.label}
     </span>
+  );
+}
+
+// Dialog shell: overlay, panel, close button. Escape and an overlay click close it.
+export function Modal({ label, onClose, wide = false, className = '', children }: {
+  label: string;
+  onClose: () => void;
+  wide?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div onClick={onClose} className={`fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 p-4 ${className}`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        onClick={(e) => e.stopPropagation()}
+        className={`${surface} shadow-2xl w-full ${wide ? 'max-w-xl' : 'max-w-md'} p-6 relative max-h-[90vh] overflow-y-auto`}
+      >
+        <button onClick={onClose} aria-label="Close" className={`absolute top-3 right-3 p-2.5 rounded-lg text-neutral-400 hover:text-white transition cursor-pointer ${focusRing}`}>
+          <X className="w-5 h-5" aria-hidden />
+        </button>
+        {children}
+      </div>
+    </div>
   );
 }

@@ -48,8 +48,11 @@ export const setCravings = (next: typeof cravings) => { cravings = next; };
 export let letters = empty
   ? []
   : [
-      { id: 'l1', heading: 'For the rainy Tuesday you made better', message: 'You showed up with soup and a terrible umbrella.', sender_id: partner.id, sender_name: 'Mika', recipient_id: me.id, created_at: ago(20), read: false },
-      { id: 'l2', heading: 'Six months of you', message: 'Still my favourite person to sit in silence with.', sender_id: me.id, sender_name: 'Jed', recipient_id: partner.id, created_at: ago(400), read: true },
+      { id: 'l1', heading: 'For the rainy Tuesday you made better', message: 'You showed up with soup and a terrible umbrella, and somehow the whole week turned around.\n\nI keep thinking about how you laughed when the umbrella flipped inside out on the steps. I want more Tuesdays like that one.', sender_id: partner.id, sender_name: 'Mika', recipient_name: 'Jed', recipient_id: me.id, created_at: ago(20), read: false, spotify_track_id: '4iV5W9uYEdYUVa79Axb7Rh', spotify_track_name: 'Here Comes the Sun', spotify_artist_name: 'The Beatles' },
+      { id: 'l3', heading: 'Thank you for the playlist', message: 'I listened to it on the whole train ride home. Track four made me miss you.', sender_id: me.id, sender_name: 'Jed', recipient_name: 'My love', recipient_id: partner.id, created_at: ago(120), read: true },
+      { id: 'l4', heading: 'Things I noticed about you this week', message: 'You hum when you cook. You always leave the last dumpling for me. You fall asleep mid-sentence.', sender_id: partner.id, sender_name: 'Mika', recipient_name: 'Jed', recipient_id: me.id, created_at: ago(300), read: true },
+      { id: 'l2', heading: 'Six months of you', message: 'Still my favourite person to sit in silence with.', sender_id: me.id, sender_name: 'Jed', recipient_name: 'Mika', recipient_id: partner.id, created_at: ago(900), read: true, spotify_track_id: '3n3Ppam7vgaVa1iaRUc9Lp', spotify_track_name: 'Mr. Brightside', spotify_artist_name: 'The Killers' },
+      { id: 'l5', heading: 'Before your big exam', message: 'You have studied more than anyone I know. Go in there and be brilliant. Dinner is on me after.', sender_id: partner.id, sender_name: 'M.', recipient_name: 'My favourite nerd', recipient_id: me.id, created_at: ago(1500), read: true },
     ];
 
 export const setLetters = (next: typeof letters) => { letters = next; };

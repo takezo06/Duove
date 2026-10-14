@@ -15,6 +15,11 @@ async function get(url: string): Promise<Res> {
   if (path === '/relationships/me') return ok({ relationship: d.relationship, partner: d.partner });
   if (path === '/cravings') return ok(d.cravings);
   if (path === '/love-letters') return ok(d.letters);
+  if (path === '/love-letters/search-song')
+    return ok([
+      { id: '4iV5W9uYEdYUVa79Axb7Rh', name: 'Here Comes the Sun', artist: 'The Beatles', albumArt: '' },
+      { id: '3n3Ppam7vgaVa1iaRUc9Lp', name: 'Mr. Brightside', artist: 'The Killers', albumArt: '' },
+    ]);
   if (path === '/qa/current') return ok(d.question);
   if (path === '/qa/history') return ok({ items: d.qaHistory, hasMore: false, nextCursor: null });
   if (path === '/qa/categories') return ok([]);
