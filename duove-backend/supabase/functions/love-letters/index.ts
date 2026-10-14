@@ -83,6 +83,32 @@ serve(async (req) => {
     return json(data, 201);
   }
 
+  // POST /love-letters/:id/open: the recipient breaks the seal. Safe to call twice.
+  const opening = path.match(/^\/([0-9a-f-]{36})\/open$/i);
+  if (opening && req.method === "POST") {
+    const relationship = await getActiveRelationship();
+    if (!relationship) return json({ error: "Pair with your partner first" }, 400);
+    const { data: letter } = await admin
+      .from("love_letters")
+      .select("id, sender_id, opened_at")
+      .eq("id", opening[1])
+      .eq("relationship_id", relationship.id)
+      .maybeSingle();
+    if (!letter) return json({ error: "Letter not found" }, 404);
+    if (letter.sender_id === userId) return json({ error: "Only the person it was written to can open it" }, 403);
+    if (letter.opened_at) return json({ id: letter.id, opened_at: letter.opened_at });
+    const { data, error } = await admin
+      .from("love_letters")
+      .update({ opened_at: new Date().toISOString() })
+      .eq("id", letter.id)
+      .is("opened_at", null)
+      .select("id, opened_at")
+      .maybeSingle();
+    if (error) return json({ error: error.message }, 500);
+    // null means a second tab opened it a moment earlier; either way it's open now
+    return json(data ?? { id: letter.id, opened_at: new Date().toISOString() });
+  }
+
   // GET /love-letters/search-song
   if (path === "/search-song" && req.method === "GET") {
     const q = url.searchParams.get("q")?.trim();

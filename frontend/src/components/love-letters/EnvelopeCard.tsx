@@ -1,18 +1,20 @@
 import { Music } from 'lucide-react';
-import { Seal, focusRing } from '../Card';
+import { Badge, Seal, focusRing } from '../Card';
 import type { Letter } from './LetterReader';
 
 interface EnvelopeCardProps {
   letter: Letter;
   mine: boolean;
   partnerName: string;
+  // still waiting for its recipient: the wax seal stays on until then
+  sealed: boolean;
   open: boolean;
   onOpen: () => void;
 }
 
 // A sealed letter. When `open` turns true the flap turns up, then the letter slides half out.
 // Layers, back to front: letter, envelope body, flap (drops behind the letter once it is up), seal.
-export function EnvelopeCard({ letter, mine, partnerName, open, onOpen }: EnvelopeCardProps) {
+export function EnvelopeCard({ letter, mine, partnerName, sealed, open, onOpen }: EnvelopeCardProps) {
   const sender = letter.sender_name || (mine ? 'You' : partnerName);
   // The partner's letters come in wine envelopes, yours in charcoal, so the box shows who wrote what at a glance
   const tone = mine
@@ -50,11 +52,13 @@ export function EnvelopeCard({ letter, mine, partnerName, open, onOpen }: Envelo
         </span>
       </span>
 
-      <Seal
-        name={sender}
-        partner={!mine}
-        className={`absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 z-30 ring-4 ${tone.ring} transition-opacity duration-100 motion-reduce:transition-none ${open ? 'opacity-0' : ''}`}
-      />
+      {sealed && (
+        <Seal
+          name={sender}
+          partner={!mine}
+          className={`absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 z-30 ring-4 ${tone.ring} transition-opacity duration-100 motion-reduce:transition-none ${open ? 'opacity-0' : ''}`}
+        />
+      )}
 
       <span className="absolute inset-x-0 bottom-0 z-20 p-4">
         <span className="font-semibold text-white leading-snug line-clamp-1 break-words">{letter.heading}</span>
@@ -72,6 +76,11 @@ export function EnvelopeCard({ letter, mine, partnerName, open, onOpen }: Envelo
               <Music className="w-3.5 h-3.5 shrink-0" aria-hidden />
               <span className="sr-only">with a song</span>
             </>
+          )}
+          {sealed && (
+            <span className="ml-auto shrink-0">
+              {mine ? <Badge tone="neutral">Unopened</Badge> : <Badge tone="rose">New</Badge>}
+            </span>
           )}
         </span>
       </span>
