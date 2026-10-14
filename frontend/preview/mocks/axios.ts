@@ -49,8 +49,14 @@ async function post(url: string, body: Record<string, string> = {}): Promise<Res
   const path = pathOf(url);
   if (path === '/cravings')
     d.setCravings([{ id: crypto.randomUUID(), content: body.content, category: body.category, fulfilled: false, user_id: d.me.id, created_at: new Date().toISOString() }, ...d.cravings]);
+  const opening = path.match(/^\/love-letters\/(.+)\/open$/);
+  if (opening) {
+    const opened_at = new Date().toISOString();
+    d.setLetters(d.letters.map((l) => (l.id === opening[1] && !l.opened_at ? { ...l, opened_at } : l)));
+    return ok({ id: opening[1], opened_at });
+  }
   if (path === '/love-letters') {
-    const letter = { id: crypto.randomUUID(), ...body, sender_id: d.me.id, created_at: new Date().toISOString(), read: false };
+    const letter = { id: crypto.randomUUID(), ...body, sender_id: d.me.id, created_at: new Date().toISOString(), opened_at: null };
     d.setLetters([letter as (typeof d.letters)[number], ...d.letters]);
     return ok(letter);
   }

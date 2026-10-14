@@ -38,6 +38,8 @@ export function RecentLetters({ letters, openId, readerId, meId, partnerName, on
                     {l.sender_id === meId ? <span>You</span> : <span className="text-rose-400 font-medium">{partnerName}</span>}
                     {on ? (
                       <Badge tone="rose">Reading</Badge>
+                    ) : !l.opened_at && l.sender_id !== meId ? (
+                      <Badge tone="rose">New</Badge>
                     ) : (
                       <time dateTime={l.created_at} title={new Date(l.created_at).toLocaleString()} className="shrink-0">
                         {when(l.created_at)}

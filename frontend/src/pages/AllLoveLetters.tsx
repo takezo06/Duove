@@ -9,6 +9,7 @@ import { LetterReader, type Letter } from '../components/love-letters/LetterRead
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
 import { groupByDate } from '../lib/groupByDate';
+import { openLetter as breakSeal } from '../lib/openLetter';
 import { plural } from '../lib/plural';
 
 const PAGE = 30;
@@ -100,14 +101,22 @@ export function AllLoveLetters() {
     return () => io.disconnect();
   }, [hasMore, moreError, loadMore]);
 
+  // Reading a sealed letter that was written to you breaks its seal, here and on the server
+  const markRead = (id: string) => {
+    const letter = letters.find((l) => l.id === id);
+    if (!letter || letter.opened_at || letter.sender_id === meId) return;
+    breakSeal(id);
+    const openedAt = new Date().toISOString();
+    setLetters((prev) => prev.map((l) => (l.id === id ? { ...l, opened_at: openedAt } : l)));
+  };
   const openLetter = (id: string) => {
     if (openId) return;
     setOpenId(id);
     // Let the flap and the letter finish moving before the reader covers them
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.setTimeout(() => setReadingId(id), still ? 0 : 420);
+    window.setTimeout(() => { setReadingId(id); markRead(id); }, still ? 0 : 420);
   };
-  const show = (id: string) => { setOpenId(id); setReadingId(id); };
+  const show = (id: string) => { setOpenId(id); setReadingId(id); markRead(id); };
   const close = () => { setReadingId(null); setOpenId(null); };
 
   if (loading) {
@@ -180,6 +189,7 @@ export function AllLoveLetters() {
                   letter={l}
                   mine={l.sender_id === meId}
                   partnerName={partnerName}
+                  sealed={!l.opened_at}
                   open={openId === l.id}
                   onOpen={() => openLetter(l.id)}
                 />

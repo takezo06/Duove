@@ -187,7 +187,8 @@ CREATE TABLE IF NOT EXISTS "public"."love_letters" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "heading" "text" DEFAULT 'Untitled'::"text" NOT NULL,
     "recipient_name" "text" DEFAULT 'My love'::"text" NOT NULL,
-    "sender_name" "text"
+    "sender_name" "text",
+    "opened_at" timestamp with time zone
 );
 
 

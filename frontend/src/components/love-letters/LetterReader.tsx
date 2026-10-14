@@ -9,6 +9,8 @@ export interface Letter {
   sender_name: string | null;
   recipient_name: string | null;
   created_at: string;
+  // null until the recipient opens it
+  opened_at?: string | null;
   spotify_track_id?: string | null;
   spotify_track_name?: string | null;
   spotify_artist_name?: string | null;

@@ -6,6 +6,8 @@ import { Mails, PenLine } from 'lucide-react';
 import { Avatar, inverseButton, primaryButton, secondaryButton, surface } from '../components/Card';
 import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
 import { RecentLetters } from '../components/love-letters/RecentLetters';
+import { EnvelopeCard } from '../components/love-letters/EnvelopeCard';
+import { openLetter } from '../lib/openLetter';
 import { SendLetterModal } from '../components/love-letters/SendLetterModal';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
@@ -29,6 +31,7 @@ export function LoveLetters() {
   const [me, setMe] = useState({ id: '', name: '' });
   const [partnerName, setPartnerName] = useState('your partner');
   const [picked, setPicked] = useState<Letter | null>(null);
+  const [breaking, setBreaking] = useState(false);
   const [counts, setCounts] = useState<{ sent: number; received: number } | null>(null);
   const [composing, setComposing] = useState(Boolean(compose));
   const [attempt, setAttempt] = useState(0);
@@ -105,8 +108,26 @@ export function LoveLetters() {
   const open = picked ?? latest;
   const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
 
+  // A letter written to you stays sealed until you tap its envelope
+  const sealed = open && !open.opened_at && !isMine(open);
+  const breakSeal = () => {
+    if (!open || breaking) return;
+    setBreaking(true);
+    openLetter(open.id);
+    const openedAt = new Date().toISOString();
+    const id = open.id;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Let the flap lift and the letter slide out before the page swaps to the letter itself
+    window.setTimeout(() => {
+      setLetters((prev) => prev.map((l) => (l.id === id ? { ...l, opened_at: openedAt } : l)));
+      setPicked((p) => (p?.id === id ? { ...p, opened_at: openedAt } : p));
+      setBreaking(false);
+    }, still ? 0 : 420);
+  };
+
   // Tap to read, tap the same one again to go back to the latest
   const toggle = (letter: Letter) => {
+    if (breaking) return;
     setPicked((p) => (p?.id === letter.id ? null : letter));
     // The reader sits under the list on narrow screens; bring it up if it's off screen or far down
     const el = reader.current;
@@ -194,7 +215,17 @@ export function LoveLetters() {
             />
           </div>
           <section id={READER_ID} ref={reader} aria-label="Open letter" className={`${surface} p-6 md:p-8 scroll-mt-6`}>
-            <LetterReader letter={open} mine={isMine(open)} partnerName={partnerName} />
+            {sealed ? (
+              <div className="flex flex-col items-center text-center py-6">
+                <div className="w-full max-w-sm">
+                  <EnvelopeCard letter={open} mine={false} partnerName={partnerName} sealed open={breaking} onOpen={breakSeal} />
+                </div>
+                <h2 className="mt-6 text-lg font-semibold text-white leading-snug">{partnerName} sent you a letter</h2>
+                <p className="mt-1 text-neutral-400">It's still sealed. Tap the envelope to open it.</p>
+              </div>
+            ) : (
+              <LetterReader letter={open} mine={isMine(open)} partnerName={partnerName} />
+            )}
           </section>
         </div>
       )}
