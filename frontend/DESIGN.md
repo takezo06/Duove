@@ -10,6 +10,8 @@ The reference for every UI change. Paths are relative to `frontend/`.
 - **Dark-only.** No light theme.
 - **System sans only.** A serif experiment was rejected. No custom fonts, and no Geist or Inter (the `@fontsource-variable/geist` dependency is unused).
 - **One accent, rose.** No second brand color.
+- **Expressive, never loud.** When a page should feel special (the love letters), the feeling comes from real-object details (stamps, wax seals, signatures, envelopes), color blocks that mean something (the rose "Your turn" card, wine envelopes for the partner's letters) and live, personal copy. It never comes from bigger type: every size, weight and spacing stays on the scales in sections 4 and 5. Inconsistent sizes are what make a page look generated.
+- **Tablets are first-class.** Layouts are designed for iPad portrait (820px) and landscape (1180px) as well as phone and desktop: use the extra width (a second column, more grid columns), don't just stretch a phone layout.
 
 ---
 
@@ -266,7 +268,7 @@ Single choice uses `role="radiogroup"`/`radio` with `aria-checked`. Filters use 
 - **Row cards:** `${surface} p-4 flex items-start gap-4 transition hover:border-neutral-700` inside `ul.space-y-3`.
 - **Grouped timeline:** one `${surface} p-2` per day, rows `p-3 md:p-4 rounded-xl hover:bg-neutral-800/50`. The leading icon is a 36px circle (`w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700`) with an optional `w-px bg-neutral-800` thread line.
 - **Desk (recent list + open item):** for a page whose job is "what's new" (Love letters). The list comes first: you pick, then read. From `lg` up: `grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start`, the turn card and a grouped list of `toggleRow`s on the left, the open item in a `${surface} p-6 md:p-8` card on the right. Below `lg` they stack in that order (`md:grid-cols-2` inside the list on tablets). The newest item from the partner is open by default. Tapping a row opens it (with a `Badge tone="rose"` "Reading"), tapping it again returns to the default, and on narrow screens the card scrolls into view. The list ends with a text action to the full collection. Stats go in the header's meta line as inline values ("30 from Mika · 15 from you"), not as big numbers. See `LoveLetters.tsx`.
-- **Lazy-loaded list:** for collections that grow forever (all letters). Fetch 30 at a time with a `before` cursor (the oldest item's `created_at`), newest first. An `IntersectionObserver` on a sentinel, rooted at `main` with `rootMargin: '0px 0px 600px 0px'`, loads the next page before the end is visible, and the sentinel holds a visible `secondaryButton` "Load older letters" for keyboards and as a fallback. A failed page shows `role="alert"` text and the button turns into "Try again". When nothing is left, end with one `text-sm text-neutral-400 text-center` line that says so. See `AllLoveLetters.tsx`.
+- **Lazy-loaded list:** for collections that grow forever (all letters). Year or month section headings over a grid, the next page loading as you near the end. The loading rules are in [section 13](#13-data-loading-and-efficiency). See `AllLoveLetters.tsx`.
 - **Meta row:** `mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400`, items separated by `<span aria-hidden>·</span>`, with `<time dateTime title>`.
 
 ### Progress
@@ -374,8 +376,52 @@ Live state for whose turn it is to write. When the partner wrote last: a solid `
 - `focusRing` on every interactive element. `aria-label` on icon-only buttons. `aria-hidden` on decorative icons. `aria-current="page"` on the active nav item. Every input is labelled. Errors use `role="alert"`.
 - Tap targets are at least 40px (`h-10`, `w-10`, or `p-2.5` around a 20px icon).
 - **Tap first, hover second.** Everything a hover shows must also work by tap, so hovers can be generous with color but never carry meaning alone. `tailwind.config.js` sets `future.hoverOnlyWhenSupported`, so `hover:` only applies on devices with a real pointer and a tap never leaves a hover style stuck on a phone.
-- **Breakpoints:** `sm` (640) turns stacked header rows into rows. `md` (768) brings 2-column grids, larger padding, and the expanded sidebar. `xl` (1280) gives the 4-column dashboard.
-- Check every change at **390px** and **1366px** (`npm run preview:mock`, one screenshot each). No horizontal scroll at 390px.
+- **Breakpoints:** `sm` (640) turns stacked header rows into rows. `md` (768) brings 2-column grids, larger padding, and the expanded sidebar (256px, so iPad portrait leaves about 516px of content). `lg` (1024) brings side-by-side layouts (the letters desk) and 3-column collections, which is iPad landscape. `xl` (1280) gives 4-column grids (dashboard, envelopes).
+- Check every change at **390px** and **1366px** (`npm run preview:mock`, one screenshot each). No horizontal scroll at 390px. Check iPad portrait (820) and landscape (1180) with `playwright-cli run-code` (column counts, overflow) instead of extra screenshots.
+
+---
+
+## 13. Data loading and efficiency
+
+Load what the view shows, nothing more, and never let a nice-to-have block the page.
+
+### How much to fetch
+
+- **Summary views fetch a small `limit`.** The dashboard tile asks for 1 letter and the letters desk for 6. A summary page never downloads a whole history "just in case"; it links to the collection instead.
+- **Collections page and lazy-load.** Never fetch an unbounded list. The letters collection loads 30, then 30 more as you scroll (below).
+- **Deep links look locally first.** A notification's `highlightId` is looked up in what's already loaded, and only fetched on its own (`?id=`) when it isn't there.
+
+### Lazy loading (infinite lists)
+
+- **Page size 30, newest first, cursor not offset.** Ask for the next page with `before` = the `created_at` of the oldest item on screen. An offset would skip or repeat items when something new arrives while you scroll.
+- **`hasMore` is `page.length === PAGE`.** At worst that costs one extra empty request at the very end, which is cheaper than a count query.
+- **Trigger:** an `IntersectionObserver` on a sentinel after the list, `root: el.closest('main')` (the layout's `main` is the scroller, so a viewport root would be clipped by it) and `rootMargin: '0px 0px 600px 0px'`, so the next page arrives before the end is visible.
+- **Re-observe after every page.** The observer effect depends on the load function, which changes with the list, so it re-checks after each page and keeps filling a tall screen until it can scroll.
+- **One request at a time:** a `useRef` busy flag, not state, guards the load function.
+- **Stop on error.** Don't observe while a page has failed. Show the `role="alert"` message and turn the button into "Try again".
+- **Always a visible fallback:** the sentinel holds a `secondaryButton` ("Load older letters") for keyboard users and if the observer never fires. While loading, `Loader2` and "Loading...".
+- **Say when it's done:** one `text-sm text-neutral-400 text-center` line, ideally with something real ("That's every letter, back to the first one on 2 November 2025.").
+- Grouping (`groupByDate`) runs over everything loaded, so a section heading that spans two pages merges by itself. Don't show per-group counts in a lazy list; they'd be wrong until the last page loads.
+
+### Requests
+
+- **Independent requests go in one `Promise.all`** (relationship, list, profile), never one after another.
+- **Nice-to-haves can't fail the page.** Totals from `/relationships/stats` are fetched with `.catch(() => null)`, and the UI simply hides what didn't arrive.
+- **Fetch in the effect, retry with a counter.** Write the async loader inside `useEffect` and re-run it by bumping an `attempt` state from the "Try again" button (this keeps the `set-state-in-effect` lint rule quiet).
+- **Use what a write returns.** After a POST, put the returned row into local state (prepend it, select it) instead of refetching the list.
+- **Pass down what the page already knows.** Modals get names and ids as props (`SendLetterModal` gets `myName` and `partnerName`) instead of fetching them again.
+- **Third-party embeds load lazily:** Spotify iframes get `loading="lazy"`.
+
+### Backend and mock contract
+
+- List endpoints take a capped `limit` and an optional `before` cursor, validate the cursor (400 on garbage) and keep returning a plain array, so older callers don't break.
+- After changing an edge function, deploy it (`supabase functions deploy <name>`) before shipping a frontend that depends on it. A frontend that sends `before` to an old function gets the first page again and shows duplicates.
+- `preview/mocks/axios.ts` honors the same params as the real function (`limit`, `before`, `id`) and adds a short delay on later pages, so loading states can be seen in the preview. Mock data should be big enough to exercise paging (the default scenario has 45 letters) and should agree with itself (mock stats count the mock letters).
+
+### Perceived speed
+
+- Skeletons shaped like the final layout (section 8). The envelope collection uses `EnvelopeSkeleton`.
+- Timed choreography checks `prefers-reduced-motion` and skips the wait too, not just the motion (the envelope opens the letter at once).
 
 ---
 
