@@ -16,40 +16,17 @@ Rules:
 
 ## Design system (frontend)
 
-Dark, warm, personal. It should feel like a shared journal for two people, not a SaaS dashboard.
+**Read `frontend/DESIGN.md` before any UI work.** It is the full spec: colors, type scale, spacing, radius, buttons, inputs, states, motion, copy, and a list of older files that still break it. The essentials:
 
-**Use the primitives; never re-type them**
-- `src/components/Card.tsx`: `surface` (every card), `inset` (box inside a card), `focusRing`, `primaryButton`, `secondaryButton`, `iconClass`, `Badge`, `CardHeader`, `Avatar`.
-- `src/lib/plural.ts` (`plural(3, 'day')`), `src/lib/relationshipYear.ts` (all anniversary/monthsary/day-count math; check: `node frontend/scripts/relationshipYear.check.ts`), `src/lib/cravingCategories.ts` (category icon + color).
-- New shared style or helper → add it to one of these files, then use it everywhere.
+- Dark, warm, personal: a shared journal for two people, not a SaaS dashboard. Dark-only, system sans, rose is the one accent.
+- Use the primitives in `src/components/Card.tsx` (`surface`, `inset`, `focusRing`, `primaryButton`, `secondaryButton`, `iconClass`, `Badge`, `CardHeader`, `Avatar`, `CategoryPill`) and helpers in `src/lib/`. Never re-type their classes; a new shared style goes into those files first.
+- Copy from the reference pages (Dashboard `BentoGrid.tsx`, Cravings, Partner, Notifications, QAHistory, Sidebar), never from files in DESIGN.md's "Known drift" table. When you fix a drift item, delete its row.
+- Banned: gradients, blur/glass, glow blobs, sparkle icons, emoji, icon-in-a-square decoration, uppercase tracked labels, hover scale/lift, undefined `animate-*` classes, em dashes in copy, `neutral-500` for readable text, `window.confirm`, `console.error`-only errors.
 
-**Color**
-- Base: `neutral-950` page, `neutral-900` cards, `neutral-800` borders and selected states. Body text `neutral-200`/white, secondary `neutral-400`. Never `neutral-500` or darker for anything people need to read.
-- Rose is the one brand accent: primary action (one per view), icons in card headers, the partner's name, "needs you" pills. Don't spend it on decoration.
-- Status pills (`Badge`): rose = needs you, emerald = done/connected, neutral = info.
-- Category colors (amber/sky/rose/violet/neutral) only mark craving categories, and appear wherever a category does. Cycle phases use `components/cycle/constants.ts`.
+## Git
 
-**Type and layout**
-- System sans only. Headings `font-bold text-white` (page title `text-2xl md:text-3xl`); card labels `text-sm text-neutral-400` beside a rose icon; values `font-bold text-white tabular-nums`; counts get `toLocaleString()`.
-- Page = `max-w-4xl mx-auto space-y-6` (dashboard `max-w-6xl`). The first card is the header card: who it's about (avatars or title), one-line subtitle, secondary action top-right, any form below a `border-t` divider.
-- Stats are centered (icon + label, value, subtitle, pill). Content cards and lists are left-aligned.
-- Profile pictures are 64px circles (`Avatar`); the partner placeholder is `Avatar dashed`.
-
-**Making navigation feel rewarding**
-- Every card that summarizes another page is a whole-card `Link` with a footer action ("Open tracker →"), hover `border-rose-400/30`.
-- Show live state, not static labels: countdowns, progress bars, "2h ago", ticking counters, unread counts, "Your turn" pills.
-- Personal copy with names: "What you and **Mika** are in the mood for", not "Manage your cravings".
-- Every empty state says what to do next and has the button to do it. Every error is visible inline (`role="alert"`), never just `console.error`.
-- Confirm destructive actions inline (Delete / Keep), never `window.confirm`.
-- Phones are first-class: check 390px, keep tap targets ≥ 40px, keep primary actions after the inputs they submit.
-
-**Banned (anti-slop; full list in the `no-ai-slop` skill)**
-- Sparkle icons, emoji as icons or in UI copy, blurred glow blobs, gradients, glassmorphism, pulsing dots.
-- Icon in a rounded square as decoration (the 64px avatar pair replaces "hero icons"), one-sided colored borders, uppercase tracked eyebrow labels.
-- Rainbow colors without a meaning, raw machine strings ("= 588.21 days (588d, 5h)"), `animate-*` classes that aren't defined, em dashes in copy.
-- Custom fonts. The serif experiment was rejected; stay with the system sans.
-
-**Accessibility**: `focusRing` on every interactive element, `aria-label` on icon-only buttons, `aria-current="page"` for the active nav item, `aria-hidden` on decorative icons, labelled inputs.
+- Commit only to the `new-feats` branch. Don't create new branches.
+- No Claude attribution (`Co-Authored-By` or similar) in commits or PRs.
 
 ## Working on the UI
 
