@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Modal, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Badge, Modal, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { EnvelopeCard, EnvelopeSkeleton } from '../components/love-letters/EnvelopeCard';
 import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
 import { groupByDate } from '../lib/groupByDate';
+import { plural } from '../lib/plural';
 
 const PAGE = 30;
 
@@ -135,20 +136,17 @@ export function AllLoveLetters() {
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5 motion-reduce:transform-none" aria-hidden />
           Love letters
         </Link>
-        <div className="mt-1 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white leading-tight">The envelope box</h1>
-            <p className="text-neutral-400 mt-2 text-lg">
+            <h1 className="text-2xl md:text-3xl font-bold text-white">The envelope box</h1>
+            <p className="text-neutral-400 mt-1">
           {letters.length > 0
             ? <>Every letter you and {partner} have sent. Tap one to open it.</>
             : <>Letters you and {partner} send each other end up here.</>}
             </p>
           </div>
           {!!total && (
-            <p className="shrink-0 sm:text-right">
-              <span className="block text-4xl md:text-5xl font-bold text-rose-400 tabular-nums">{total.toLocaleString()}</span>
-              <span className="text-sm text-neutral-400">{total === 1 ? 'letter' : 'letters'} kept</span>
-            </p>
+            <Badge tone="neutral">{plural(total, 'letter')} kept</Badge>
           )}
         </div>
 
@@ -174,10 +172,7 @@ export function AllLoveLetters() {
 
       {groupByDate(letters, { year: 'numeric' }).map((g) => (
         <section key={g.label}>
-          <div className="flex items-center gap-4 mb-5">
-            <h2 className="text-3xl md:text-4xl font-bold text-white tabular-nums">{g.label}</h2>
-            <span aria-hidden className="h-px flex-1 bg-neutral-800" />
-          </div>
+          <h2 className="text-sm font-semibold text-white tabular-nums px-1 mb-3">{g.label}</h2>
           <ul className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {g.items.map((l) => (
               <li key={l.id}>

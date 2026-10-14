@@ -74,7 +74,7 @@ export function LoveLetters() {
     return (
       <div className="max-w-6xl mx-auto space-y-6" aria-busy="true">
         <div className={`${surface} h-36 animate-pulse`} />
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-6">
+        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6">
           <div className={`${surface} h-96 animate-pulse`} />
           <div className={`${surface} h-96 animate-pulse`} />
         </div>
@@ -108,8 +108,10 @@ export function LoveLetters() {
   // Tap to read, tap the same one again to go back to the latest
   const toggle = (letter: Letter) => {
     setPicked((p) => (p?.id === letter.id ? null : letter));
+    // The reader sits under the list on narrow screens; bring it up if it's off screen or far down
     const el = reader.current;
-    if (el && el.getBoundingClientRect().top < 0) {
+    const top = el?.getBoundingClientRect().top ?? 0;
+    if (el && (top < 0 || top > window.innerHeight / 2)) {
       const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       el.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
     }
@@ -118,30 +120,23 @@ export function LoveLetters() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <section className={`${surface} p-6 md:p-8`}>
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
           <div>
-            <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white leading-tight">Love letters</h1>
-            <p className="text-neutral-400 mt-2 text-lg">
-              Everything you and {partner} have put in writing.
-            </p>
-            {letters.length > 0 && (
-              <Link to="/letters/all" className={`${secondaryButton} mt-5`}>
-                <Mails className="w-4 h-4" aria-hidden />
-                Open the envelope box
-              </Link>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Love letters</h1>
+            <p className="text-neutral-400 mt-1">Everything you and {partner} have put in writing.</p>
+            {counts && counts.sent + counts.received > 0 && (
+              <p className="text-sm text-neutral-400 mt-1">
+                <span className="text-white font-medium tabular-nums">{counts.received.toLocaleString()}</span> from {partnerName}
+                <span aria-hidden> · </span>
+                <span className="text-white font-medium tabular-nums">{counts.sent.toLocaleString()}</span> from you
+              </p>
             )}
           </div>
-          {counts && counts.sent + counts.received > 0 && (
-            <dl className="flex gap-8 md:gap-10">
-              <div>
-                <dt className="text-sm text-neutral-400">From {partnerName}</dt>
-                <dd className="mt-1 text-4xl md:text-5xl font-bold text-rose-400 tabular-nums">{counts.received.toLocaleString()}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-neutral-400">From you</dt>
-                <dd className="mt-1 text-4xl md:text-5xl font-bold text-white tabular-nums">{counts.sent.toLocaleString()}</dd>
-              </div>
-            </dl>
+          {letters.length > 0 && (
+            <Link to="/letters/all" className={`${secondaryButton} shrink-0 self-start`}>
+              <Mails className="w-4 h-4" aria-hidden />
+              Open the envelope box
+            </Link>
           )}
         </div>
 
@@ -165,14 +160,11 @@ export function LoveLetters() {
       </section>
 
       {open && (
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-6 items-start">
-          <section id={READER_ID} ref={reader} aria-label="Open letter" className={`${surface} p-6 md:p-8 scroll-mt-6`}>
-            <LetterReader letter={open} mine={isMine(open)} partnerName={partnerName} />
-          </section>
+        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start">
           <div className="space-y-6">
             {isMine(letters[0]) ? (
               <section className={`${surface} p-6`}>
-                <h2 className="text-xl font-bold text-white">Waiting on {partnerName}</h2>
+                <h2 className="text-lg font-semibold text-white leading-snug">Waiting on {partnerName}</h2>
                 <p className="mt-1 text-neutral-400">You wrote {daysAgo(letters[0].created_at)}. Nothing says you can't write again.</p>
                 <button onClick={() => setComposing(true)} className={`${secondaryButton} mt-5`}>
                   <PenLine className="w-4 h-4" aria-hidden />
@@ -181,11 +173,11 @@ export function LoveLetters() {
               </section>
             ) : (
               <section className="rounded-2xl bg-rose-600 p-6 text-white">
-                <p className="text-sm font-semibold">Your turn</p>
-                <h2 className="mt-2 text-2xl font-bold leading-tight">
+                <p className="text-sm">Your turn</p>
+                <h2 className="mt-3 text-lg font-semibold leading-snug">
                   {partnerName} wrote to you {daysAgo(letters[0].created_at)}.
                 </h2>
-                <p className="mt-2">Write back while it still feels new.</p>
+                <p className="mt-1">Write back while it still feels new.</p>
                 <button onClick={() => setComposing(true)} className={`${inverseButton} mt-5 w-full`}>
                   <PenLine className="w-4 h-4" aria-hidden />
                   Write to {partnerName}
@@ -201,6 +193,9 @@ export function LoveLetters() {
               onToggle={toggle}
             />
           </div>
+          <section id={READER_ID} ref={reader} aria-label="Open letter" className={`${surface} p-6 md:p-8 scroll-mt-6`}>
+            <LetterReader letter={open} mine={isMine(open)} partnerName={partnerName} />
+          </section>
         </div>
       )}
 

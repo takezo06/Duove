@@ -127,12 +127,11 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 
 | Role | Classes |
 |---|---|
-| Page title (h1, header card) | `text-2xl md:text-3xl font-bold text-white` (the two love-letter pages go bigger on purpose: `text-2xl sm:text-3xl md:text-5xl leading-tight`, subtitle `text-lg mt-2`) |
-| Year heading in a long collection | `text-3xl md:text-4xl font-bold text-white tabular-nums` beside a `h-px flex-1 bg-neutral-800` rule |
+| Page title (h1, header card) | `text-2xl md:text-3xl font-bold text-white` |
 | Centered state title (not paired, error, 404) | `text-2xl font-bold text-white mb-2` |
 | Hero number (Together counter) | `text-4xl md:text-5xl font-bold text-white tabular-nums`; unit in `text-2xl md:text-3xl font-semibold text-neutral-300` |
 | Stat value | `text-2xl font-bold text-white tabular-nums` (Partner activity: `text-2xl md:text-3xl`) |
-| Content headline in a card (today's question, letter heading, phase, quote) | `text-lg font-semibold text-white leading-snug`, plus `line-clamp-2` or `line-clamp-3` in previews |
+| Content headline in a card (today's question, letter heading, phase, quote) | `text-lg font-semibold text-white leading-snug`, plus `line-clamp-2` or `line-clamp-3` in previews. An open letter's heading uses the modal title size (`text-xl font-bold`) |
 | Card label / stat label | `text-sm text-neutral-400` beside a rose `iconClass` icon (`CardHeader`) |
 | Page subtitle (title-only header) | `text-neutral-400 mt-1` (base size) |
 | Meta line under a title (date, "Paired on …") | `text-sm text-neutral-400 mt-1` |
@@ -266,7 +265,7 @@ Single choice uses `role="radiogroup"`/`radio` with `aria-checked`. Filters use 
 
 - **Row cards:** `${surface} p-4 flex items-start gap-4 transition hover:border-neutral-700` inside `ul.space-y-3`.
 - **Grouped timeline:** one `${surface} p-2` per day, rows `p-3 md:p-4 rounded-xl hover:bg-neutral-800/50`. The leading icon is a 36px circle (`w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700`) with an optional `w-px bg-neutral-800` thread line.
-- **Desk (open item + recent list):** for a page whose job is "what's new" (Love letters). From `lg` up: `grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-6 items-start`, the open item in a `${surface} p-6 md:p-8` card on the left and a grouped list of `toggleRow`s on the right. Below `lg` the list sits under the card (`md:grid-cols-2` inside the list on tablets). The newest item from the partner is open by default. Tapping a row opens it (with a `Badge tone="rose"` "Reading"), tapping it again returns to the default, and the card scrolls back into view if it was above the fold. The list ends with a text action to the full collection. See `LoveLetters.tsx`.
+- **Desk (recent list + open item):** for a page whose job is "what's new" (Love letters). The list comes first: you pick, then read. From `lg` up: `grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start`, the turn card and a grouped list of `toggleRow`s on the left, the open item in a `${surface} p-6 md:p-8` card on the right. Below `lg` they stack in that order (`md:grid-cols-2` inside the list on tablets). The newest item from the partner is open by default. Tapping a row opens it (with a `Badge tone="rose"` "Reading"), tapping it again returns to the default, and on narrow screens the card scrolls into view. The list ends with a text action to the full collection. Stats go in the header's meta line as inline values ("30 from Mika · 15 from you"), not as big numbers. See `LoveLetters.tsx`.
 - **Lazy-loaded list:** for collections that grow forever (all letters). Fetch 30 at a time with a `before` cursor (the oldest item's `created_at`), newest first. An `IntersectionObserver` on a sentinel, rooted at `main` with `rootMargin: '0px 0px 600px 0px'`, loads the next page before the end is visible, and the sentinel holds a visible `secondaryButton` "Load older letters" for keyboards and as a fallback. A failed page shows `role="alert"` text and the button turns into "Try again". When nothing is left, end with one `text-sm text-neutral-400 text-center` line that says so. See `AllLoveLetters.tsx`.
 - **Meta row:** `mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400`, items separated by `<span aria-hidden>·</span>`, with `<time dateTime title>`.
 
@@ -299,12 +298,13 @@ Use `Modal` from `Card.tsx`. It renders the parts below. Pass `wide` (`max-w-xl`
 ### Letter sheet (`LetterReader`)
 
 How an open letter reads, on the desk and in the envelope box's modal:
-- A postage stamp leads the header: `w-16 h-20 md:w-20 md:h-24 -rotate-3 rounded-lg`, the sender's initial (`text-3xl md:text-4xl font-bold`) over the short date. `bg-rose-600` with a dashed `outline-white/50` perforation for the partner, `bg-neutral-800` with `outline-neutral-600` for you. The perforation is the one other place dashes are allowed.
-- Heading `text-2xl md:text-4xl font-bold leading-tight`. Body `text-lg leading-relaxed`, the greeting in `text-rose-400 font-semibold`, and the signature right-aligned in `text-2xl font-semibold` under a `w-12 h-px bg-rose-400/60` rule.
+- A postage stamp leads the header: `w-14 h-16 -rotate-3 rounded-lg`, the sender's initial (`text-xl font-bold`, like an avatar initial) over the short date in `text-xs`. `bg-rose-600` with a dashed `outline-white/50` perforation for the partner, `bg-neutral-800` with `outline-neutral-600` for you. The perforation is the one other place dashes are allowed.
+- Heading `text-xl font-bold leading-snug`. Body at base size, `leading-relaxed`, the greeting in `text-rose-400 font-semibold`, and the signature right-aligned in `font-semibold text-white` under a `w-10 h-px bg-rose-400/60` rule. Sections inside follow the normal `mt-6 pt-6 border-t` rhythm.
+- The letter is personal through these details, not through bigger type. Keep every size on the scale in section 4.
 
 ### Turn card (Love letters desk)
 
-Live state for whose turn it is to write. When the partner wrote last: a solid `rounded-2xl bg-rose-600 p-6 text-white` block ("Your turn", "Mika wrote to you yesterday.") with a full-width `inverseButton`. This is the view's one rose primary. When you wrote last: a plain `${surface} p-6` "Waiting on Mika" card with a `secondaryButton`. Use `rose-600`, not `rose-500`, under white body text (4.7:1).
+Live state for whose turn it is to write. When the partner wrote last: a solid `rounded-2xl bg-rose-600 p-6 text-white` block ("Your turn", "Mika wrote to you yesterday.") with a `text-sm` label, a `text-lg font-semibold leading-snug` line and a full-width `inverseButton`. This is the view's one rose primary. When you wrote last: a plain `${surface} p-6` "Waiting on Mika" card with a `secondaryButton`. Use `rose-600`, not `rose-500`, under white body text (4.7:1).
 
 ### Avatars
 
