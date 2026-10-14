@@ -1,19 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { Mails, Music, PenLine } from 'lucide-react';
-import { Avatar, Chip, Modal, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Mails, PenLine } from 'lucide-react';
+import { Avatar, primaryButton, secondaryButton, surface } from '../components/Card';
 import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
+import { RecentLetters } from '../components/love-letters/RecentLetters';
 import { SendLetterModal } from '../components/love-letters/SendLetterModal';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
-import { plural } from '../lib/plural';
-import { when } from '../lib/when';
-import { groupByDate } from '../lib/groupByDate';
 
-type Filter = 'all' | 'received' | 'sent';
+const RECENT = 6;
+const READER_ID = 'open-letter';
 
+// The letters desk: the newest letter from your partner open to read, the last few beside it,
+// and the envelope box (/letters/all) for everything else.
 export function LoveLetters() {
   usePageTitle('Love Letters');
   const navigate = useNavigate();
@@ -26,11 +27,10 @@ export function LoveLetters() {
   const [unpaired, setUnpaired] = useState(false);
   const [me, setMe] = useState({ id: '', name: '' });
   const [partnerName, setPartnerName] = useState('your partner');
-  const [filter, setFilter] = useState<Filter>('all');
-  // A notification deep link opens its letter straight away
-  const [selectedId, setSelectedId] = useState<string | null>(highlightId ?? null);
+  const [picked, setPicked] = useState<Letter | null>(null);
   const [composing, setComposing] = useState(Boolean(compose));
   const [attempt, setAttempt] = useState(0);
+  const reader = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -38,16 +38,22 @@ export function LoveLetters() {
         const { data: { user } } = await supabase.auth.getUser();
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         const headers = { Authorization: `Bearer ${token}` };
-        // ponytail: newest 100 only (the backend cap); add paging when a couple outgrows it
+        const api = import.meta.env.VITE_BACKEND_URL;
         const [rel, list, profile] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/relationships/me`, { headers }),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/love-letters?limit=100`, { headers }),
+          axios.get(`${api}/relationships/me`, { headers }),
+          axios.get(`${api}/love-letters?limit=${RECENT}`, { headers }),
           supabase.from('profiles').select('display_name').eq('id', user?.id ?? '').single(),
         ]);
         if (!rel.data?.relationship) { setUnpaired(true); return; }
         setPartnerName(rel.data.partner?.display_name || 'your partner');
         setMe({ id: user?.id ?? '', name: profile.data?.display_name ?? '' });
         setLetters(list.data);
+        // A notification deep link opens its letter, even one older than the recent few
+        if (highlightId) {
+          const linked = (list.data as Letter[]).find((l) => l.id === highlightId)
+            ?? (await axios.get(`${api}/love-letters`, { headers, params: { id: highlightId } })).data[0];
+          if (linked) setPicked(linked);
+        }
       } catch (err) {
         if ((err as { response?: { status?: number } }).response?.status === 404) setUnpaired(true);
         else setError(apiError(err, "Couldn't load your letters. Try again."));
@@ -56,15 +62,15 @@ export function LoveLetters() {
       }
     };
     load();
-  }, [attempt]);
+  }, [attempt, highlightId]);
 
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto space-y-6" aria-busy="true">
         <div className={`${surface} h-36 animate-pulse`} />
-        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-6">
           <div className={`${surface} h-96 animate-pulse`} />
-          <div className={`${surface} h-96 animate-pulse hidden lg:block`} />
+          <div className={`${surface} h-96 animate-pulse`} />
         </div>
       </div>
     );
@@ -89,31 +95,19 @@ export function LoveLetters() {
   }
 
   const isMine = (l: Letter) => l.sender_id === me.id;
-  const sentCount = letters.filter(isMine).length;
-  const shown = letters.filter((l) => filter === 'all' || (filter === 'sent') === isMine(l));
-  const selected = shown.find((l) => l.id === selectedId) ?? null;
-  // The side pane always has something open; the phone modal only opens on a tap
-  const reading = selected ?? shown[0];
-  const index = reading ? shown.indexOf(reading) : -1;
-
-  const groups = groupByDate(shown, { month: 'long', year: 'numeric' });
-
+  const latest = letters.find((l) => !isMine(l)) ?? letters[0];
+  const open = picked ?? latest;
   const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
-  const filters: { value: Filter; label: string; count: number }[] = [
-    { value: 'all', label: 'All', count: letters.length },
-    { value: 'received', label: `From ${partnerName}`, count: letters.length - sentCount },
-    { value: 'sent', label: 'From you', count: sentCount },
-  ];
 
-  const reader = (letter: Letter) => (
-    <LetterReader
-      letter={letter}
-      mine={isMine(letter)}
-      partnerName={partnerName}
-      onNewer={index > 0 ? () => setSelectedId(shown[index - 1].id) : undefined}
-      onOlder={index < shown.length - 1 ? () => setSelectedId(shown[index + 1].id) : undefined}
-    />
-  );
+  // Tap to read, tap the same one again to go back to the latest
+  const toggle = (letter: Letter) => {
+    setPicked((p) => (p?.id === letter.id ? null : letter));
+    const el = reader.current;
+    if (el && el.getBoundingClientRect().top < 0) {
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -123,7 +117,7 @@ export function LoveLetters() {
             <h1 className="text-2xl md:text-3xl font-bold text-white">Love letters</h1>
             <p className="text-neutral-400 mt-1">
               {letters.length > 0
-                ? <>{plural(letters.length, 'letter')} between you and {partner}, newest first.</>
+                ? <>Write to {partner}, or read what's new.</>
                 : <>Everything you and {partner} write to each other lives here.</>}
             </p>
           </div>
@@ -160,81 +154,20 @@ export function LoveLetters() {
         )}
       </section>
 
-      {letters.length > 0 && (
-        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start">
-          <div className="space-y-5 min-w-0">
-            <nav aria-label="Filter letters" className="flex flex-wrap gap-2">
-              {filters.map((f) => (
-                <Chip key={f.value} onClick={() => setFilter(f.value)} aria-pressed={filter === f.value} active={filter === f.value}>
-                  {f.label} <span className="text-neutral-500 tabular-nums">{f.count}</span>
-                </Chip>
-              ))}
-            </nav>
-
-            {shown.length === 0 ? (
-              <div className={`${surface} px-6 py-14 text-center`}>
-                <p className="text-lg font-semibold text-white">
-                  {filter === 'sent' ? "You haven't written one yet" : `Nothing from ${partnerName} yet`}
-                </p>
-                <button onClick={() => setFilter('all')} className={`${secondaryButton} mt-5`}>Show all letters</button>
-              </div>
-            ) : (
-              groups.map((g) => (
-                <section key={g.label}>
-                  <h2 className="flex items-baseline justify-between text-sm px-1 mb-2">
-                    <span className="font-semibold text-white">{g.label}</span>
-                    <span className="text-neutral-400 tabular-nums">{plural(g.items.length, 'letter')}</span>
-                  </h2>
-                  <ul className={`${surface} p-2 space-y-1`}>
-                    {g.items.map((l) => {
-                      const open = l.id === reading?.id;
-                      return (
-                        <li key={l.id}>
-                          <button
-                            onClick={() => setSelectedId(l.id)}
-                            aria-current={open ? 'true' : undefined}
-                            className={`w-full text-left p-3 md:p-4 rounded-xl transition cursor-pointer ${focusRing} ${
-                              open ? 'lg:bg-neutral-800 hover:bg-neutral-800/50' : 'hover:bg-neutral-800/50'
-                            }`}
-                          >
-                            <span className="flex items-baseline justify-between gap-3 text-xs text-neutral-400">
-                              {isMine(l) ? <span>You</span> : <span className="text-rose-400 font-medium">{partnerName}</span>}
-                              <time dateTime={l.created_at} title={new Date(l.created_at).toLocaleString()} className="shrink-0">
-                                {when(l.created_at)}
-                              </time>
-                            </span>
-                            <span className="mt-1 font-semibold text-white leading-snug line-clamp-2 break-words">{l.heading}</span>
-                            <span className="mt-1 text-sm text-neutral-400 line-clamp-1 break-words">{l.message}</span>
-                            {l.spotify_track_name && (
-                              <span className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400 min-w-0">
-                                <Music className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                                <span className="truncate">
-                                  {l.spotify_track_name}{l.spotify_artist_name && ` · ${l.spotify_artist_name}`}
-                                </span>
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              ))
-            )}
-          </div>
-
-          {reading && (
-            <div className={`hidden lg:block sticky top-0 ${surface} p-6 md:p-8 max-h-[calc(100vh-3rem)] overflow-y-auto`}>
-              {reader(reading)}
-            </div>
-          )}
+      {open && (
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-6 items-start">
+          <section id={READER_ID} ref={reader} aria-label="Open letter" className={`${surface} p-6 md:p-8 scroll-mt-6`}>
+            <LetterReader letter={open} mine={isMine(open)} partnerName={partnerName} />
+          </section>
+          <RecentLetters
+            letters={letters}
+            openId={open.id}
+            readerId={READER_ID}
+            meId={me.id}
+            partnerName={partnerName}
+            onToggle={toggle}
+          />
         </div>
-      )}
-
-      {selected && (
-        <Modal label={selected.heading} onClose={() => setSelectedId(null)} wide className="lg:hidden">
-          {reader(selected)}
-        </Modal>
       )}
 
       {composing && (
@@ -243,9 +176,8 @@ export function LoveLetters() {
           partnerName={partnerName}
           onClose={() => setComposing(false)}
           onSent={(letter) => {
-            setLetters((prev) => [letter, ...prev]);
-            setFilter('all');
-            setSelectedId(letter.id);
+            setLetters((prev) => [letter, ...prev].slice(0, RECENT));
+            setPicked(letter);
           }}
         />
       )}

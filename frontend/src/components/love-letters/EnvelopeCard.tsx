@@ -30,7 +30,7 @@ export function EnvelopeCard({ letter, mine, partnerName, open, onOpen }: Envelo
         <span className="text-sm font-semibold text-white line-clamp-1">{letter.heading}</span>
       </span>
 
-      <span className="absolute inset-0 z-10 rounded-xl bg-neutral-900 border border-neutral-800 group-hover:border-neutral-700 transition" />
+      <span className="absolute inset-0 z-10 rounded-xl bg-neutral-900 border border-neutral-800 group-hover:border-rose-400/30 transition" />
 
       <span
         aria-hidden
