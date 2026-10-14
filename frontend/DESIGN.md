@@ -24,6 +24,8 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `focusRing` | 2px `rose-400/50` ring, offset 2, offset color `neutral-950` | Every interactive element (`Sidebar.tsx` uses a `neutral-900` offset because it sits on the sidebar) |
 | `primaryButton` | Rose fill, `px-5 py-3 rounded-xl font-medium`, rose glow shadow | The one main action of a view |
 | `secondaryButton` | `neutral-800` fill, `neutral-700` border, `px-4 py-2.5 rounded-xl text-sm font-medium` | Every other button |
+| `inverseButton` | White fill, `text-rose-700`, white focus ring offset on `rose-600` | The primary action when it sits on a rose block (the letters "Your turn" card) |
+| `Seal` | 32px initial circle, rose for the partner, neutral for you | The sender on a letter row or envelope |
 | `iconClass` | `w-4 h-4 text-rose-400` | The icon in a card header or stat label |
 | `Badge` | Status pill, `tone` = `rose` / `emerald` / `neutral` | Status only (see section 3) |
 | `CardHeader` | Rose icon + `text-sm text-neutral-400` label, badge on the right | The top line of every summary card |
@@ -125,7 +127,8 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 
 | Role | Classes |
 |---|---|
-| Page title (h1, header card) | `text-2xl md:text-3xl font-bold text-white` |
+| Page title (h1, header card) | `text-2xl md:text-3xl font-bold text-white` (the two love-letter pages go bigger on purpose: `text-2xl sm:text-3xl md:text-5xl leading-tight`, subtitle `text-lg mt-2`) |
+| Year heading in a long collection | `text-3xl md:text-4xl font-bold text-white tabular-nums` beside a `h-px flex-1 bg-neutral-800` rule |
 | Centered state title (not paired, error, 404) | `text-2xl font-bold text-white mb-2` |
 | Hero number (Together counter) | `text-4xl md:text-5xl font-bold text-white tabular-nums`; unit in `text-2xl md:text-3xl font-semibold text-neutral-300` |
 | Stat value | `text-2xl font-bold text-white tabular-nums` (Partner activity: `text-2xl md:text-3xl`) |
@@ -287,11 +290,21 @@ Use `Modal` from `Card.tsx`. It renders the parts below. Pass `wide` (`max-w-xl`
 ### Envelope (letters collection)
 
 `EnvelopeCard` in `components/love-letters/`. A letter shown as the back of a sealed envelope, `aspect-[3/2]`:
-- Body: `rounded-xl bg-neutral-900 border border-neutral-800`, `hover:border-rose-400/30`. No shadow, no lift.
-- Flap: a triangle over the top 42%, `fill-neutral-800` with `stroke-neutral-700` edges.
+- Body (`rounded-xl`): yours are charcoal (`bg-neutral-900 border-neutral-800`, flap `fill-neutral-800` with `stroke-neutral-700` edges). The partner's are wine (`bg-rose-950 border-rose-900`, flap `fill-rose-900` with `stroke-rose-800`, meta `text-rose-200/80`), so the box shows who wrote what. Hover: `border-rose-400/50`. No shadow, no lift.
+- Flap: a triangle over the top 42%.
 - Seal: a 32px circle on the flap's tip with `ring-4 ring-neutral-900`, holding the initial of the name the letter was signed with. `bg-rose-500` when the partner sent it, `bg-neutral-700` when you did.
 - Address, bottom left: the heading (`font-semibold text-white line-clamp-1`) over a meta row ("From Mika · 14 Oct", plus a music icon when a song is attached).
 - Opening it is the one choreographed motion in the app (see section 10).
+
+### Letter sheet (`LetterReader`)
+
+How an open letter reads, on the desk and in the envelope box's modal:
+- A postage stamp leads the header: `w-16 h-20 md:w-20 md:h-24 -rotate-3 rounded-lg`, the sender's initial (`text-3xl md:text-4xl font-bold`) over the short date. `bg-rose-600` with a dashed `outline-white/50` perforation for the partner, `bg-neutral-800` with `outline-neutral-600` for you. The perforation is the one other place dashes are allowed.
+- Heading `text-2xl md:text-4xl font-bold leading-tight`. Body `text-lg leading-relaxed`, the greeting in `text-rose-400 font-semibold`, and the signature right-aligned in `text-2xl font-semibold` under a `w-12 h-px bg-rose-400/60` rule.
+
+### Turn card (Love letters desk)
+
+Live state for whose turn it is to write. When the partner wrote last: a solid `rounded-2xl bg-rose-600 p-6 text-white` block ("Your turn", "Mika wrote to you yesterday.") with a full-width `inverseButton`. This is the view's one rose primary. When you wrote last: a plain `${surface} p-6` "Waiting on Mika" card with a `secondaryButton`. Use `rose-600`, not `rose-500`, under white body text (4.7:1).
 
 ### Avatars
 

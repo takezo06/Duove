@@ -3,12 +3,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { Mails, PenLine } from 'lucide-react';
-import { Avatar, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, inverseButton, primaryButton, secondaryButton, surface } from '../components/Card';
 import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
 import { RecentLetters } from '../components/love-letters/RecentLetters';
 import { SendLetterModal } from '../components/love-letters/SendLetterModal';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
+import { daysAgo } from '../lib/when';
 
 const RECENT = 6;
 const READER_ID = 'open-letter';
@@ -28,6 +29,7 @@ export function LoveLetters() {
   const [me, setMe] = useState({ id: '', name: '' });
   const [partnerName, setPartnerName] = useState('your partner');
   const [picked, setPicked] = useState<Letter | null>(null);
+  const [counts, setCounts] = useState<{ sent: number; received: number } | null>(null);
   const [composing, setComposing] = useState(Boolean(compose));
   const [attempt, setAttempt] = useState(0);
   const reader = useRef<HTMLElement>(null);
@@ -39,11 +41,15 @@ export function LoveLetters() {
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         const headers = { Authorization: `Bearer ${token}` };
         const api = import.meta.env.VITE_BACKEND_URL;
-        const [rel, list, profile] = await Promise.all([
+        const [rel, list, profile, stats] = await Promise.all([
           axios.get(`${api}/relationships/me`, { headers }),
           axios.get(`${api}/love-letters?limit=${RECENT}`, { headers }),
           supabase.from('profiles').select('display_name').eq('id', user?.id ?? '').single(),
+          // the totals are a nice-to-have; the page works without them
+          axios.get(`${api}/relationships/stats`, { headers }).catch(() => null),
         ]);
+        const totals = stats?.data?.stats;
+        if (totals) setCounts({ sent: totals.letters_sent, received: totals.letters_received });
         if (!rel.data?.relationship) { setUnpaired(true); return; }
         setPartnerName(rel.data.partner?.display_name || 'your partner');
         setMe({ id: user?.id ?? '', name: profile.data?.display_name ?? '' });
@@ -112,26 +118,30 @@ export function LoveLetters() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <section className={`${surface} p-6 md:p-8`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Love letters</h1>
-            <p className="text-neutral-400 mt-1">
-              {letters.length > 0
-                ? <>Write to {partner}, or read what's new.</>
-                : <>Everything you and {partner} write to each other lives here.</>}
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white leading-tight">Love letters</h1>
+            <p className="text-neutral-400 mt-2 text-lg">
+              Everything you and {partner} have put in writing.
             </p>
-          </div>
-          {letters.length > 0 && (
-            <div className="flex flex-wrap gap-3 shrink-0">
-              <Link to="/letters/all" className={secondaryButton}>
+            {letters.length > 0 && (
+              <Link to="/letters/all" className={`${secondaryButton} mt-5`}>
                 <Mails className="w-4 h-4" aria-hidden />
-                All letters
+                Open the envelope box
               </Link>
-              <button onClick={() => setComposing(true)} className={primaryButton}>
-                <PenLine className="w-4 h-4" aria-hidden />
-                Write a letter
-              </button>
-            </div>
+            )}
+          </div>
+          {counts && counts.sent + counts.received > 0 && (
+            <dl className="flex gap-8 md:gap-10">
+              <div>
+                <dt className="text-sm text-neutral-400">From {partnerName}</dt>
+                <dd className="mt-1 text-4xl md:text-5xl font-bold text-rose-400 tabular-nums">{counts.received.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-neutral-400">From you</dt>
+                <dd className="mt-1 text-4xl md:text-5xl font-bold text-white tabular-nums">{counts.sent.toLocaleString()}</dd>
+              </div>
+            </dl>
           )}
         </div>
 
@@ -159,14 +169,38 @@ export function LoveLetters() {
           <section id={READER_ID} ref={reader} aria-label="Open letter" className={`${surface} p-6 md:p-8 scroll-mt-6`}>
             <LetterReader letter={open} mine={isMine(open)} partnerName={partnerName} />
           </section>
-          <RecentLetters
-            letters={letters}
-            openId={open.id}
-            readerId={READER_ID}
-            meId={me.id}
-            partnerName={partnerName}
-            onToggle={toggle}
-          />
+          <div className="space-y-6">
+            {isMine(letters[0]) ? (
+              <section className={`${surface} p-6`}>
+                <h2 className="text-xl font-bold text-white">Waiting on {partnerName}</h2>
+                <p className="mt-1 text-neutral-400">You wrote {daysAgo(letters[0].created_at)}. Nothing says you can't write again.</p>
+                <button onClick={() => setComposing(true)} className={`${secondaryButton} mt-5`}>
+                  <PenLine className="w-4 h-4" aria-hidden />
+                  Write another
+                </button>
+              </section>
+            ) : (
+              <section className="rounded-2xl bg-rose-600 p-6 text-white">
+                <p className="text-sm font-semibold">Your turn</p>
+                <h2 className="mt-2 text-2xl font-bold leading-tight">
+                  {partnerName} wrote to you {daysAgo(letters[0].created_at)}.
+                </h2>
+                <p className="mt-2">Write back while it still feels new.</p>
+                <button onClick={() => setComposing(true)} className={`${inverseButton} mt-5 w-full`}>
+                  <PenLine className="w-4 h-4" aria-hidden />
+                  Write to {partnerName}
+                </button>
+              </section>
+            )}
+            <RecentLetters
+              letters={letters}
+              openId={open.id}
+              readerId={READER_ID}
+              meId={me.id}
+              partnerName={partnerName}
+              onToggle={toggle}
+            />
+          </div>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { Badge, focusRing, surface, toggleRow, toggleRowOff, toggleRowOn } from '../Card';
+import { Badge, Seal, focusRing, surface, toggleRow, toggleRowOff, toggleRowOn } from '../Card';
 import { when } from '../../lib/when';
 import type { Letter } from './LetterReader';
 
@@ -30,22 +30,25 @@ export function RecentLetters({ letters, openId, readerId, meId, partnerName, on
                 onClick={() => onToggle(l)}
                 aria-pressed={on}
                 aria-controls={readerId}
-                className={`${toggleRow} ${on ? toggleRowOn : toggleRowOff}`}
+                className={`${toggleRow} ${on ? toggleRowOn : toggleRowOff} flex items-start gap-3`}
               >
-                <span className="flex items-center justify-between gap-3 min-h-5 text-xs text-neutral-400">
-                  {l.sender_id === meId ? <span>You</span> : <span className="text-rose-400 font-medium">{partnerName}</span>}
-                  {on ? (
-                    <Badge tone="rose">Reading</Badge>
-                  ) : (
-                    <time dateTime={l.created_at} title={new Date(l.created_at).toLocaleString()} className="shrink-0">
-                      {when(l.created_at)}
-                    </time>
-                  )}
+                <Seal name={l.sender_name || (l.sender_id === meId ? 'You' : partnerName)} partner={l.sender_id !== meId} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3 min-h-5 text-xs text-neutral-400">
+                    {l.sender_id === meId ? <span>You</span> : <span className="text-rose-400 font-medium">{partnerName}</span>}
+                    {on ? (
+                      <Badge tone="rose">Reading</Badge>
+                    ) : (
+                      <time dateTime={l.created_at} title={new Date(l.created_at).toLocaleString()} className="shrink-0">
+                        {when(l.created_at)}
+                      </time>
+                    )}
+                  </span>
+                  <span className={`mt-1 font-semibold leading-snug line-clamp-2 break-words transition ${on ? 'text-white' : 'text-white group-hover:text-rose-400'}`}>
+                    {l.heading}
+                  </span>
+                  <span className="mt-1 text-sm text-neutral-400 line-clamp-1 break-words">{l.message}</span>
                 </span>
-                <span className={`mt-1 font-semibold leading-snug line-clamp-2 break-words transition ${on ? 'text-white' : 'text-white group-hover:text-rose-400'}`}>
-                  {l.heading}
-                </span>
-                <span className="mt-1 text-sm text-neutral-400 line-clamp-1 break-words">{l.message}</span>
               </button>
             </li>
           );

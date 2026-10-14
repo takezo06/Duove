@@ -28,19 +28,29 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
 
   return (
     <article>
-      <p className="text-sm text-neutral-400 pr-10">
-        {mine ? <>You to {partner}</> : <>{partner} to you</>}
-        <span aria-hidden> · </span>
-        <time dateTime={letter.created_at}>
-          {new Date(letter.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
-        </time>
-      </p>
-      <h2 className="mt-2 text-2xl font-bold text-white leading-snug break-words">{letter.heading}</h2>
+      <div className="flex items-start gap-4 md:gap-6 pr-10">
+        <Stamp name={letter.sender_name || (mine ? 'You' : partnerName)} partner={!mine} date={letter.created_at} />
+        <div className="min-w-0 pt-1">
+          <p className="text-sm text-neutral-400">
+            {mine ? <>You to {partner}</> : <>{partner} to you</>}
+            <span aria-hidden> · </span>
+            <time dateTime={letter.created_at}>
+              {new Date(letter.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+            </time>
+          </p>
+          <h2 className="mt-2 text-2xl md:text-4xl font-bold text-white leading-tight break-words">{letter.heading}</h2>
+        </div>
+      </div>
 
-      <div className="mt-6 max-w-prose text-neutral-200 leading-relaxed break-words">
-        {letter.recipient_name && <p className="text-neutral-300">{letter.recipient_name},</p>}
-        <p className="mt-4 whitespace-pre-wrap">{letter.message}</p>
-        {letter.sender_name && <p className="mt-6 text-neutral-300">{letter.sender_name}</p>}
+      <div className="mt-8 max-w-prose text-lg text-neutral-200 leading-relaxed break-words">
+        {letter.recipient_name && <p className="text-rose-400 font-semibold">{letter.recipient_name},</p>}
+        <p className="mt-5 whitespace-pre-wrap">{letter.message}</p>
+        {letter.sender_name && (
+          <div className="mt-10 flex flex-col items-end">
+            <span aria-hidden className="w-12 h-px bg-rose-400/60" />
+            <p className="mt-3 text-2xl font-semibold text-white">{letter.sender_name}</p>
+          </div>
+        )}
       </div>
 
       {letter.spotify_track_id && (
@@ -74,5 +84,23 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
         </nav>
       )}
     </article>
+  );
+}
+
+// A postage stamp in the letter's corner: the sender's initial and the day it was sent.
+// Rose for the partner, neutral for you. The dashed outline is the perforation.
+function Stamp({ name, partner, date }: { name: string; partner: boolean; date: string }) {
+  return (
+    <div
+      aria-hidden
+      className={`w-16 h-20 md:w-20 md:h-24 shrink-0 -rotate-3 rounded-lg flex flex-col items-center justify-center outline-2 outline-dashed [outline-offset:-5px] ${
+        partner ? 'bg-rose-600 text-white outline-white/50' : 'bg-neutral-800 text-neutral-200 outline-neutral-600'
+      }`}
+    >
+      <span className="text-3xl md:text-4xl font-bold leading-none">{name.charAt(0).toUpperCase()}</span>
+      <span className="mt-1.5 text-xs font-medium tabular-nums">
+        {new Date(date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+      </span>
+    </div>
   );
 }
