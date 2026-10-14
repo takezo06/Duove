@@ -38,6 +38,11 @@ async function post(url: string, body: Record<string, string> = {}): Promise<Res
   const path = pathOf(url);
   if (path === '/cravings')
     d.setCravings([{ id: crypto.randomUUID(), content: body.content, category: body.category, fulfilled: false, user_id: d.me.id, created_at: new Date().toISOString() }, ...d.cravings]);
+  if (path === '/love-letters') {
+    const letter = { id: crypto.randomUUID(), ...body, sender_id: d.me.id, created_at: new Date().toISOString(), read: false };
+    d.setLetters([letter as (typeof d.letters)[number], ...d.letters]);
+    return ok(letter);
+  }
   if (path === '/relationships/invite') return ok({ invite_code: 'K7Q2M9XD' });
   return ok({});
 }

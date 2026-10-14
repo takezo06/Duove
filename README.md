@@ -67,17 +67,17 @@ A clean workspace displaying all core platform items at a glance:
 
 ## 🛠 Tech Stack
 
-| Frontend | Backend (Local Dev) | Backend (Production) | Database & Auth |
-| :--- | :--- | :--- | :--- |
-| React 19 (Vite + TypeScript) | Node.js 20 + Express 5 | Supabase Edge Functions (Deno) | PostgreSQL (Supabase) |
-| Tailwind CSS 3 | TypeScript Core | Per-entity function handlers | Supabase Auth (JWT) |
-| React Router DOM 7 | Helmet / CORS / Morgan | Shared `_shared/` utilities | Row-Level Security (RLS) |
-| Axios HTTP | Winston Logger | CORS + Auth helpers | Supabase Storage Buckets |
-| Framer Motion | Express Validator / Rate-Limiter | Spotify API integration | |
+| Frontend | Backend | Database & Auth |
+| :--- | :--- | :--- |
+| React 19 (Vite + TypeScript) | Supabase Edge Functions (Deno) | PostgreSQL (Supabase) |
+| Tailwind CSS 3 | Per-entity function handlers | Supabase Auth (JWT) |
+| React Router DOM 7 | Shared `_shared/` utilities | Row-Level Security (RLS) |
+| Axios HTTP | CORS + Auth helpers | Supabase Storage Buckets |
+| Framer Motion | Spotify API integration | |
 
 **Key libraries:**
 - **Frontend**: `@supabase/supabase-js` v2 (auth + realtime), `axios` (API calls), `framer-motion` (animations), `lucide-react` (icons), `react-router-dom` v7
-- **Backend**: `@supabase/supabase-js` v2 (two-client pattern: anon + service role), `jsonwebtoken`, `node-cron` (scheduler), `winston` (logging), `express-validator`, `express-rate-limit`
+- **Backend**: `@supabase/supabase-js` v2 (two-client pattern: anon + service role)
 - **Database**: Full RLS policies on all tables, UUID primary keys, CASCADE deletes on relationships
 
 ---
@@ -89,7 +89,7 @@ A clean workspace displaying all core platform items at a glance:
 * npm >= 9.x
 * A verified Supabase Account (project with auth, database, and storage)
 * A registered Spotify Developer Application (for song search/embeds)
-* (Optional) Docker — for local Postgres via `docker-compose.yml`
+* Supabase CLI (to deploy or serve the edge functions)
 
 ### 1. Clone the Repository
 ```
@@ -108,14 +108,13 @@ chmod +x setup-env.sh
 
 > ⚠️ **Manual Override**: If you choose to configure parameters manually, create `duove-backend/.env` and `frontend/.env.local` using the definitions outlined in the Environment Variables section below.
 
-### 3. Initialize & Launch Backend Core
+### 3. Run the Edge Functions Locally (optional)
 ```
 cd duove-backend
-npm install
-npm run dev
+supabase functions serve --env-file .env
 ```
 
-*The local Express API listens on port 5000. The local dev server serves as a reference implementation; production traffic flows through Supabase Edge Functions.*
+*Or skip this and point the frontend at your deployed functions.*
 
 ### 4. Initialize & Launch Frontend Workspace
 ```
@@ -141,37 +140,26 @@ npm run dev
 
 The interactive setup script (`setup-env.sh`) handles creating these files safely. Ensure your live keys match these definitions:
 
-### Backend Configuration (`duove-backend/.env`)
+### Edge Function Secrets (`duove-backend/.env`)
 
 ```
-PORT=5000
-NODE_ENV=development
 SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_JWT_SECRET=your-secure-jwt-secret-string
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-secret
 SUPABASE_ANON_KEY=your-supabase-anon-public-key
 SPOTIFY_CLIENT_ID=your-spotify-developer-client-id
 SPOTIFY_CLIENT_SECRET=your-spotify-developer-client-secret
-FRONTEND_URL=http://localhost:5173
 ```
 
 ### Frontend Configuration (`frontend/.env.local`)
 
-In **local development**, point to the Express backend:
-```
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-public-key
-VITE_BACKEND_URL=http://localhost:5000
-```
-
-In **production**, the frontend calls Supabase Edge Functions directly:
+The frontend calls Supabase Edge Functions directly (use `http://127.0.0.1:54321/functions/v1` with `supabase functions serve`):
 ```
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-public-key
 VITE_BACKEND_URL=https://your-project-id.supabase.co/functions/v1
 ```
 
-> 🛑 **Security Guardrail**: Never expose `SUPABASE_SERVICE_ROLE_KEY` or `SPOTIFY_CLIENT_SECRET` into frontend builds. These represent high-privileged administrative actions restricted exclusively to server-side code (Express backend or Supabase Edge Functions with `Deno.env.get`).
+> 🛑 **Security Guardrail**: Never expose `SUPABASE_SERVICE_ROLE_KEY` or `SPOTIFY_CLIENT_SECRET` into frontend builds. These represent high-privileged administrative actions restricted exclusively to server-side code (Supabase Edge Functions via `Deno.env.get`).
 
 ---
 
@@ -180,39 +168,6 @@ VITE_BACKEND_URL=https://your-project-id.supabase.co/functions/v1
 duove/
 ├── frontend/
 │   ├── public/               # Static vector assets (logo, favicon, icons)
-│   ├── src/
-│   │   ├── App.tsx            # React Router v7 — auth-gated + public routes
-│   │   ├── main.tsx           # React 19 root, AuthProvider, global CSS
-│   │   ├── index.css          # Tailwind + custom animations
-│   │   ├── context/           # AuthContext (Supabase session management)
-│   │   ├── lib/               # supabase.ts client, utils.ts (cn helper)
-│   │   ├── hooks/             # useDashboardData, useCycleData, useDailyTip, usePageTitle
-│   │   ├── layouts/           # ProtectedLayout (animated loader + sidebar shell)
-│   │   ├── components/
-│   │   │   ├── Sidebar.tsx    # Resizable/collapsible nav with unread badge
-│   │   │   ├── BentoGrid.tsx  # Dashboard grid (6 cards)
-│   │   │   ├── ProtectedRoute.tsx
-│   │   │   ├── ui/            # shadcn-style primitives (button, card, dialog, etc.)
-│   │   │   ├── cycle/         # CycleTracker components (10 files)
-│   │   │   ├── love-letters/  # Envelope cards, modals, send form (6 files)
-│   │   │   ├── qa/            # Deck, answer form, category modal (5 files)
-│   │   │   └── profile/       # ChangePassword, DeleteAccount, DeleteRelationship
-│   │   └── pages/             # 16 pages (Login, Signup, Dashboard, Cravings, LoveLetters,
-│   │                          #   QA, QAHistory, CycleTracker, CycleAnalytics, CycleLog,
-│   │                          #   Notifications, Partner, Profile, NotFound)
-│
-├── duove-backend/
-│   ├── src/
-│   │   ├── config/            # env.ts, logger.ts (winston), supabase.ts (user client),
-│   │   │                      #   supabaseAdmin.ts (service client singleton)
-│   │   ├── middleware/        # auth.ts (JWT verification), dailyLimit.ts (5/day factory)
-│   │   ├── routes/            # 9 routers: health, account, cravings, cycles, letters,
-│   │   │                      #   notifications, profile, qa, relationships
-│   │   ├── services/          # cravingsService, cycleService (CycleEngine), lettersService,
-│   │   │                      #   limitService, qaService, scheduler.ts (node-cron)
-│   │   ├── app.ts             # Express server (helmet, CORS, morgan, dynamic route mount)
-│   │   ├── index.ts           # Server bootstrapper + graceful shutdown
-│   │   └── __tests__/         # Jest + supertest unit tests (health.test.ts)
 │   ├── sql/
 │   │   └── schema.sql         # Master schema: 10 tables, indexes, RLS policies
 │   ├── supabase/
@@ -229,9 +184,6 @@ duove/
 │   │       ├── profile/        # GET/PATCH profile
 │   │       ├── qa/             # Daily Q&A assignments, answers, history, skip, categories
 │   │       └── relationships/  # Stats, invite, join, anniversary, delete
-│   ├── docker-compose.yml     # Postgres + app containers for local dev
-│   ├── Dockerfile
-│   ├── jest.config.js         # Jest + ts-jest + supertest
 │   └── .env                   # Live credentials (NEVER commit)
 │
 ├── package.json               # Root workspace (placeholder deps)
@@ -242,40 +194,20 @@ duove/
 
 ## 🏗️ API Architecture
 
-Duove uses a **dual-stack API** approach:
-
-### Express Backend (`duove-backend/src/`) — Local Development
-- Runs on **port 5000** via `npm run dev` (nodemon + ts-node)
-- Full feature set: JWT auth, rate limiting, daily usage limits, input validation, Winston logging
-- The auth middleware verifies the bearer token via the Supabase anon client, then routes create either a user-scoped client (RLS-respecting) or a service-role admin client (bypasses RLS)
-- The daily limit middleware enforces 5 actions/day per type (letter, craving, qa) via the `daily_usage` table
-- The scheduler (`scheduler.ts`) uses `node-cron` for weekly prompt assignment, answer reveals, and craving archiving — currently **disabled** (`// startScheduler(); // disabled for now`)
-
-### Supabase Edge Functions (`supabase/functions/`) — Production
+The backend is Supabase Edge Functions (`duove-backend/supabase/functions/`):
 - Deployed via `supabase functions deploy`; production frontend calls them at `https://<project>.supabase.co/functions/v1`
 - Each resource has its own Deno function handler with a shared utility layer (`_shared/`)
-- Simpler implementation: no rate limiting or daily limits, but identical core logic for relationship resolution, cycle predictions, and double-blind Q&A reveal
 - CORS-enabled with wildcard origin; auth via `getUserId()` which extracts and verifies the JWT from the `Authorization` header
 
 ### Data Flow
 1. Frontend calls an API endpoint with the user's Supabase JWT as a Bearer token
-2. The backend (Express or Edge Function) verifies the token and resolves the user's **active relationship**
+2. The edge function verifies the token and resolves the user's **active relationship**
 3. All couple-scoped queries filter on `relationship_id` with RLS policies ensuring users can only access their own relationship's data
 4. Partner data (stats, symptoms, profile names) is accessed via the service-role admin client to bypass RLS restrictions
 
 ---
 
 ## 📦 Deployment
-
-### Server-Side API Target (Railway / Render / Fly.io)
-The Express backend is deployed for local reference and as a fallback. For production, edge functions are the primary API:
-1. Link your live project fork directly to your hosting provider workspace dashboard.
-2. Bind all values from the Backend Environment Variables section into your cloud provider's app variables manager.
-3. Run:
-   ```
-   npm run build
-   npm start
-   ```
 
 ### Edge Functions (Supabase)
 Deploy the edge functions to Supabase:
@@ -297,7 +229,6 @@ Ensure the following secrets are set in your Supabase project dashboard:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_BACKEND_URL` → set to your Supabase Edge Functions URL (e.g. `https://<project>.supabase.co/functions/v1`)
-4. Update CORS configurations on your backend instances to permit authenticated handshakes from your production domain.
 
 ---
 

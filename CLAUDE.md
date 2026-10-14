@@ -11,7 +11,7 @@ Rules:
 ## Backend wiring
 
 - `VITE_BACKEND_URL` is the Supabase Edge Functions base (`…/functions/v1`). Call `${VITE_BACKEND_URL}/<function>/<path>` with no `/api/` prefix.
-- Edge functions live in `duove-backend/supabase/functions/<name>/index.ts`. `duove-backend/src` (Express) is legacy: keep response shapes in sync with it, but the frontend never calls it.
+- Edge functions live in `duove-backend/supabase/functions/<name>/index.ts`. They are the only backend (the old Express server was removed).
 - After changing an edge function, tell the user to run `supabase functions deploy <name>`. Pushing does not deploy them.
 
 ## Design system (frontend)
