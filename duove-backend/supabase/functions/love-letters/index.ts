@@ -37,12 +37,17 @@ serve(async (req) => {
     if (!relationship) return json([]);
     const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "20") || 20, 1), 100);
     const letterId = url.searchParams.get("id");
+    // Cursor paging: `before` is the created_at of the oldest letter the client already has.
+    // ponytail: letters sharing the exact same microsecond would be skipped; add an id tiebreak if that ever happens
+    const before = url.searchParams.get("before");
+    if (before && Number.isNaN(Date.parse(before))) return json({ error: "Invalid before cursor" }, 400);
     let query;
     if (letterId) {
       query = admin.from("love_letters").select("*").eq("id", letterId).eq("relationship_id", relationship.id);
     } else {
-      query = admin.from("love_letters").select("*").eq("relationship_id", relationship.id)
-        .order("created_at", { ascending: false }).limit(limit);
+      query = admin.from("love_letters").select("*").eq("relationship_id", relationship.id);
+      if (before) query = query.lt("created_at", before);
+      query = query.order("created_at", { ascending: false }).limit(limit);
     }
     const { data, error } = await query;
     if (error) return json({ error: error.message }, 500);

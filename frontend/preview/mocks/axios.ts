@@ -7,14 +7,20 @@ const ok = (data: unknown): Res => ({ data });
 const notFound = () => Promise.reject({ response: { status: 404, data: { error: 'No active relationship' } } });
 const pathOf = (url: string) => new URL(url, location.origin).pathname.replace(/^.*\/functions\/v1/, '');
 
-async function get(url: string): Promise<Res> {
+async function get(url: string, config: { params?: Record<string, unknown> } = {}): Promise<Res> {
   const path = pathOf(url);
+  const q = { ...Object.fromEntries(new URL(url, location.origin).searchParams), ...config.params };
   if (path.startsWith('/relationships/pending')) return ok(d.paired ? null : { invite_code: 'K7Q2M9XD' });
   if (!d.paired && /^\/(relationships|cycles|cravings|qa|love-letters)/.test(path)) return notFound();
   if (path === '/relationships/stats') return ok(d.stats);
   if (path === '/relationships/me') return ok({ relationship: d.relationship, partner: d.partner });
   if (path === '/cravings') return ok(d.cravings);
-  if (path === '/love-letters') return ok(d.letters);
+  if (path === '/love-letters') {
+    if (q.id) return ok(d.letters.filter((l) => l.id === q.id));
+    const older = q.before ? d.letters.filter((l) => l.created_at < String(q.before)) : d.letters;
+    if (q.before) await new Promise((r) => setTimeout(r, 400)); // let the "loading more" state show
+    return ok(older.slice(0, Number(q.limit) || 20));
+  }
   if (path === '/love-letters/search-song')
     return ok([
       { id: '4iV5W9uYEdYUVa79Axb7Rh', name: 'Here Comes the Sun', artist: 'The Beatles', albumArt: '' },

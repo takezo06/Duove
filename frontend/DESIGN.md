@@ -4,7 +4,7 @@ The reference for every UI change. Paths are relative to `frontend/`.
 
 **Feel:** dark, warm, personal. A shared journal for two people, not a SaaS dashboard.
 
-**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `pages/LoveLetters.tsx` (list + reading pane), `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
+**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `pages/LoveLetters.tsx` (list + reading pane), `pages/AllLoveLetters.tsx` (envelope collection, lazy loading), `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
 
 **Deliberate choices.** These are intentional. Do not "fix" them, even if a generic design skill suggests it:
 - **Dark-only.** No light theme.
@@ -32,13 +32,14 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `iconButton` | 40px square, `rounded-lg`, `neutral-400` icon that turns white on a `neutral-800` hover | Every icon-only button (add an `aria-label`) |
 | `field` | The input style in section 7 | Every text input and textarea |
 | `Chip` | A `<button>` chip: `active`, optional `cat` for the category tint | Filters (`aria-pressed`) and single choice (`role="radio"`) |
-| `Modal` | Overlay, panel, close button, Escape and overlay click to close. `wide` gives `max-w-xl` | Every dialog |
+| `Modal` | Overlay, panel, close button, Escape and overlay click to close, focus moved in on open and back on close. `wide` gives `max-w-xl` | Every dialog |
 
 Helpers:
 - `src/lib/plural.ts`: `plural(3, 'day')` gives "3 days". Never write `day(s)`.
 - `src/lib/relationshipYear.ts`: all anniversary, monthsary and day-count math. Verify changes with `node frontend/scripts/relationshipYear.check.ts` (from the repo root).
 - `src/lib/cravingCategories.ts`: `CATEGORIES` and `categoryFor()` give each category's icon, `iconColor` and `tint`.
 - `src/lib/apiError.ts`: `apiError(err, fallback)` returns the backend's `{ error }` message or the fallback.
+- `src/lib/groupByDate.ts`: `groupByDate(items, { month: 'long', year: 'numeric' })` splits newest-first items under date headings.
 - `src/lib/when.ts`: `when(iso)` gives relative times ("3h ago", "Yesterday", "Mon", "3 Mar").
 - `components/cycle/constants.ts`: `phaseColors` for cycle phases.
 
@@ -157,8 +158,8 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 
 | Element | Classes |
 |---|---|
-| Page root | `max-w-4xl mx-auto space-y-6` (Dashboard and Love letters: `max-w-6xl`) |
-| Card grids | `grid md:grid-cols-2 gap-4 md:gap-6` (3-up stats: `md:grid-cols-3`; Dashboard: `grid-cols-1 md:grid-cols-2 xl:grid-cols-4`) |
+| Page root | `max-w-4xl mx-auto space-y-6` (Dashboard and both love-letter pages: `max-w-6xl`) |
+| Card grids | `grid md:grid-cols-2 gap-4 md:gap-6` (3-up stats: `md:grid-cols-3`; Dashboard: `grid-cols-1 md:grid-cols-2 xl:grid-cols-4`; envelopes: `grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6`) |
 | Dense number row (3 small stats) | `grid grid-cols-3 gap-3 md:gap-6` |
 
 ### Card padding
@@ -203,7 +204,7 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 | Radius | Used on |
 |---|---|
 | `rounded-2xl` | Cards (`surface`), modal panels, the full-page state card |
-| `rounded-xl` | Buttons (primary and secondary), inputs, `inset` boxes, nav items, error boxes, rows inside a grouped card |
+| `rounded-xl` | Buttons (primary and secondary), inputs, `inset` boxes, nav items, error boxes, rows inside a grouped card, envelopes |
 | `rounded-lg` | Icon buttons, small inline buttons (Delete/Keep), tooltips |
 | `rounded-full` | Badges, pills, chips, avatars, progress bars, dots, round checkboxes |
 | `rounded` | Only as the focus shape of a bare text link |
@@ -262,6 +263,7 @@ Single choice uses `role="radiogroup"`/`radio` with `aria-checked`. Filters use 
 - **Row cards:** `${surface} p-4 flex items-start gap-4 transition hover:border-neutral-700` inside `ul.space-y-3`.
 - **Grouped timeline:** one `${surface} p-2` per day, rows `p-3 md:p-4 rounded-xl hover:bg-neutral-800/50`. The leading icon is a 36px circle (`w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700`) with an optional `w-px bg-neutral-800` thread line.
 - **Reader (list + open item):** for content people read in full (letters). Below `lg` it is the list alone, and a tap opens the item in a `wide` `Modal` (`className="lg:hidden"`). From `lg` up it is `grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start`: the grouped list on the left, and a `sticky top-0 ${surface} p-6 md:p-8 max-h-[calc(100vh-3rem)] overflow-y-auto` pane on the right that always shows the newest item until one is picked. The open row gets `lg:bg-neutral-800` and `aria-current`. The pane ends with Newer and Older `secondaryButton`s. See `LoveLetters.tsx`.
+- **Lazy-loaded list:** for collections that grow forever (all letters). Fetch 30 at a time with a `before` cursor (the oldest item's `created_at`), newest first. An `IntersectionObserver` on a sentinel, rooted at `main` with `rootMargin: '0px 0px 600px 0px'`, loads the next page before the end is visible, and the sentinel holds a visible `secondaryButton` "Load older letters" for keyboards and as a fallback. A failed page shows `role="alert"` text and the button turns into "Try again". When nothing is left, end with one `text-sm text-neutral-400 text-center` line that says so. See `AllLoveLetters.tsx`.
 - **Meta row:** `mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400`, items separated by `<span aria-hidden>·</span>`, with `<time dateTime title>`.
 
 ### Progress
@@ -280,6 +282,15 @@ Use `Modal` from `Card.tsx`. It renders the parts below. Pass `wide` (`max-w-xl`
 - **Close button:** top right, `absolute top-3 right-3 p-2.5 rounded-lg text-neutral-400 hover:text-white ${focusRing}`, `aria-label="Close"`.
 - **Title:** `text-xl font-bold text-white`.
 - Escape and clicking the overlay close it.
+
+### Envelope (letters collection)
+
+`EnvelopeCard` in `components/love-letters/`. A letter shown as the back of a sealed envelope, `aspect-[3/2]`:
+- Body: `rounded-xl bg-neutral-900 border border-neutral-800`, `hover:border-neutral-700`. No shadow, no lift.
+- Flap: a triangle over the top 42%, `fill-neutral-800` with `stroke-neutral-700` edges.
+- Seal: a 32px circle on the flap's tip with `ring-4 ring-neutral-900`, holding the initial of the name the letter was signed with. `bg-rose-500` when the partner sent it, `bg-neutral-700` when you did.
+- Address, bottom left: the heading (`font-semibold text-white line-clamp-1`) over a meta row ("From Mika · 14 Oct", plus a music icon when a song is attached).
+- Opening it is the one choreographed motion in the app (see section 10).
 
 ### Avatars
 
@@ -327,6 +338,7 @@ Use `Modal` from `Card.tsx`. It renders the parts below. Pass `wide` (`max-w-xl`
 - The only movement allowed is the arrow nudge: `group-hover:translate-x-0.5 motion-reduce:transform-none`.
 - `animate-pulse` only on skeletons. `animate-spin` only on `Loader2`.
 - `fadeIn` (`.animate-fadeIn` in `index.css`) is the only custom keyframe. Any other `animate-*` class must be defined in `index.css` before it is used. `animate-fade-in`, `animate-scale-up`, `animate-ambient-slow`, `animate-ambient-delayed` and `animate-infinite-loading` are currently used but **not defined**, so they do nothing.
+- **Envelope open** is the one exception, and only on `EnvelopeCard`. It runs on tap, never on hover: the flap turns up (`rotateX(180deg)`, 200ms), then the letter slides half out (200ms), then the reader opens in a `Modal` at 420ms. Closing plays it back. Under `prefers-reduced-motion` both the motion and the wait are skipped. Don't copy it anywhere else.
 - **Banned:** `hover:scale-*`, `-translate-y` lift on hover, `animate-ping`, pulsing dots, long `duration-300+` choreography, glow shadows on hover.
 
 ---
