@@ -45,12 +45,14 @@ export let cravings = empty
     ];
 export const setCravings = (next: typeof cravings) => { cravings = next; };
 
-export const letters = empty
+export let letters = empty
   ? []
   : [
-      { id: 'l1', heading: 'For the rainy Tuesday you made better', body: 'You showed up with soup and a terrible umbrella.', sender_id: partner.id, sender_name: 'Mika', recipient_id: me.id, created_at: ago(20), read: false },
-      { id: 'l2', heading: 'Six months of you', body: 'Still my favourite person to sit in silence with.', sender_id: me.id, sender_name: 'Jed', recipient_id: partner.id, created_at: ago(400), read: true },
+      { id: 'l1', heading: 'For the rainy Tuesday you made better', message: 'You showed up with soup and a terrible umbrella.', sender_id: partner.id, sender_name: 'Mika', recipient_id: me.id, created_at: ago(20), read: false },
+      { id: 'l2', heading: 'Six months of you', message: 'Still my favourite person to sit in silence with.', sender_id: me.id, sender_name: 'Jed', recipient_id: partner.id, created_at: ago(400), read: true },
     ];
+
+export const setLetters = (next: typeof letters) => { letters = next; };
 
 export const cycles = empty ? [] : [
   { id: 'cy1', user_id: me.id, start_date: day(-54), end_date: day(-50) },

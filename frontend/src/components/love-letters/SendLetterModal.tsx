@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import axios from 'axios';
 import { X, Music, Send, Heart } from 'lucide-react';
+import { focusRing } from '../Card';
+import { apiError } from '../../lib/apiError';
 
 interface SendLetterModalProps {
   onClose: () => void;
@@ -18,6 +20,9 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
   const [selectedSong, setSelectedSong] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [sendError, setSendError] = useState('');
+  const canSend = heading.trim() !== '' && body.trim() !== '' && !sending;
 
   // Fetch user's display name and partner's name
   useEffect(() => {
@@ -51,10 +56,10 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
     fetchNames();
   }, []);
 
-  // Spotify search (unchanged)
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setSearchError('');
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/love-letters/search-song`, {
@@ -62,16 +67,18 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
         params: { q: searchQuery },
       });
       setSearchResults(res.data);
+      if (res.data.length === 0) setSearchError('No songs found. Try another search.');
     } catch (err) {
-      console.error(err);
+      setSearchError(apiError(err, "Couldn't search songs. Try again."));
     } finally {
       setLoading(false);
     }
   };
 
   const handleSend = async () => {
-    if (!heading || !body) return;
+    if (!canSend) return;
     setSending(true);
+    setSendError('');
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       await axios.post(
@@ -80,18 +87,18 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
           heading,
           message: body,
           recipient_name: recipientName,
-          sender_name: senderName,   // include custom sender name
-          spotifyTrackId: selectedSong?.id,
-          spotifyTrackName: selectedSong?.name,
-          spotifyArtistName: selectedSong?.artist,
-          spotifyAlbumArt: selectedSong?.albumArt,
+          sender_name: senderName,
+          spotify_track_id: selectedSong?.id,
+          spotify_track_name: selectedSong?.name,
+          spotify_artist_name: selectedSong?.artist,
+          spotify_album_art: selectedSong?.albumArt,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       onSent();
       onClose();
     } catch (err) {
-      console.error(err);
+      setSendError(apiError(err, "Your letter didn't send. Try again."));
     } finally {
       setSending(false);
     }
@@ -100,8 +107,8 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-4 right-4 text-neutral-400 hover:text-white">
-          <X className="w-5 h-5" />
+        <button onClick={onClose} aria-label="Close" className={`absolute top-3 right-3 p-2.5 rounded-lg text-neutral-400 hover:text-white ${focusRing}`}>
+          <X className="w-5 h-5" aria-hidden />
         </button>
 
         <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
@@ -111,9 +118,10 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
 
         {/* To */}
         <div className="mb-4">
-          <label className="text-sm text-neutral-400 mb-1 block">To</label>
+          <label htmlFor="letter-to" className="text-sm text-neutral-400 mb-1 block">To</label>
           <input
             type="text"
+            id="letter-to"
             value={recipientName}
             onChange={(e) => setRecipientName(e.target.value)}
             className="w-full bg-neutral-800 text-white rounded-lg px-3 py-2 border border-neutral-700 focus:border-rose-400 outline-none"
@@ -122,9 +130,10 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
 
         {/* Heading */}
         <div className="mb-4">
-          <label className="text-sm text-neutral-400 mb-1 block">Heading</label>
+          <label htmlFor="letter-heading" className="text-sm text-neutral-400 mb-1 block">Heading</label>
           <input
             type="text"
+            id="letter-heading"
             value={heading}
             onChange={(e) => setHeading(e.target.value)}
             placeholder="e.g. My favorite memory with you..."
@@ -134,8 +143,9 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
 
         {/* Body */}
         <div className="mb-4">
-          <label className="text-sm text-neutral-400 mb-1 block">Message</label>
+          <label htmlFor="letter-message" className="text-sm text-neutral-400 mb-1 block">Message</label>
           <textarea
+            id="letter-message"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write your heart out..."
@@ -145,9 +155,10 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
 
         {/* From */}
         <div className="mb-4">
-          <label className="text-sm text-neutral-400 mb-1 block">From</label>
+          <label htmlFor="letter-from" className="text-sm text-neutral-400 mb-1 block">From</label>
           <input
             type="text"
+            id="letter-from"
             value={senderName}
             onChange={(e) => setSenderName(e.target.value)}
             placeholder="Your name or nickname"
@@ -163,17 +174,22 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+              aria-label="Search Spotify"
               placeholder="Search Spotify..."
               className="flex-1 bg-neutral-800 text-white rounded-lg px-3 py-2 border border-neutral-700 focus:border-rose-400 outline-none"
             />
             <button
               onClick={handleSearch}
               disabled={loading || !searchQuery.trim()}
-              className="px-3 py-2 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg disabled:opacity-50"
+              aria-label="Search songs"
+              className={`px-3 py-2 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg disabled:opacity-50 ${focusRing}`}
             >
-              <Music className="w-4 h-4" />
+              <Music className="w-4 h-4" aria-hidden />
             </button>
           </div>
+
+          {searchError && <p role="alert" className="text-sm text-rose-300 mb-2">{searchError}</p>}
 
           {searchResults.length > 0 && (
             <div className="max-h-36 overflow-y-auto space-y-2">
@@ -202,19 +218,21 @@ export function SendLetterModal({ onClose, onSent }: SendLetterModalProps) {
                 <p className="text-white text-sm font-medium">{selectedSong.name}</p>
                 <p className="text-neutral-400 text-xs">{selectedSong.artist}</p>
               </div>
-              <button onClick={() => setSelectedSong(null)} className="text-neutral-400 hover:text-white">
-                <X className="w-4 h-4" />
+              <button onClick={() => setSelectedSong(null)} aria-label="Remove song" className={`p-2 rounded-lg text-neutral-400 hover:text-white ${focusRing}`}>
+                <X className="w-4 h-4" aria-hidden />
               </button>
             </div>
           )}
         </div>
 
+        {sendError && <p role="alert" className="text-sm text-rose-300 mb-3">{sendError}</p>}
+
         <button
           onClick={handleSend}
-          disabled={!heading || !body || sending}
+          disabled={!canSend}
           className="w-full py-3 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-lg flex items-center justify-center gap-2 transition"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-4 h-4" aria-hidden />
           {sending ? 'Sending...' : 'Send Letter'}
         </button>
       </div>

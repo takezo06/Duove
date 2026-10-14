@@ -5,6 +5,7 @@ import { LetterCard } from './LetterCard';
 import { LetterDetailModal } from './LetterDetailModal';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { apiError } from '../../lib/apiError';
 
 interface RecentLettersListProps {
   onSelectLetter?: (letter: any) => void;   // optional external control
@@ -13,20 +14,21 @@ interface RecentLettersListProps {
 export function RecentLettersList({ onSelectLetter }: RecentLettersListProps) {
   const [letters, setLetters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [internalSelected, setInternalSelected] = useState<any | null>(null);
 
   const selectedLetter = onSelectLetter ? undefined : internalSelected;  // when external control is active, we don't use internal state
 
   const fetchRecent = async () => {
     const token = (await supabase.auth.getSession()).data.session?.access_token;
-    if (!token) return;
+    if (!token) { setLoading(false); return; }
     try {
       const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/love-letters?limit=6`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLetters(res.data);
     } catch (err) {
-      console.error(err);
+      setError(apiError(err, "Couldn't load your letters. Refresh to try again."));
     } finally {
       setLoading(false);
     }
@@ -56,8 +58,10 @@ export function RecentLettersList({ onSelectLetter }: RecentLettersListProps) {
 
         {loading ? (
           <p className="text-neutral-400 text-sm">Loading...</p>
+        ) : error ? (
+          <p role="alert" className="text-sm text-rose-300">{error}</p>
         ) : letters.length === 0 ? (
-          <p className="text-neutral-500 text-sm">No letters yet. Send your first one!</p>
+          <p className="text-neutral-400 text-sm">No letters yet. Send your first one!</p>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
             {letters.map((letter) => (
