@@ -4,7 +4,7 @@ The reference for every UI change. Paths are relative to `frontend/`.
 
 **Feel:** dark, warm, personal. A shared journal for two people, not a SaaS dashboard.
 
-**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `pages/LoveLetters.tsx` (list + reading pane), `pages/AllLoveLetters.tsx` (envelope collection, lazy loading), `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
+**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `pages/LoveLetters.tsx` (desk: open letter + recent letters), `pages/AllLoveLetters.tsx` (envelope collection, lazy loading), `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
 
 **Deliberate choices.** These are intentional. Do not "fix" them, even if a generic design skill suggests it:
 - **Dark-only.** No light theme.
@@ -30,6 +30,7 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `Avatar` | 64px circle with `ring-4 ring-neutral-900`; `dashed` = missing partner | Profile pictures |
 | `CategoryPill` | Craving category pill (icon + label in the category tint) | Wherever a craving's category appears |
 | `iconButton` | 40px square, `rounded-lg`, `neutral-400` icon that turns white on a `neutral-800` hover | Every icon-only button (add an `aria-label`) |
+| `toggleRow` + `toggleRowOn` / `toggleRowOff` | A full-width row button, `p-3 md:p-4 rounded-xl`. On: `bg-rose-500/10 border-rose-400/20`. Off: transparent border, `neutral-800/60` fill and `neutral-700` border on hover | Rows you tap to open and tap again to close (`aria-pressed`). The heading inside turns `group-hover:text-rose-400` while off, and the on row also shows a `Badge` so state is never color alone |
 | `field` | The input style in section 7 | Every text input and textarea |
 | `Chip` | A `<button>` chip: `active`, optional `cat` for the category tint | Filters (`aria-pressed`) and single choice (`role="radio"`) |
 | `Modal` | Overlay, panel, close button, Escape and overlay click to close, focus moved in on open and back on close. `wide` gives `max-w-xl` | Every dialog |
@@ -262,7 +263,7 @@ Single choice uses `role="radiogroup"`/`radio` with `aria-checked`. Filters use 
 
 - **Row cards:** `${surface} p-4 flex items-start gap-4 transition hover:border-neutral-700` inside `ul.space-y-3`.
 - **Grouped timeline:** one `${surface} p-2` per day, rows `p-3 md:p-4 rounded-xl hover:bg-neutral-800/50`. The leading icon is a 36px circle (`w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700`) with an optional `w-px bg-neutral-800` thread line.
-- **Reader (list + open item):** for content people read in full (letters). Below `lg` it is the list alone, and a tap opens the item in a `wide` `Modal` (`className="lg:hidden"`). From `lg` up it is `grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start`: the grouped list on the left, and a `sticky top-0 ${surface} p-6 md:p-8 max-h-[calc(100vh-3rem)] overflow-y-auto` pane on the right that always shows the newest item until one is picked. The open row gets `lg:bg-neutral-800` and `aria-current`. The pane ends with Newer and Older `secondaryButton`s. See `LoveLetters.tsx`.
+- **Desk (open item + recent list):** for a page whose job is "what's new" (Love letters). From `lg` up: `grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-6 items-start`, the open item in a `${surface} p-6 md:p-8` card on the left and a grouped list of `toggleRow`s on the right. Below `lg` the list sits under the card (`md:grid-cols-2` inside the list on tablets). The newest item from the partner is open by default. Tapping a row opens it (with a `Badge tone="rose"` "Reading"), tapping it again returns to the default, and the card scrolls back into view if it was above the fold. The list ends with a text action to the full collection. See `LoveLetters.tsx`.
 - **Lazy-loaded list:** for collections that grow forever (all letters). Fetch 30 at a time with a `before` cursor (the oldest item's `created_at`), newest first. An `IntersectionObserver` on a sentinel, rooted at `main` with `rootMargin: '0px 0px 600px 0px'`, loads the next page before the end is visible, and the sentinel holds a visible `secondaryButton` "Load older letters" for keyboards and as a fallback. A failed page shows `role="alert"` text and the button turns into "Try again". When nothing is left, end with one `text-sm text-neutral-400 text-center` line that says so. See `AllLoveLetters.tsx`.
 - **Meta row:** `mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400`, items separated by `<span aria-hidden>·</span>`, with `<time dateTime title>`.
 
@@ -286,7 +287,7 @@ Use `Modal` from `Card.tsx`. It renders the parts below. Pass `wide` (`max-w-xl`
 ### Envelope (letters collection)
 
 `EnvelopeCard` in `components/love-letters/`. A letter shown as the back of a sealed envelope, `aspect-[3/2]`:
-- Body: `rounded-xl bg-neutral-900 border border-neutral-800`, `hover:border-neutral-700`. No shadow, no lift.
+- Body: `rounded-xl bg-neutral-900 border border-neutral-800`, `hover:border-rose-400/30`. No shadow, no lift.
 - Flap: a triangle over the top 42%, `fill-neutral-800` with `stroke-neutral-700` edges.
 - Seal: a 32px circle on the flap's tip with `ring-4 ring-neutral-900`, holding the initial of the name the letter was signed with. `bg-rose-500` when the partner sent it, `bg-neutral-700` when you did.
 - Address, bottom left: the heading (`font-semibold text-white line-clamp-1`) over a meta row ("From Mika · 14 Oct", plus a music icon when a song is attached).
@@ -359,6 +360,7 @@ Use `Modal` from `Card.tsx`. It renders the parts below. Pass `wide` (`max-w-xl`
 
 - `focusRing` on every interactive element. `aria-label` on icon-only buttons. `aria-hidden` on decorative icons. `aria-current="page"` on the active nav item. Every input is labelled. Errors use `role="alert"`.
 - Tap targets are at least 40px (`h-10`, `w-10`, or `p-2.5` around a 20px icon).
+- **Tap first, hover second.** Everything a hover shows must also work by tap, so hovers can be generous with color but never carry meaning alone. `tailwind.config.js` sets `future.hoverOnlyWhenSupported`, so `hover:` only applies on devices with a real pointer and a tap never leaves a hover style stuck on a phone.
 - **Breakpoints:** `sm` (640) turns stacked header rows into rows. `md` (768) brings 2-column grids, larger padding, and the expanded sidebar. `xl` (1280) gives the 4-column dashboard.
 - Check every change at **390px** and **1366px** (`npm run preview:mock`, one screenshot each). No horizontal scroll at 390px.
 

@@ -11,6 +11,11 @@ export const primaryButton = `inline-flex items-center justify-center gap-2 px-5
 export const secondaryButton = `inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-sm font-medium transition border border-neutral-700 disabled:opacity-50 cursor-pointer ${focusRing}`;
 export const iconClass = 'w-4 h-4 text-rose-400';
 export const iconButton = `w-10 h-10 shrink-0 flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400 ${focusRing}`;
+// A row you tap to open and tap again to close (aria-pressed). Pair with toggleRowOn or toggleRowOff;
+// headings inside take group-hover:text-rose-400 while off.
+export const toggleRow = `group w-full text-left p-3 md:p-4 rounded-xl border transition cursor-pointer ${focusRing}`;
+export const toggleRowOn = 'bg-rose-500/10 border-rose-400/20';
+export const toggleRowOff = 'border-transparent hover:bg-neutral-800/60 hover:border-neutral-700';
 export const field =
   'w-full bg-neutral-800/50 text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition';
 
