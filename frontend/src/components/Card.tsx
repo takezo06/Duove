@@ -94,6 +94,32 @@ export function Seal({ name, partner, className = '' }: { name: string; partner:
   );
 }
 
+// A card on top of its pile: two cards behind it, each narrower and lower so their edges step
+// out underneath, the last one slightly askew (half as much from md up, where the card is wide).
+// Drawn with borders and contrast (never a shadow) and still (no motion). `className` pads the top card.
+export function Deck({ className = '', children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className="relative pb-6">
+      <div aria-hidden className="absolute inset-x-6 md:inset-x-10 top-0 bottom-6 translate-y-6 rotate-1 md:rotate-[0.5deg] rounded-2xl bg-neutral-800 border border-neutral-700" />
+      <div aria-hidden className="absolute inset-x-3 md:inset-x-5 top-0 bottom-6 translate-y-3 rounded-2xl bg-neutral-900 border border-neutral-700" />
+      <div className={`relative ${surface} ${className}`}>{children}</div>
+    </div>
+  );
+}
+
+// The back of a card still face down: wine like the partner's envelopes, an inset frame and
+// their seal in the middle. Children say what's under it.
+export function CardBack({ name, label, children }: { name: string; label: string; children: ReactNode }) {
+  return (
+    <section aria-label={label} className="rounded-2xl bg-rose-950 border border-rose-900 p-2">
+      <div className="h-full rounded-xl border border-rose-900 px-4 py-10 flex flex-col items-center justify-center text-center">
+        <Seal name={name} partner />
+        {children}
+      </div>
+    </section>
+  );
+}
+
 // Category pill on each craving: same shape as the selected chip, smaller
 export function CategoryPill({ cat }: { cat: Category }) {
   return (

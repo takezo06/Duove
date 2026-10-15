@@ -26,9 +26,10 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
       { id: '4iV5W9uYEdYUVa79Axb7Rh', name: 'Here Comes the Sun', artist: 'The Beatles', albumArt: '' },
       { id: '3n3Ppam7vgaVa1iaRUc9Lp', name: 'Mr. Brightside', artist: 'The Killers', albumArt: '' },
     ]);
-  if (path === '/qa/current') return ok(d.question);
+  if (path === '/qa/current')
+    return d.question ? ok(d.question) : Promise.reject({ response: { status: 404, data: { error: 'No questions available' } } });
   if (path === '/qa/history') return ok({ items: d.qaHistory, hasMore: false, nextCursor: null });
-  if (path === '/qa/categories') return ok([]);
+  if (path === '/qa/categories') return ok(d.qaCategories);
   if (path === '/cycles/stats' || path === '/cycles/partner/stats')
     return ok({ prediction: d.prediction, calendar: [], lastPeriodStart: d.cycles.at(-1)?.start_date ?? null, partnerName: d.partner.display_name });
   if (path.startsWith('/cycles/')) return ok([]);
@@ -39,7 +40,8 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
   return ok({});
 }
 
-async function patch(url: string): Promise<Res> {
+async function patch(url: string, body: Record<string, string | null> = {}): Promise<Res> {
+  if (pathOf(url) === '/qa/preferred-category' && d.question) d.question.preferredCategoryId = body.category_id;
   const m = pathOf(url).match(/^\/cravings\/(.+)\/toggle$/);
   if (m) d.setCravings(d.cravings.map((c) => (c.id === m[1] ? { ...c, fulfilled: !c.fulfilled, fulfilled_at: c.fulfilled ? null : new Date().toISOString() } : c)));
   return ok({});
@@ -60,6 +62,15 @@ async function post(url: string, body: Record<string, string> = {}): Promise<Res
     d.setLetters([letter as (typeof d.letters)[number], ...d.letters]);
     return ok(letter);
   }
+  if (path === '/qa/submit' && d.question) {
+    const q = d.question;
+    q.yourAnswer = { answer_text: body.answer_text, submitted_at: new Date().toISOString() };
+    q.bothAnswered = q.revealed = q.partnerAnswered;
+    q.partnerAnswer = q.partnerAnswered ? d.qaPartnerAnswer : null;
+    return ok({ message: '' });
+  }
+  if (path === '/qa/skip' && d.question)
+    d.question.question = { id: 'q2', question_text: 'If we could spend one whole day doing nothing together, what would it look like?', category_id: 'cat-dreams' };
   if (path === '/relationships/invite') return ok({ invite_code: 'K7Q2M9XD' });
   return ok({});
 }
