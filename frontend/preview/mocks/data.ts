@@ -96,16 +96,26 @@ export const prediction = empty ? null : {
 };
 
 export const question = empty ? null : {
-  question: { id: 'q1', question_text: 'What is a small habit of mine you secretly love?', category: 'Deep' },
-  yourAnswer: null,
-  partnerAnswer: null,
+  question: { id: 'q1', question_text: 'What is a small habit of mine you secretly love?', category_id: 'cat-deep' },
+  yourAnswer: null as { answer_text: string; submitted_at: string } | null,
+  partnerAnswer: null as { answer_text: string; submitted_at: string } | null,
   partnerAnswered: true,
   bothAnswered: false,
   revealed: false,
   partnerName: partner.display_name,
   nextQuestionAvailableIn: 6 * 3600 + 42 * 60,
-  preferredCategoryId: null,
+  preferredCategoryId: null as string | null,
 };
+
+// Mika's answer to today's question, revealed once you answer (matches qaHistory h1)
+export const qaPartnerAnswer = { answer_text: 'The way you hum while cooking.', submitted_at: ago(3) };
+
+export const qaCategories = [
+  { id: 'cat-deep', name: 'deep', description: 'Questions that go a little further', icon: 'brain' },
+  { id: 'cat-fun', name: 'fun', description: 'Light ones for a lazy evening', icon: 'smile' },
+  { id: 'cat-dreams', name: 'dreams', description: 'Plans, wishes and somedays', icon: 'compass' },
+  { id: 'cat-memories', name: 'memories', description: 'Looking back at the two of you', icon: 'heart' },
+];
 
 const qa = (id: string, offset: number, text: string, mine: string | null, theirs: string | null) => ({
   id, assigned_date: day(offset), revealed_at: mine && theirs ? ago(-offset * 24) : null,

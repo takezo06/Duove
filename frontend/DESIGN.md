@@ -4,7 +4,7 @@ The reference for every UI change. Paths are relative to `frontend/`.
 
 **Feel:** dark, warm, personal. A shared journal for two people, not a SaaS dashboard.
 
-**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `pages/LoveLetters.tsx` (desk: open letter + recent letters), `pages/AllLoveLetters.tsx` (envelope collection, lazy loading), `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
+**Reference pages** (follow these when this doc is silent): `components/BentoGrid.tsx` (Dashboard), `pages/Cravings.tsx`, `pages/Partner.tsx`, `pages/Notifications.tsx`, `pages/QAHistory.tsx`, `pages/LoveLetters.tsx` (desk: open letter + recent letters), `pages/AllLoveLetters.tsx` (envelope collection, lazy loading), `pages/QA.tsx` (question deck, face-down answers), `components/Sidebar.tsx`. Everything listed under [Known drift](#known-drift) is older code. Do not copy from it.
 
 **Deliberate choices.** These are intentional. Do not "fix" them, even if a generic design skill suggests it:
 - **Dark-only.** No light theme.
@@ -27,7 +27,9 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `primaryButton` | Rose fill, `px-5 py-3 rounded-xl font-medium`, rose glow shadow | The one main action of a view |
 | `secondaryButton` | `neutral-800` fill, `neutral-700` border, `px-4 py-2.5 rounded-xl text-sm font-medium` | Every other button |
 | `inverseButton` | White fill, `text-rose-700`, white focus ring offset on `rose-600` | The primary action when it sits on a rose block (the letters "Your turn" card) |
-| `Seal` | 32px initial circle, rose for the partner, neutral for you | The sender on a letter row or envelope |
+| `Seal` | 32px initial circle, rose for the partner, neutral for you | The sender on a letter row or envelope, the owner of an answer card |
+| `Deck` | A `surface` card on a pile of two: the cards behind step out underneath (`inset-x-3`/`inset-x-6`, `md:inset-x-5`/`md:inset-x-10`, `translate-y-3`/`translate-y-6`), lit by `neutral-700` borders and a `neutral-800` back card, the last one `rotate-1` (`md:rotate-[0.5deg]`). No shadow, no motion | The one item a page is about when it is one of many (today's question). See [Question deck](#question-deck-daily-qa) |
+| `CardBack` | A face-down card: wine `bg-rose-950 border-rose-900`, an inset `rounded-xl border-rose-900` frame, the partner's `Seal` in the middle | Something of the partner's you can't see yet (their answer before you've written yours) |
 | `iconClass` | `w-4 h-4 text-rose-400` | The icon in a card header or stat label |
 | `Badge` | Status pill, `tone` = `rose` / `emerald` / `neutral` | Status only (see section 3) |
 | `CardHeader` | Rose icon + `text-sm text-neutral-400` label, badge on the right | The top line of every summary card |
@@ -133,7 +135,7 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 | Centered state title (not paired, error, 404) | `text-2xl font-bold text-white mb-2` |
 | Hero number (Together counter) | `text-4xl md:text-5xl font-bold text-white tabular-nums`; unit in `text-2xl md:text-3xl font-semibold text-neutral-300` |
 | Stat value | `text-2xl font-bold text-white tabular-nums` (Partner activity: `text-2xl md:text-3xl`) |
-| Content headline in a card (today's question, letter heading, phase, quote) | `text-lg font-semibold text-white leading-snug`, plus `line-clamp-2` or `line-clamp-3` in previews. An open letter's heading uses the modal title size (`text-xl font-bold`) |
+| Content headline in a card (today's question, letter heading, phase, quote) | `text-lg font-semibold text-white leading-snug`, plus `line-clamp-2` or `line-clamp-3` in previews. An open letter's heading and the question on the Q&A deck use the modal title size (`text-xl font-bold`) |
 | Card label / stat label | `text-sm text-neutral-400` beside a rose `iconClass` icon (`CardHeader`) |
 | Page subtitle (title-only header) | `text-neutral-400 mt-1` (base size) |
 | Meta line under a title (date, "Paired on …") | `text-sm text-neutral-400 mt-1` |
@@ -217,7 +219,7 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 Never `rounded-md`, `rounded-sm` or `rounded-3xl`.
 
 - **Borders:** always 1px, in `border-neutral-800` (cards, dividers) or `border-neutral-700` (inputs, controls). Dashed only for the missing-partner avatar. **No one-sided colored borders.**
-- **Elevation comes from borders and contrast, not shadows.** Cards have no shadow. The only shadows are the rose glow built into `primaryButton`, `shadow-xl` on the sidebar tooltip, and `shadow-2xl` on a modal panel.
+- **Elevation comes from borders and contrast, not shadows.** Cards have no shadow. A pile of cards (`Deck`) shows depth with lighter borders and a lighter back card, not a shadow. The only shadows are the rose glow built into `primaryButton`, `shadow-xl` on the sidebar tooltip, and `shadow-2xl` on a modal panel.
 
 ---
 
@@ -307,6 +309,16 @@ How an open letter reads, on the desk and in the envelope box's modal:
 ### Turn card (Love letters desk)
 
 Live state for whose turn it is to write. When the partner wrote last: a solid `rounded-2xl bg-rose-600 p-6 text-white` block ("Your turn", "Mika wrote to you yesterday.") with a `text-sm` label, a `text-lg font-semibold leading-snug` line and a full-width `inverseButton`. This is the view's one rose primary. When you wrote last: a plain `${surface} p-6` "Waiting on Mika" card with a `secondaryButton`. Use `rose-600`, not `rose-500`, under white body text (4.7:1).
+
+### Question deck (Daily Q&A)
+
+How the daily question plays out, as cards on a table. See `QA.tsx`.
+- **The question** is the top card of a `Deck` (`p-6 md:p-8`): `CardHeader` with the topic's icon as its suit and its name as the label ("Today's question" without one), the status badge on the right ("Your turn", "Waiting on Mika", "Both answered"), the question in `text-xl font-bold leading-snug`, and its actions ("Skip this question" while nobody has answered, "Topic: Deep") as `secondaryButton`s under a `mt-6 pt-6 border-t` divider.
+- **The answers** sit under it in `grid md:grid-cols-2 gap-4 md:gap-6`, yours first. Each opens with its owner: a `Seal`, the name ("You" in white, the partner in rose) and a `text-xs` line under it ("Answered 3h ago", "Mika is waiting on you").
+- **Yours** is a `${surface} p-6` form until you send it: the textarea and the page's one `primaryButton` ("Send answer").
+- **Theirs** is a `CardBack` while it's hidden ("Mika answered", "It turns over when you send yours." in `text-rose-200/80`), a plain card saying they haven't answered yet, or face up once you both have. Face-up answers are body text (`text-neutral-200 leading-relaxed whitespace-pre-wrap`).
+- The header card's meta line carries the live countdown ("Next question in 6h 42m"), never an `HH:MM:SS` clock.
+- The topic picker is a `Modal` of `toggleRow`s with `role="radio"`; the chosen one shows `Badge tone="neutral"` "Current".
 
 ### Avatars
 
@@ -434,9 +446,7 @@ This is older code that breaks the rules above. Fix it when you touch the file, 
 | File | Problem | Fix |
 |---|---|---|
 | `layouts/ProtectedLayout.tsx` (loader) | Gradients, gradient text, blurred glow, `animate-ping`, undefined `animate-fade-in` / `animate-infinite-loading`, `tracking-wider` | Plain `neutral-950` screen with the logo and a skeleton or simple spinner |
-| `components/qa/QACategoryModal.tsx` | `backdrop-blur` overlay | `Modal` |
 | `pages/Profile.tsx` + `components/profile/*` | Icon-in-square heading, `red-*` danger buttons, hand-typed buttons, `text-neutral-500` text, unlabelled icon buttons, page `px-4 py-8`, `max-w-2xl` | Header card with `Avatar`, rose destructive buttons with inline confirm, primitives |
-| `pages/QA.tsx` + `components/qa/*` | `Sparkles`, `max-w-lg` page, hand-typed buttons, `rounded` skeleton bars | `max-w-4xl` page with a header card, primitives |
 | `pages/CycleTracker.tsx` + `components/cycle/*` | `Sparkles` tip, blur in `CycleCircle`, hand-typed buttons, em dashes in `StatsCards` | Primitives, `CardHeader`, no em dashes |
 | `pages/CycleLog.tsx`, `pages/CycleAnalytics.tsx` | `red-*` error box, `max-w-2xl`, page padding, em dashes | Error-box spec, `max-w-4xl` |
 | `pages/NotFound.tsx` | Page padding, icon-in-square, `shadow-xl` card, hand-typed primary | Centered state card spec, primitives |
