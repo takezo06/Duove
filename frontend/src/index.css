@@ -5,29 +5,5 @@
 @layer base {
   :root {
     --radius: 0.5rem;   /* This is what Tailwind's rounded-lg uses */
-    --color-accent: #fb7185;
-    --color-accent-glow: rgba(251, 113, 133, 0.25);
   }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-fadeIn {
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-.scrollbar-thin::-webkit-scrollbar {
-  height: 4px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: #525252;
-  border-radius: 2px;
 }

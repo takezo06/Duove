@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -7,29 +6,15 @@ import {
   Loader2,
   BarChart3,
   AlertTriangle,
-  FileText,
   Download,
-  Calendar,
-  TrendingUp,
-  Activity,
 } from 'lucide-react';
-
-interface SymptomLog {
-  log_date: string;
-  bleeding_intensity: string | null;
-  physical_symptoms: string[];
-  moods: string[];
-  lifestyle: any;
-}
 
 export function CycleAnalytics() {
   usePageTitle('Cycle Analytics');
   const [loading, setLoading] = useState(true);
-  const [symptoms, setSymptoms] = useState<SymptomLog[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [anomalies, setAnomalies] = useState<string[]>([]);
   const [symptomFrequency, setSymptomFrequency] = useState<Record<string, number>>({});
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,7 +28,6 @@ export function CycleAnalytics() {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
-        setSymptoms(symptomsRes.data);
         setCycles(cyclesRes.data);
 
         // Detect anomalies: variation > 7 days or bleeding > 8 days

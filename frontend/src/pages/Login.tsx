@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Heart, Mail, Lock, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 export function Login() {

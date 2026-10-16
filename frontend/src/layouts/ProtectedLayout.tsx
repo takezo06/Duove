@@ -66,7 +66,7 @@ export function ProtectedLayout() {
             
             {/* Micro-Interaction Carousel Message */}
             <div className="h-5 overflow-hidden">
-              <p className="text-sm font-medium text-neutral-400 transition-all duration-500 transform translate-y-0 animate-fade-in key={messageIndex}">
+              <p className="text-sm font-medium text-neutral-400 transition-all duration-500 transform translate-y-0">
                 {LOADING_MESSAGES[messageIndex]}
               </p>
             </div>
@@ -75,7 +75,7 @@ export function ProtectedLayout() {
 
         {/* Minimal Progress Line Indicator */}
         <div className="absolute bottom-12 w-32 h-[3px] bg-neutral-900 rounded-full overflow-hidden border border-neutral-900">
-          <div className="h-full bg-gradient-to-r from-rose-500 to-orange-400 rounded-full animate-infinite-loading" />
+          <div className="h-full bg-gradient-to-r from-rose-500 to-orange-400 rounded-full" />
         </div>
       </div>
     );

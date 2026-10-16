@@ -211,7 +211,6 @@ export function CycleTracker() {
     const remainingDays = avgCycle - bleeds;
     const follicularDays = Math.ceil(remainingDays / 3);
     const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
-    const lutealDays = remainingDays - follicularDays - fertileDays;
 
     const follicularEnd = bleeds + follicularDays;
     const fertileEnd = follicularEnd + fertileDays;

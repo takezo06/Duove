@@ -84,8 +84,6 @@ export function useDashboardData(): DashboardData {
           { headers }
         );
         const stats = statsRes.data;
-        console.log('Partner avatar_url:', stats.partner?.avatar_url);
-        const partnerId = stats.partner?.id;
         const partnerName = stats.partner?.display_name || 'Your Partner';
 
         // Compute days together from anniversary or paired_at
@@ -188,10 +186,11 @@ export function useDashboardData(): DashboardData {
           cravings,
         });
       } catch (err: any) {
-        console.error('Dashboard data fetch error:', err);
+        // 404 means not paired yet: an expected state, not a failure
         if (err.response?.status === 404) {
           setError('No active relationship found. Pair with your partner first.');
         } else {
+          console.error('Dashboard data fetch error:', err);
           setError('Failed to load dashboard data.');
         }
       } finally {
