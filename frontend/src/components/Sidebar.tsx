@@ -111,7 +111,7 @@ export function Sidebar() {
         return;
       }
       if (user) {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('display_name, avatar_url')
           .eq('id', user.id)

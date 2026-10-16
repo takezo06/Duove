@@ -52,7 +52,7 @@ Helpers:
 
 **Adding a new shared style:** add it to `Card.tsx` (styles and components) or `src/lib/` (logic) the first time a second file needs it, then import it everywhere. `Card.tsx` may only export strings and components (fast refresh), so a style that takes arguments becomes a component, like `Chip`.
 
-**Do not use** `src/components/ui/*` (unused shadcn leftovers), the shadcn color tokens in `tailwind.config.js` (`bg-primary`, `border-border`, `bg-card` and so on; the CSS variables behind them are not defined, so they render broken), or `src/App.css` (unused Vite template).
+**Do not use** `src/components/ui/*` (unused shadcn leftovers), or `src/App.css` (unused Vite template).
 
 ---
 
@@ -365,7 +365,7 @@ How the daily question plays out, as cards on a table. See `QA.tsx`.
 - `transition` (Tailwind default, 150ms) on color, border and background changes. That's all most elements need.
 - The only movement allowed is the arrow nudge: `group-hover:translate-x-0.5 motion-reduce:transform-none`.
 - `animate-pulse` only on skeletons. `animate-spin` only on `Loader2`.
-- `fadeIn` (`.animate-fadeIn` in `index.css`) is the only custom keyframe. Any other `animate-*` class must be defined in `index.css` before it is used. `animate-fade-in`, `animate-scale-up`, `animate-ambient-slow`, `animate-ambient-delayed` and `animate-infinite-loading` are currently used but **not defined**, so they do nothing.
+- There are no custom keyframes. Any `animate-*` class beyond Tailwind's built-ins must be defined in `index.css` before it is used.
 - **Envelope open** is the one exception, and only on `EnvelopeCard`. It runs on tap, never on hover: the flap turns up (`rotateX(180deg)`, 200ms), then the letter slides half out (200ms), then the reader opens in a `Modal` at 420ms. Closing plays it back. Under `prefers-reduced-motion` both the motion and the wait are skipped. Don't copy it anywhere else.
 - **Banned:** `hover:scale-*`, `-translate-y` lift on hover, `animate-ping`, pulsing dots, long `duration-300+` choreography, glow shadows on hover.
 
@@ -445,7 +445,7 @@ This is older code that breaks the rules above. Fix it when you touch the file, 
 
 | File | Problem | Fix |
 |---|---|---|
-| `layouts/ProtectedLayout.tsx` (loader) | Gradients, gradient text, blurred glow, `animate-ping`, undefined `animate-fade-in` / `animate-infinite-loading`, `tracking-wider` | Plain `neutral-950` screen with the logo and a skeleton or simple spinner |
+| `layouts/ProtectedLayout.tsx` (loader) | Gradients, gradient text, blurred glow, `animate-ping`, `tracking-wider` | Plain `neutral-950` screen with the logo and a skeleton or simple spinner |
 | `pages/Profile.tsx` + `components/profile/*` | Icon-in-square heading, `red-*` danger buttons, hand-typed buttons, `text-neutral-500` text, unlabelled icon buttons, page `px-4 py-8`, `max-w-2xl` | Header card with `Avatar`, rose destructive buttons with inline confirm, primitives |
 | `pages/CycleTracker.tsx` + `components/cycle/*` | `Sparkles` tip, blur in `CycleCircle`, hand-typed buttons, em dashes in `StatsCards` | Primitives, `CardHeader`, no em dashes |
 | `pages/CycleLog.tsx`, `pages/CycleAnalytics.tsx` | `red-*` error box, `max-w-2xl`, page padding, em dashes | Error-box spec, `max-w-4xl` |

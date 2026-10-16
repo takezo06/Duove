@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'sonner';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { ProtectedLayout } from './layouts/ProtectedLayout';
@@ -41,7 +40,6 @@ function App() {
           {/* add other protected routes here */}
         </Route>
       </Routes>
-      <Toaster />
     </BrowserRouter>
   );
 }

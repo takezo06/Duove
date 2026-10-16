@@ -69,8 +69,6 @@ export function CalendarGrid({
     // Divide into 3 roughly equal parts (follicular, fertile, luteal)
     const follicularDays = Math.ceil(remainingDays / 3);
     const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
-    // whatever is left goes to luteal
-    const lutealDays = remainingDays - follicularDays - fertileDays;
 
     const follicularEnd = bleeds + follicularDays;
     const fertileEnd = follicularEnd + fertileDays;
