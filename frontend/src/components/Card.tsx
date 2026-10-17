@@ -30,6 +30,16 @@ const toneClass: Record<Tone, string> = {
 };
 
 // Status pill: rose = needs you, emerald = done/connected, neutral = info
+// A word in a heading that needs data, while it loads
+export function InlineBar({ w }: { w: string }) {
+  return <span className={`inline-block h-4 ${w} rounded bg-neutral-800 animate-pulse align-middle`} aria-hidden />;
+}
+
+// A badge that is still loading
+export function BadgeBar() {
+  return <span className="block h-5 w-16 rounded-full bg-neutral-800 animate-pulse" aria-hidden />;
+}
+
 export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium whitespace-nowrap ${toneClass[tone]}`}>
@@ -39,7 +49,7 @@ export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
 }
 
 // Card header: rose icon + label on the left, optional status on the right
-export function CardHeader({ icon, title, badge }: { icon: ReactNode; title: string; badge?: ReactNode }) {
+export function CardHeader({ icon, title, badge }: { icon: ReactNode; title: ReactNode; badge?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 min-h-6">
       <h2 className="flex items-center gap-2 text-neutral-400 text-sm">

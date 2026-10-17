@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import axios from 'axios';
-import { Avatar, Badge, CategoryPill, Chip, field, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, BadgeBar, CategoryPill, Chip, InlineBar, field, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { Check, Plus, Trash2, Loader2 } from 'lucide-react';
 import { CATEGORIES, categoryFor } from '../lib/cravingCategories';
 import { when } from '../lib/when';
@@ -84,6 +84,7 @@ export function Cravings() {
           if (res.data.partner?.display_name) setPartnerName(res.data.partner.display_name);
         } else {
           setError('No active relationship found.');
+          setLoading(false);
         }
       } catch (err: any) {
         if (err.response?.status === 404) {
@@ -92,9 +93,9 @@ export function Cravings() {
           console.error('Error fetching relationship:', err);
           setError('Could not fetch relationship details.');
         }
+        setLoading(false);
       } finally {
         setFetchingRelationship(false);
-        setLoading(false);
       }
     };
     fetchUserAndRelationship();
@@ -112,6 +113,8 @@ export function Cravings() {
       setCravings(res.data);
     } catch {
       setError('Could not load cravings.');
+    } finally {
+      setLoading(false);
     }
   }, [relationshipId]);
 
@@ -197,18 +200,6 @@ export function Cravings() {
   const open = filteredCravings.filter((c) => !c.fulfilled);
   const done = filteredCravings.filter((c) => c.fulfilled);
   const totalOpen = cravings.filter((c) => !c.fulfilled).length;
-
-  // Loading skeleton
-  if (fetchingRelationship || loading) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
-        <div className={`${surface} h-56 animate-pulse`} />
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className={`${surface} h-20 animate-pulse`} />
-        ))}
-      </div>
-    );
-  }
 
   // No partner
   if (error && RELATIONSHIP_ERRORS.includes(error)) {
@@ -306,10 +297,12 @@ export function Cravings() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">Cravings</h1>
             <p className="text-neutral-400 mt-1">
-              What you and <span className="text-rose-400 font-semibold">{partnerName}</span> are in the mood for.
+              What you and{' '}
+              {fetchingRelationship ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>}{' '}
+              are in the mood for.
             </p>
           </div>
-          {totalOpen > 0 && <Badge tone="rose">{totalOpen} open</Badge>}
+          {loading ? <BadgeBar /> : totalOpen > 0 && <Badge tone="rose">{totalOpen} open</Badge>}
         </div>
 
         <form onSubmit={handleAddCraving} className="mt-6 pt-6 border-t border-neutral-800">
@@ -382,7 +375,13 @@ export function Cravings() {
       )}
 
       {/* List */}
-      {filteredCravings.length === 0 ? (
+      {loading ? (
+        <div className="space-y-3" aria-busy="true">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className={`${surface} h-20 animate-pulse`} />
+          ))}
+        </div>
+      ) : filteredCravings.length === 0 ? (
         <div className={`${surface} px-6 py-14 text-center`}>
           <p className="text-lg font-semibold text-white">
             {cravings.length === 0 ? 'Nothing on the list yet' : 'Nothing in this category'}

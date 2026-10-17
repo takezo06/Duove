@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Loader2, MessageCircle } from 'lucide-react';
 import { Avatar, Badge, focusRing, inset, primaryButton, secondaryButton, surface } from '../components/Card';
+import { apiError } from '../lib/apiError';
 import { plural } from '../lib/plural';
 
 interface HistoryItem {
@@ -28,6 +29,23 @@ interface HistoryItem {
 }
 
 type Person = { name: string; avatar: string | null };
+
+const PAGE = 30;
+
+// One page of history, newest first. `before` is the assigned_date of the oldest question already shown.
+// The first page also brings the partner.
+async function fetchHistory(before?: string): Promise<{
+  items: HistoryItem[];
+  hasMore: boolean;
+  partner?: { display_name: string; avatar_url: string | null } | null;
+}> {
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/qa/history`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { limit: PAGE, before },
+  });
+  return res.data;
+}
 
 // assigned_date is a plain local date; parse it as local midnight, not UTC
 const localDay = (d: string) => new Date(`${d}T00:00:00`);
@@ -55,83 +73,109 @@ function groupByMonth(items: HistoryItem[]) {
 export function QAHistory() {
   usePageTitle('Daily Q&A');
   const [loading, setLoading] = useState(true);
+  const [unpaired, setUnpaired] = useState(false);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [me, setMe] = useState<Person>({ name: 'You', avatar: null });
+  const [moreError, setMoreError] = useState('');
+  // undefined = still loading
+  const [me, setMe] = useState<Person | undefined>(undefined);
   const [partner, setPartner] = useState<Person | null>(null);
+  const busy = useRef(false);
+  const sentinel = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const fetchHistory = async (cursor?: string) => {
-    setError(null);
-    try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const url = cursor
-        ? `${import.meta.env.VITE_BACKEND_URL}/qa/history?cursor=${cursor}`
-        : `${import.meta.env.VITE_BACKEND_URL}/qa/history`;
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const { items: newItems, hasMore: more, nextCursor: next } = res.data;
-      if (cursor) {
-        setItems((prev) => [...prev, ...newItems]);
-      } else {
-        setItems(newItems);
-      }
-      setHasMore(more);
-      setNextCursor(next);
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Couldn't load your past questions.");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
+  // Your name and avatar only decorate the header: they fill in when they land, and a retry doesn't refetch them
+  useEffect(() => {
+    const load = async () => {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) return;
+      const fallback = { name: 'You', avatar: null };
+      supabase.from('profiles').select('display_name, avatar_url').eq('id', session.user.id).maybeSingle().then(
+        ({ data }) => setMe(data ? { name: data.display_name || 'You', avatar: data.avatar_url || null } : fallback),
+        () => setMe(fallback),
+      );
+    };
+    load();
+  }, []);
 
   useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+    const load = async () => {
+      if (!(await supabase.auth.getSession()).data.session) {
         navigate('/login');
         return;
       }
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      // Names and avatars only decorate the page; the history still shows if they fail
-      const [{ data: profile }, stats] = await Promise.all([
-        supabase.from('profiles').select('display_name, avatar_url').eq('id', user.id).maybeSingle(),
-        axios
-          .get(`${import.meta.env.VITE_BACKEND_URL}/relationships/stats`, { headers: { Authorization: `Bearer ${token}` } })
-          .then((r) => r.data)
-          .catch(() => null),
-        fetchHistory(),
-      ]);
-      setMe({ name: profile?.display_name || 'You', avatar: profile?.avatar_url || null });
-      if (stats?.partner) setPartner({ name: stats.partner.display_name, avatar: stats.partner.avatar_url ?? null });
+      try {
+        const page = await fetchHistory();
+        setItems(page.items);
+        setHasMore(page.hasMore);
+        if (page.partner) setPartner({ name: page.partner.display_name, avatar: page.partner.avatar_url });
+      } catch (err) {
+        // 404 means not paired yet: an expected state, not a failure
+        if ((err as { response?: { status?: number } }).response?.status === 404) setUnpaired(true);
+        else setError(apiError(err, "Couldn't load your past questions. Try again."));
+      } finally {
+        setLoading(false);
+      }
     };
-    init();
-  }, [navigate]);
+    load();
+  }, [attempt, navigate]);
 
-  const loadMore = () => {
-    if (nextCursor && !loadingMore) {
-      setLoadingMore(true);
-      fetchHistory(nextCursor);
+  const loadMore = useCallback(async () => {
+    if (busy.current || items.length === 0) return;
+    busy.current = true;
+    setLoadingMore(true);
+    setMoreError('');
+    try {
+      const page = await fetchHistory(items[items.length - 1].assigned_date);
+      setItems((prev) => [...prev, ...page.items]);
+      setHasMore(page.hasMore);
+    } catch (err) {
+      setMoreError(apiError(err, "Couldn't load older questions. Try again."));
+    } finally {
+      busy.current = false;
+      setLoadingMore(false);
     }
-  };
+  }, [items]);
 
-  if (loading) {
+  // Lazy loading: fetch the next page while the end is still 600px below the fold.
+  // Re-observing after every page keeps filling a tall screen until it can scroll.
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasMore || moreError) return;
+    const io = new IntersectionObserver(([entry]) => entry.isIntersecting && loadMore(), {
+      root: el.closest('main'),
+      rootMargin: '0px 0px 600px 0px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, moreError, loadMore]);
+
+  if (unpaired) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
-        <div className={`${surface} h-40 animate-pulse`} />
-        <div className={`${surface} h-48 animate-pulse`} />
-        <div className={`${surface} h-48 animate-pulse`} />
+      <div className="max-w-4xl mx-auto">
+        <div className={`${surface} p-8 md:p-12 text-center`}>
+          <div className="flex justify-center -space-x-4 mb-5">
+            <Avatar src={null} name="You" />
+            <Avatar src={null} name="Your partner" dashed />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">A question needs two answers</h1>
+          <p className="text-neutral-400 max-w-md mx-auto">Connect with your partner to get a new question every day.</p>
+          <button onClick={() => navigate('/partner')} className={`${primaryButton} mt-6`}>
+            Connect with your partner
+          </button>
+        </div>
       </div>
     );
   }
 
+  // The heading draws right away; avatars, the partner's name and the list each wait for their own data
+  const avatarSkeleton = <div className="w-16 h-16 rounded-full ring-4 ring-neutral-900 bg-neutral-800 animate-pulse" aria-hidden />;
   const partnerName = partner?.name || 'your partner';
-  const together = items.filter((i) => i.both_answered).length;
+  // Only counted once every page is in; a partial count would be wrong
+  const together = hasMore ? 0 : items.filter((i) => i.both_answered).length;
   const today = todayKey();
 
   return (
@@ -139,8 +183,8 @@ export function QAHistory() {
       <section className={`${surface} p-6 md:p-8`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex -space-x-3">
-            <Avatar src={me.avatar} name={me.name} />
-            {partner ? <Avatar src={partner.avatar} name={partner.name} /> : <Avatar src={null} name="Your partner" dashed />}
+            {me ? <Avatar src={me.avatar} name={me.name} /> : avatarSkeleton}
+            {loading ? avatarSkeleton : partner ? <Avatar src={partner.avatar} name={partner.name} /> : <Avatar src={null} name="Your partner" dashed />}
           </div>
           <Link to="/qa" className={`${secondaryButton} hover:border-rose-400/40 hover:text-white`}>
             <MessageCircle className="w-4 h-4 text-rose-400" aria-hidden />
@@ -152,19 +196,25 @@ export function QAHistory() {
           {together > 0 && <Badge tone="emerald">{plural(together, 'question')} answered together</Badge>}
         </div>
         <p className="text-neutral-400 mt-1">
-          Every question you and <span className="text-rose-400 font-semibold">{partnerName}</span> have been asked, and what you both said.
+          Every question you and{' '}
+          {loading ? (
+            <span className="inline-block h-4 w-12 rounded bg-neutral-800 animate-pulse align-middle" aria-hidden />
+          ) : (
+            <span className="text-rose-400 font-semibold">{partnerName}</span>
+          )}{' '}
+          have been asked, and what you both said.
         </p>
 
         {error && (
           <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
             <p role="alert" className="text-sm text-rose-300">{error}</p>
-            <button onClick={() => fetchHistory()} className={secondaryButton}>
+            <button onClick={() => { setError(''); setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>
               Try again
             </button>
           </div>
         )}
 
-        {!error && items.length === 0 && (
+        {!loading && !error && items.length === 0 && (
           <div className="mt-6 pt-6 border-t border-neutral-800">
             <p className="text-neutral-200">No questions yet.</p>
             <p className="text-sm text-neutral-400 mt-1">
@@ -177,12 +227,28 @@ export function QAHistory() {
         )}
       </section>
 
+      {loading && (
+        <div className="space-y-3 animate-pulse" aria-busy="true">
+          <div className="h-4 w-28 rounded bg-neutral-800 mx-1" />
+          {[0, 1].map((i) => (
+            <div key={i} className={`${surface} p-5 md:p-6`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="h-4 w-36 rounded bg-neutral-800" />
+                <div className="h-5 w-24 rounded-full bg-neutral-800" />
+              </div>
+              <div className="h-5 w-3/4 rounded bg-neutral-800 mt-3" />
+              <div className="grid md:grid-cols-2 gap-3 mt-4">
+                <div className="h-16 rounded-xl bg-neutral-800/40 border border-neutral-800" />
+                <div className="h-16 rounded-xl bg-neutral-800/40 border border-neutral-800" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {groupByMonth(items).map(([month, group]) => (
         <section key={month} aria-label={month} className="space-y-3">
-          <h2 className="flex items-baseline justify-between text-sm px-1">
-            <span className="font-semibold text-white">{month}</span>
-            <span className="text-neutral-400">{plural(group.length, 'question')}</span>
-          </h2>
+          <h2 className="text-sm font-semibold text-white px-1">{month}</h2>
           {group.map((item) => {
             const isToday = item.assigned_date === today;
             const date = localDay(item.assigned_date);
@@ -243,16 +309,26 @@ export function QAHistory() {
         </section>
       ))}
 
-      {hasMore && (
-        <div className="text-center">
-          <button
-            onClick={loadMore}
-            disabled={loadingMore}
-            className={`${secondaryButton} min-w-32 hover:border-rose-400/40 hover:text-white`}
-          >
-            {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" aria-label="Loading" /> : 'Load more'}
+      {hasMore ? (
+        <div ref={sentinel} className="flex flex-col items-center gap-3">
+          {moreError && <p role="alert" className="text-sm text-rose-300">{moreError}</p>}
+          <button onClick={loadMore} disabled={loadingMore} className={secondaryButton}>
+            {loadingMore && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+            {loadingMore ? 'Loading...' : moreError ? 'Try again' : 'Load older questions'}
           </button>
         </div>
+      ) : (
+        items.length > 0 && (
+          <p className="text-sm text-neutral-400 text-center">
+            That's every question, back to the first one on{' '}
+            {localDay(items[items.length - 1].assigned_date).toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+            .
+          </p>
+        )
       )}
     </div>
   );

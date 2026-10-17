@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { phaseColors } from './cycle/constants';
 import { relationshipYear } from '../lib/relationshipYear';
-import { Avatar, Badge, CardHeader, focusRing, iconClass, inset, primaryButton, surface } from './Card';
+import { Avatar, Badge, BadgeBar, CardHeader, InlineBar, focusRing, iconClass, inset, primaryButton, surface } from './Card';
 import { plural } from '../lib/plural';
 import { categoryFor } from '../lib/cravingCategories';
 import {
@@ -33,7 +33,7 @@ const skeleton = (children: ReactNode) => (
     {children}
   </div>
 );
-const badgeSkeleton = <span className="block h-5 w-16 rounded-full bg-neutral-800 animate-pulse" aria-hidden />;
+const badgeSkeleton = <BadgeBar />;
 
 const questionSkeleton = skeleton(
   <>
@@ -122,17 +122,6 @@ export function BentoGrid() {
   const grid = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6 max-w-6xl mx-auto';
   const fullRow = 'md:col-span-2 xl:col-span-4';
 
-  if (loading) {
-    return (
-      <div className={grid} aria-busy="true">
-        <div className={`${fullRow} ${surface} h-80 animate-pulse`} />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className={`${surface} h-56 animate-pulse`} />
-        ))}
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="max-w-6xl mx-auto">
@@ -154,7 +143,7 @@ export function BentoGrid() {
   const greeting = greetingFor(now.getHours());
   const dateLine = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   const year = since ? relationshipYear(since) : null;
-  const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
+  const partner = loading ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>;
 
   // Daily question status
   const q = currentQuestion;
@@ -162,7 +151,7 @@ export function BentoGrid() {
     <Badge tone="rose">Your turn</Badge>
   ) : q.partnerAnswered ? (
     <Badge tone="emerald">Both answered</Badge>
-  ) : (
+  ) : loading ? badgeSkeleton : (
     <Badge tone="neutral">Waiting on {partnerName}</Badge>
   );
 
@@ -184,16 +173,17 @@ export function BentoGrid() {
       <section className={`${fullRow} ${surface} p-6 md:p-8`}>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
           <div className="flex -space-x-4">
+            {/* Blank circles until the names land */}
             <Avatar src={userAvatar} name={userName} />
             <Avatar src={partnerAvatar} name={partnerName} />
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl md:text-3xl font-bold text-white">
-              {greeting}, {userName}
+              {greeting}, {loading ? <InlineBar w="w-24" /> : userName}
               {greeting === 'Still up' ? '?' : ''}
             </h1>
             <p className="text-neutral-400 text-sm mt-1">
-              {dateLine} · <span className="text-white font-medium tabular-nums">{daysTogether} days</span> with {partner}
+              {dateLine} · {loading ? <InlineBar w="w-16" /> : <span className="text-white font-medium tabular-nums">{daysTogether} days</span>} with {partner}
             </p>
           </div>
           <Link
@@ -204,6 +194,25 @@ export function BentoGrid() {
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden />
           </Link>
         </div>
+
+        {loading && (
+          <div className="mt-8 pt-6 border-t border-neutral-800 animate-pulse" aria-busy="true">
+            <div className="flex items-center justify-between gap-3">
+              {bar('h-4 w-36')}
+              {bar('h-5 w-24 rounded-full')}
+            </div>
+            {bar('h-6 w-56 max-w-full mt-4')}
+            {bar('h-2 w-full mt-6 rounded-full')}
+            <div className="flex justify-between mt-3">
+              {bar('h-3 w-12')}
+              {bar('h-3 w-28')}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3 mt-5">
+              <div className={`${inset} h-[4.25rem]`} />
+              <div className={`${inset} h-[4.25rem]`} />
+            </div>
+          </div>
+        )}
 
         {year && (
           <div className="mt-8 pt-6 border-t border-neutral-800">

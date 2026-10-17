@@ -32,7 +32,13 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
     ]);
   if (path === '/qa/current')
     return d.question ? ok(d.question) : Promise.reject({ response: { status: 404, data: { error: 'No questions available' } } });
-  if (path === '/qa/history') return ok({ items: d.qaHistory, hasMore: false, nextCursor: null });
+  if (path === '/qa/history') {
+    const older = q.before ? d.qaHistory.filter((h) => h.assigned_date < String(q.before)) : d.qaHistory;
+    const page = older.slice(0, Number(q.limit) || 20);
+    const hasMore = older.length > page.length;
+    const { display_name, avatar_url } = d.partner;
+    return ok({ items: page, hasMore, nextCursor: hasMore ? page[page.length - 1].assigned_date : null, partner: q.before ? null : { display_name, avatar_url } });
+  }
   if (path === '/qa/categories') return ok(d.qaCategories);
   if (path === '/cycles/stats' || path === '/cycles/partner/stats')
     return ok({ prediction: d.prediction, calendar: [], lastPeriodStart: d.cycles.at(-1)?.start_date ?? null, partnerName: d.partner.display_name });
@@ -75,7 +81,7 @@ async function post(url: string, body: Record<string, string> = {}): Promise<Res
     q.yourAnswer = { answer_text: body.answer_text, submitted_at: new Date().toISOString() };
     q.bothAnswered = q.revealed = q.partnerAnswered;
     q.partnerAnswer = q.partnerAnswered ? d.qaPartnerAnswer : null;
-    return ok({ message: '' });
+    return ok({ answer: q.yourAnswer, bothAnswered: q.bothAnswered, message: '' });
   }
   if (path === '/qa/skip' && d.question)
     d.question.question = { id: 'q2', question_text: 'If we could spend one whole day doing nothing together, what would it look like?', category_id: 'cat-dreams' };

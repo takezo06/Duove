@@ -405,7 +405,7 @@ Load what the view shows, nothing more, and never let a nice-to-have block the p
 ### Lazy loading (infinite lists)
 
 - **Page size 30, newest first, cursor not offset.** Ask for the next page with `before` = the `created_at` of the oldest item on screen. An offset would skip or repeat items when something new arrives while you scroll.
-- **`hasMore` is `page.length === PAGE`.** At worst that costs one extra empty request at the very end, which is cheaper than a count query.
+- **`hasMore` is `page.length === PAGE`.** At worst that costs one extra empty request at the very end, which is cheaper than a count query. When the endpoint already returns an exact `hasMore` (Q&A history reads `limit + 1` rows), use that instead.
 - **Trigger:** an `IntersectionObserver` on a sentinel after the list, `root: el.closest('main')` (the layout's `main` is the scroller, so a viewport root would be clipped by it) and `rootMargin: '0px 0px 600px 0px'`, so the next page arrives before the end is visible.
 - **Re-observe after every page.** The observer effect depends on the load function, which changes with the list, so it re-checks after each page and keeps filling a tall screen until it can scroll.
 - **One request at a time:** a `useRef` busy flag, not state, guards the load function.
@@ -417,7 +417,7 @@ Load what the view shows, nothing more, and never let a nice-to-have block the p
 ### Requests
 
 - **Independent requests go in one `Promise.all`** (relationship, list, profile), never one after another.
-- **Render per component, not per page.** Only the data the page frame needs (header, not-paired check) gates the page skeleton. Every other section fetches on its own and writes its slice with `setData((prev) => ({ ...prev, field }))` when it lands. Use `undefined` for still loading and `null` / `[]` for loaded but empty. While a section is `undefined`, show its own skeleton shaped like its content (bars for lines, a circle for an icon, a pill for a badge) so nothing jumps when it fills in. Reference: `useDashboardData.ts` + `BentoGrid.tsx`, `Notifications.tsx`.
+- **Render per component, not per page.** The page heading draws on the first render, before any fetch: its static text right away, any word that needs data (the partner's name, a countdown) as an inline `h-4` skeleton bar. No whole-page skeleton. The not-paired card replaces the page once the first response says so. Every other section fetches on its own and writes its slice with `setData((prev) => ({ ...prev, field }))` when it lands. Use `undefined` for still loading and `null` / `[]` for loaded but empty. While a section is `undefined`, show its own skeleton shaped like its content (bars for lines, a circle for an icon, a pill for a badge) so nothing jumps when it fills in. Reference: `QA.tsx`, `QAHistory.tsx`, `useDashboardData.ts` + `BentoGrid.tsx`.
 - **Don't wait on background writes.** Mark-as-read and similar POSTs fire after the page renders, never before.
 - **Dependent requests chain only on what they need.** Cravings wait for the relationship id, not for everything else.
 - **Check loading states with `?slow`** in `preview:mock`: every GET waits a random 1-3s.

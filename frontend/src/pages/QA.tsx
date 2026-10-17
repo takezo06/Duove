@@ -7,7 +7,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
 import { when } from '../lib/when';
 import { topicIcon, topicName, type Topic } from '../lib/qaTopics';
-import { Avatar, Badge, CardBack, CardHeader, Deck, Seal, field, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, CardBack, CardHeader, Deck, InlineBar, Seal, field, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
 import { QACategoryModal } from '../components/qa/QACategoryModal';
 
 interface Answer {
@@ -32,6 +32,7 @@ const api = import.meta.env.VITE_BACKEND_URL;
 const tzParams = { tz: Intl.DateTimeFormat().resolvedOptions().timeZone };
 const auth = async () => ({ Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` });
 
+// A text-height skeleton for a word that hasn't loaded yet
 // "6h 42m" or "42m" until the next question
 function untilNext(seconds: number) {
   const mins = Math.ceil(seconds / 60);
@@ -41,11 +42,15 @@ function untilNext(seconds: number) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-// Who a card belongs to: their seal, their name, one line under it
-function Owner({ name, partner = false, children }: { name: string; partner?: boolean; children: ReactNode }) {
+// Who a card belongs to: their seal, their name, one line under it. The seal is a skeleton until the name lands.
+function Owner({ name, partner = false, children }: { name?: string; partner?: boolean; children: ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <Seal name={name} partner={partner} />
+      {name === undefined ? (
+        <span className="w-8 h-8 shrink-0 rounded-full bg-neutral-800 animate-pulse" aria-hidden />
+      ) : (
+        <Seal name={name} partner={partner} />
+      )}
       <div className="min-w-0">
         <p className={`font-semibold ${partner ? 'text-rose-400' : 'text-white'}`}>{partner ? name : 'You'}</p>
         <p className="text-xs text-neutral-400">{children}</p>
@@ -55,7 +60,7 @@ function Owner({ name, partner = false, children }: { name: string; partner?: bo
 }
 
 // An answer turned face up
-function AnswerCard({ name, partner = false, answer }: { name: string; partner?: boolean; answer: Answer }) {
+function AnswerCard({ name, partner = false, answer }: { name?: string; partner?: boolean; answer: Answer }) {
   return (
     <section aria-label={partner ? `${name}'s answer` : 'Your answer'} className={`${surface} p-6`}>
       <Owner name={name} partner={partner}>
@@ -76,9 +81,12 @@ export function QA() {
   const [unpaired, setUnpaired] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [current, setCurrent] = useState<CurrentQA | null>(null);
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [myName, setMyName] = useState('You');
+  // undefined = still loading
+  const [topics, setTopics] = useState<Topic[] | undefined>(undefined);
+  const [myName, setMyName] = useState<string | undefined>(undefined);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  // When the next question is due, as a timestamp; only a fetch of /qa/current moves it
+  const [deadline, setDeadline] = useState(0);
   const [answerText, setAnswerText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [answerError, setAnswerError] = useState('');
@@ -97,21 +105,15 @@ export function QA() {
     }
     setCurrent(data);
     setSecondsLeft(data.nextQuestionAvailableIn);
+    setDeadline(Date.now() + data.nextQuestionAvailableIn * 1000);
   }, []);
 
+  // Only today's question gates the page
   useEffect(() => {
     const load = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { navigate('/login'); return; }
-        const [, list, profile] = await Promise.all([
-          fetchCurrent(),
-          // Topics and your name only dress the page; it works without them
-          axios.get(`${api}/qa/categories`, { headers: await auth() }).then((r) => r.data as Topic[]).catch(() => []),
-          supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
-        ]);
-        setTopics(list);
-        if (profile.data?.display_name) setMyName(profile.data.display_name);
+        if (!(await supabase.auth.getSession()).data.session) { navigate('/login'); return; }
+        await fetchCurrent();
       } catch (err) {
         // Both "not paired" and "no questions" are 404s, so tell them apart by message
         const message = apiError(err, '');
@@ -125,13 +127,30 @@ export function QA() {
     load();
   }, [attempt, navigate, fetchCurrent]);
 
+  // Topics and your name only dress the page: each fills in when it lands, and the page works without them.
+  // A retry doesn't refetch them.
+  useEffect(() => {
+    const load = async () => {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) return;
+      axios.get(`${api}/qa/categories`, { headers: await auth() }).then(
+        (r) => setTopics(r.data as Topic[]),
+        () => setTopics([]),
+      );
+      supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle().then(
+        ({ data }) => setMyName(data?.display_name || 'You'),
+        () => setMyName('You'),
+      );
+    };
+    load();
+  }, []);
+
   // Tick the countdown from a fixed deadline (background tabs throttle timers) and load the
   // next question at midnight. Coming back to the tab also picks up your partner's answer.
   // A failed background refresh is harmless: the page keeps what it has.
   useEffect(() => {
-    if (!current) return;
+    if (!deadline) return;
     const refresh = () => { fetchCurrent().catch(() => {}); };
-    const deadline = Date.now() + current.nextQuestionAvailableIn * 1000;
     const id = setInterval(() => {
       const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
       setSecondsLeft(left);
@@ -139,19 +158,20 @@ export function QA() {
     }, 1000);
     window.addEventListener('focus', refresh);
     return () => { clearInterval(id); window.removeEventListener('focus', refresh); };
-  }, [current, fetchCurrent]);
+  }, [deadline, fetchCurrent]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!answerText.trim() || !current || submitting) return;
     setSubmitting(true);
     setAnswerError('');
+    let sent: { answer?: Answer; bothAnswered?: boolean };
     try {
-      await axios.post(
+      ({ data: sent } = await axios.post(
         `${api}/qa/submit`,
         { question_id: current.question.id, answer_text: answerText.trim() },
         { headers: await auth(), params: tzParams },
-      );
+      ));
     } catch (err) {
       setAnswerError(apiError(err, "Your answer didn't send. Try again."));
       // 409 means the day rolled over while you were typing: show the new question.
@@ -159,7 +179,14 @@ export function QA() {
       setSubmitting(false);
       return;
     }
-    await fetchCurrent().catch(() => setAnswerError('Your answer is in. Refresh the page to see it.'));
+    if (sent.answer && !sent.bothAnswered) {
+      // Use what the write returns: nobody else has answered, so only your card turns over
+      const { answer_text, submitted_at } = sent.answer;
+      setCurrent((prev) => prev && { ...prev, yourAnswer: { answer_text, submitted_at } });
+    } else {
+      // Both answered: refetch for your partner's answer, which the write doesn't return
+      await fetchCurrent().catch(() => setAnswerError('Your answer is in. Refresh the page to see it.'));
+    }
     setSubmitting(false);
   };
 
@@ -187,19 +214,6 @@ export function QA() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
-        <div className={`${surface} h-36 animate-pulse`} />
-        <div className={`${surface} h-56 animate-pulse`} />
-        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-          <div className={`${surface} h-64 animate-pulse`} />
-          <div className={`${surface} h-64 animate-pulse`} />
-        </div>
-      </div>
-    );
-  }
-
   if (unpaired) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -218,30 +232,171 @@ export function QA() {
     );
   }
 
-  if (!current) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <section className={`${surface} p-6 md:p-8`}>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Daily Q&A</h1>
-          <p className="text-neutral-400 mt-1">One question a day for the two of you.</p>
-          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
-            <p role="alert" className="text-sm text-rose-300">{loadError}</p>
-            <button onClick={() => { setLoadError(''); setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>
-              Try again
+  const now = new Date();
+
+  // The heading draws right away; the deck and the answers wait for today's question
+  let content: ReactNode = null;
+  if (current) {
+    const { question, yourAnswer, partnerAnswer, partnerAnswered, revealed, partnerName } = current;
+    const topic = topics?.find((t) => t.id === question.category_id);
+    const preferred = topics?.find((t) => t.id === current.preferredCategoryId);
+    // A topic name we can't show until the topics land
+    const topicPending = topics === undefined && !!question.category_id;
+    const preferredPending = topics === undefined && !!current.preferredCategoryId;
+    // The backend only swaps a question nobody has answered
+    const canSkip = !yourAnswer && !partnerAnswered;
+
+    content = (
+      <>
+        <Deck className="p-6 md:p-8">
+          <CardHeader
+            icon={topicPending ? <span className="w-4 h-4 rounded-full bg-neutral-800 animate-pulse" aria-hidden /> : topicIcon(topic?.icon, iconClass)}
+            title={
+              topicPending ? (
+                <span className="inline-block h-4 w-20 rounded bg-neutral-800 animate-pulse" aria-hidden />
+              ) : topic ? (
+                topicName(topic)
+              ) : (
+                "Today's question"
+              )
+            }
+            badge={
+              revealed ? (
+                <Badge tone="emerald">Both answered</Badge>
+              ) : !yourAnswer ? (
+                <Badge tone="rose">Your turn</Badge>
+              ) : (
+                <Badge tone="neutral">Waiting on {partnerName}</Badge>
+              )
+            }
+          />
+          <h2 className="mt-4 text-xl font-bold text-white leading-snug break-words">{question.question_text}</h2>
+          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center gap-3">
+            {canSkip && (
+              <button onClick={skip} disabled={skipping} className={secondaryButton}>
+                {skipping ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <SkipForward className="w-4 h-4" aria-hidden />}
+                {skipping ? 'Skipping...' : 'Skip this question'}
+              </button>
+            )}
+            {/* The topic picker lists the topics, so it waits for them */}
+            <button
+              onClick={() => { setTopicError(''); setChoosing(true); }}
+              disabled={topics === undefined}
+              aria-haspopup="dialog"
+              className={secondaryButton}
+            >
+              {preferredPending ? (
+                <span className="w-4 h-4 rounded-full bg-neutral-600 animate-pulse" aria-hidden />
+              ) : preferred ? (
+                topicIcon(preferred.icon, 'w-4 h-4')
+              ) : (
+                <Shuffle className="w-4 h-4" aria-hidden />
+              )}
+              <span>
+                Topic:{' '}
+                {preferredPending ? (
+                  <span className="inline-block h-4 w-14 rounded bg-neutral-600 animate-pulse align-middle" aria-hidden />
+                ) : preferred ? (
+                  topicName(preferred)
+                ) : (
+                  'Random'
+                )}
+              </span>
             </button>
           </div>
-        </section>
-      </div>
+          {deckError && <p role="alert" className="mt-3 text-sm text-rose-300">{deckError}</p>}
+        </Deck>
+
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+          {yourAnswer ? (
+            <AnswerCard name={myName} answer={yourAnswer} />
+          ) : (
+            <form onSubmit={submit} aria-label="Your answer" className={`${surface} p-6 flex flex-col`}>
+              <Owner name={myName}>{partnerAnswered ? `${partnerName} is waiting on you` : 'Your turn'}</Owner>
+              <textarea
+                aria-label="Your answer"
+                value={answerText}
+                onChange={(e) => setAnswerText(e.target.value)}
+                placeholder="Write what comes to mind first"
+                className={`${field} mt-4 min-h-32 flex-1 resize-none`}
+              />
+              <button type="submit" disabled={!answerText.trim() || submitting} className={`${primaryButton} mt-5 w-full`}>
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
+                {submitting ? 'Sending...' : 'Send answer'}
+              </button>
+              {answerError && <p role="alert" className="mt-3 text-sm text-rose-300">{answerError}</p>}
+            </form>
+          )}
+
+          {partnerAnswer ? (
+            <AnswerCard name={partnerName} partner answer={partnerAnswer} />
+          ) : partnerAnswered ? (
+            <CardBack name={partnerName} label={`${partnerName}'s answer, face down`}>
+              <p className="mt-4 text-lg font-semibold text-white leading-snug">{partnerName} answered</p>
+              <p className="mt-1 text-rose-200/80">It turns over when you send yours.</p>
+            </CardBack>
+          ) : (
+            <section aria-label={`${partnerName}'s answer`} className={`${surface} p-6`}>
+              <Owner name={partnerName} partner>Hasn't answered yet</Owner>
+              <p className="mt-4 text-neutral-300">
+                {yourAnswer
+                  ? 'Your card stays face down on their side until they answer too.'
+                  : 'Whoever answers first waits face down for the other.'}
+              </p>
+            </section>
+          )}
+        </div>
+
+        {choosing && topics && (
+          <QACategoryModal
+            topics={topics}
+            selectedId={current.preferredCategoryId}
+            error={topicError}
+            onSelect={chooseTopic}
+            onClose={() => setChoosing(false)}
+          />
+        )}
+      </>
+    );
+  } else if (loading) {
+    content = (
+      <>
+        <Deck className="p-6 md:p-8">
+          <div className="animate-pulse" aria-busy="true">
+            <div className="flex items-center justify-between gap-3 min-h-6">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-neutral-800" />
+                <div className="h-4 w-24 rounded bg-neutral-800" />
+              </div>
+              <div className="h-5 w-16 rounded-full bg-neutral-800" />
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="h-6 w-full rounded bg-neutral-800" />
+              <div className="h-6 w-2/3 rounded bg-neutral-800" />
+            </div>
+            <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap gap-3">
+              <div className="h-10 w-40 rounded-xl bg-neutral-800" />
+              <div className="h-10 w-36 rounded-xl bg-neutral-800" />
+            </div>
+          </div>
+        </Deck>
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6 animate-pulse" aria-busy="true">
+          {[0, 1].map((i) => (
+            <div key={i} className={`${surface} p-6`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-neutral-800 shrink-0" />
+                <div className="space-y-2">
+                  <div className="h-4 w-16 rounded bg-neutral-800" />
+                  <div className="h-3 w-28 rounded bg-neutral-800" />
+                </div>
+              </div>
+              <div className="mt-4 h-32 rounded-xl bg-neutral-800/40 border border-neutral-800" />
+            </div>
+          ))}
+        </div>
+      </>
     );
   }
-
-  const { question, yourAnswer, partnerAnswer, partnerAnswered, revealed, partnerName } = current;
-  const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
-  const topic = topics.find((t) => t.id === question.category_id);
-  const preferred = topics.find((t) => t.id === current.preferredCategoryId);
-  // The backend only swaps a question nobody has answered
-  const canSkip = !yourAnswer && !partnerAnswered;
-  const now = new Date();
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -250,14 +405,30 @@ export function QA() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">Daily Q&A</h1>
             <p className="text-neutral-400 mt-1">
-              One question a day for you and {partner}. Answers stay face down until you've both written one.
+              {current ? (
+                <>
+                  One question a day for you and <span className="text-rose-400 font-semibold">{current.partnerName}</span>.
+                  Answers stay face down until you've both written one.
+                </>
+              ) : loading ? (
+                <>
+                  One question a day for you and <InlineBar w="w-12" />. Answers stay face down until you've both written one.
+                </>
+              ) : (
+                'One question a day for the two of you.'
+              )}
             </p>
             <p className="text-sm text-neutral-400 mt-1">
               <time dateTime={now.toLocaleDateString('en-CA')}>
                 {now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
               </time>
-              <span aria-hidden> · </span>
-              Next question in <span className="text-white font-medium tabular-nums">{untilNext(secondsLeft)}</span>
+              {(current || loading) && (
+                <>
+                  <span aria-hidden> · </span>
+                  Next question in{' '}
+                  {current ? <span className="text-white font-medium tabular-nums">{untilNext(secondsLeft)}</span> : <InlineBar w="w-14" />}
+                </>
+              )}
             </p>
           </div>
           <Link to="/qa/history" className={`${secondaryButton} shrink-0 self-start`}>
@@ -265,91 +436,17 @@ export function QA() {
             Past questions
           </Link>
         </div>
+        {loadError && (
+          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+            <p role="alert" className="text-sm text-rose-300">{loadError}</p>
+            <button onClick={() => { setLoadError(''); setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>
+              Try again
+            </button>
+          </div>
+        )}
       </section>
 
-      <Deck className="p-6 md:p-8">
-        <CardHeader
-          icon={topicIcon(topic?.icon, iconClass)}
-          title={topic ? topicName(topic) : "Today's question"}
-          badge={
-            revealed ? (
-              <Badge tone="emerald">Both answered</Badge>
-            ) : !yourAnswer ? (
-              <Badge tone="rose">Your turn</Badge>
-            ) : (
-              <Badge tone="neutral">Waiting on {partnerName}</Badge>
-            )
-          }
-        />
-        <h2 className="mt-4 text-xl font-bold text-white leading-snug break-words">{question.question_text}</h2>
-        <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center gap-3">
-          {canSkip && (
-            <button onClick={skip} disabled={skipping} className={secondaryButton}>
-              {skipping ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <SkipForward className="w-4 h-4" aria-hidden />}
-              {skipping ? 'Skipping...' : 'Skip this question'}
-            </button>
-          )}
-          <button
-            onClick={() => { setTopicError(''); setChoosing(true); }}
-            aria-haspopup="dialog"
-            className={secondaryButton}
-          >
-            {preferred ? topicIcon(preferred.icon, 'w-4 h-4') : <Shuffle className="w-4 h-4" aria-hidden />}
-            Topic: {preferred ? topicName(preferred) : 'Random'}
-          </button>
-        </div>
-        {deckError && <p role="alert" className="mt-3 text-sm text-rose-300">{deckError}</p>}
-      </Deck>
-
-      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-        {yourAnswer ? (
-          <AnswerCard name={myName} answer={yourAnswer} />
-        ) : (
-          <form onSubmit={submit} aria-label="Your answer" className={`${surface} p-6 flex flex-col`}>
-            <Owner name={myName}>{partnerAnswered ? `${partnerName} is waiting on you` : 'Your turn'}</Owner>
-            <textarea
-              aria-label="Your answer"
-              value={answerText}
-              onChange={(e) => setAnswerText(e.target.value)}
-              placeholder="Write what comes to mind first"
-              className={`${field} mt-4 min-h-32 flex-1 resize-none`}
-            />
-            <button type="submit" disabled={!answerText.trim() || submitting} className={`${primaryButton} mt-5 w-full`}>
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
-              {submitting ? 'Sending...' : 'Send answer'}
-            </button>
-            {answerError && <p role="alert" className="mt-3 text-sm text-rose-300">{answerError}</p>}
-          </form>
-        )}
-
-        {partnerAnswer ? (
-          <AnswerCard name={partnerName} partner answer={partnerAnswer} />
-        ) : partnerAnswered ? (
-          <CardBack name={partnerName} label={`${partnerName}'s answer, face down`}>
-            <p className="mt-4 text-lg font-semibold text-white leading-snug">{partnerName} answered</p>
-            <p className="mt-1 text-rose-200/80">It turns over when you send yours.</p>
-          </CardBack>
-        ) : (
-          <section aria-label={`${partnerName}'s answer`} className={`${surface} p-6`}>
-            <Owner name={partnerName} partner>Hasn't answered yet</Owner>
-            <p className="mt-4 text-neutral-300">
-              {yourAnswer
-                ? 'Your card stays face down on their side until they answer too.'
-                : 'Whoever answers first waits face down for the other.'}
-            </p>
-          </section>
-        )}
-      </div>
-
-      {choosing && (
-        <QACategoryModal
-          topics={topics}
-          selectedId={current.preferredCategoryId}
-          error={topicError}
-          onSelect={chooseTopic}
-          onClose={() => setChoosing(false)}
-        />
-      )}
+      {content}
     </div>
   );
 }

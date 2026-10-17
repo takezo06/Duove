@@ -43,14 +43,16 @@ serve(async (req) => {
   }
 
   async function pickFor(rel: any, exclude?: string) {
-    const all = must(await admin.from("qa_questions").select("*").eq("is_active", true)) ?? [];
-    const used = must(
-      await admin
+    const [allRes, usedRes] = await Promise.all([
+      admin.from("qa_questions").select("*").eq("is_active", true),
+      admin
         .from("qa_assignments")
         .select("question_id, assigned_date")
         .eq("relationship_id", rel.id)
         .order("assigned_date", { ascending: false }),
-    ) ?? [];
+    ]);
+    const all = must(allRes) ?? [];
+    const used = must(usedRes) ?? [];
     const preferred = rel.preferred_category_id
       ? all.filter((q: any) => q.category_id === rel.preferred_category_id)
       : all;
@@ -118,7 +120,11 @@ serve(async (req) => {
       const assignment = await getOrCreateToday(rel);
       if (!assignment) return json({ error: "No questions available" }, 404);
 
-      const answers = await answersOf(rel, assignment);
+      const [answers, partnerRes] = await Promise.all([
+        answersOf(rel, assignment),
+        admin.from("profiles").select("display_name").eq("id", getPartnerId(rel)).maybeSingle(),
+      ]);
+      const partner = must(partnerRes);
       const yourAnswer = answers.find((a: any) => a.user_id === userId) ?? null;
       const partnerAnswer = answers.find((a: any) => a.user_id !== userId) ?? null;
       const bothAnswered = !!yourAnswer && !!partnerAnswer;
@@ -126,9 +132,6 @@ serve(async (req) => {
         assignment.revealed_at = new Date().toISOString();
         must(await admin.from("qa_assignments").update({ revealed_at: assignment.revealed_at }).eq("id", assignment.id));
       }
-      const partner = must(
-        await admin.from("profiles").select("display_name").eq("id", getPartnerId(rel)).maybeSingle(),
-      );
       return json({
         assignment,
         question: assignment.qa_questions,
@@ -221,10 +224,13 @@ serve(async (req) => {
       return json({ message: "Preferred category updated" });
     }
 
-    // GET /qa/history?cursor=<assigned_date>&limit=20
+    // GET /qa/history?before=<assigned_date>&limit=30
+    // `before` is the assigned_date of the oldest question the client has (`cursor` is its old name).
+    // The first page also carries the partner, so the page header needs no second request.
     if (path === "/history" && req.method === "GET") {
-      const limit = Number(url.searchParams.get("limit")) || 20;
-      const cursor = url.searchParams.get("cursor");
+      const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "20") || 20, 1), 100);
+      const cursor = url.searchParams.get("before") ?? url.searchParams.get("cursor");
+      if (cursor && Number.isNaN(Date.parse(cursor))) return json({ error: "Invalid before cursor" }, 400);
       const rel = await getActiveRelationship();
       if (!rel) return json({ error: "No active relationship" }, 404);
 
@@ -235,7 +241,12 @@ serve(async (req) => {
         .order("assigned_date", { ascending: false })
         .limit(limit + 1);
       if (cursor) query = query.lt("assigned_date", cursor);
-      const assignments = must(await query) ?? [];
+      const [assignmentsRes, partnerRes] = await Promise.all([
+        query,
+        cursor ? null : admin.from("profiles").select("display_name, avatar_url").eq("id", getPartnerId(rel)).maybeSingle(),
+      ]);
+      const assignments = must(assignmentsRes) ?? [];
+      const partner = partnerRes && must(partnerRes);
       const hasMore = assignments.length > limit;
       const page = assignments.slice(0, limit);
 
@@ -268,7 +279,12 @@ serve(async (req) => {
         };
       });
 
-      return json({ items, hasMore, nextCursor: hasMore ? page[page.length - 1].assigned_date : null });
+      return json({
+        items,
+        hasMore,
+        nextCursor: hasMore ? page[page.length - 1].assigned_date : null,
+        partner: partner && { display_name: partner.display_name || "Partner", avatar_url: partner.avatar_url ?? null },
+      });
     }
 
     return json({ error: "Not found" }, 404);
