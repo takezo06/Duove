@@ -7,8 +7,12 @@ const ok = (data: unknown): Res => ({ data });
 const notFound = () => Promise.reject({ response: { status: 404, data: { error: 'No active relationship' } } });
 const pathOf = (url: string) => new URL(url, location.origin).pathname.replace(/^.*\/functions\/v1/, '');
 
+// ?slow: every GET waits a random 1-3s so loading states can be checked
+const slow = new URLSearchParams(location.search).has('slow');
+
 async function get(url: string, config: { params?: Record<string, unknown> } = {}): Promise<Res> {
   const path = pathOf(url);
+  if (slow) await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
   const q = { ...Object.fromEntries(new URL(url, location.origin).searchParams), ...config.params };
   if (path.startsWith('/relationships/pending')) return ok(d.paired ? null : { invite_code: 'K7Q2M9XD' });
   if (!d.paired && /^\/(relationships|cycles|cravings|qa|love-letters)/.test(path)) return notFound();
