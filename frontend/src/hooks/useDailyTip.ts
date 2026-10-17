@@ -1,49 +1,35 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { daysBetween, today, type Phase } from '../lib/cycle';
 
-export function useDailyTip(phase: string | null, targetAudience: string = 'self') {
-  const [tip, setTip] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+const FALLBACK = 'Listen to your body and go easy on yourself today.';
+
+// One tip per phase per day: the same all day, a different one tomorrow.
+// No phase (a late period) reads the general tips.
+export function useDailyTip(phase: Phase | null, audience: 'self' | 'partner') {
+  const [tip, setTip] = useState<{ key: string; text: string } | null>(null);
+  const dbPhase = phase === 'fertile' ? 'ovulatory' : phase ?? 'general';
+  const key = `${dbPhase}:${audience}`;
 
   useEffect(() => {
-    if (!phase) {
-      setTip(null);
-      return;
-    }
-
     let cancelled = false;
-
-    const fetchTip = async () => {
-      setLoading(true);
-      try {
-        // Correct table name: cycle_tips
-        const { data, error } = await supabase
-          .from('cycle_tips')                        // ← was 'tips'
-          .select('tip_text')
-          .eq('phase', phase)
-          .eq('target_audience', targetAudience);
-
+    supabase
+      .from('cycle_tips')
+      .select('tip_text')
+      .eq('phase', dbPhase)
+      .eq('target_audience', audience)
+      .order('id')
+      .then(({ data }) => {
         if (cancelled) return;
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          const randomIndex = Math.floor(Math.random() * data.length);
-          setTip(data[randomIndex].tip_text);
-        } else {
-          setTip('Listen to your body and take care of yourself today.');
-        }
-      } catch (err) {
-        console.error('useDailyTip error:', err);
-        if (!cancelled) setTip('Listen to your body and take care of yourself today.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+        const tips = (data ?? []) as { tip_text: string }[];
+        const n = daysBetween('2026-01-01', today());
+        setTip({ key, text: tips.length ? tips[((n % tips.length) + tips.length) % tips.length].tip_text : FALLBACK });
+      });
+    return () => {
+      cancelled = true;
     };
+  }, [dbPhase, audience, key]);
 
-    fetchTip();
-    return () => { cancelled = true; };
-  }, [phase, targetAudience]);
-
-  return { tip, loading };
+  // undefined while the tip for this phase is loading
+  return tip?.key === key ? tip.text : undefined;
 }

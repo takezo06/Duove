@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { relationshipYear } from '../lib/relationshipYear';
 import { plural } from '../lib/plural';
-import { Avatar, Badge, BadgeBar, CardHeader, InlineBar, focusRing, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, BadgeBar, CardHeader, InlineBar, Stat, focusRing, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
 import {
   Loader2,
   Heart,
@@ -57,21 +56,6 @@ function span(r: ReturnType<typeof relationshipYear>) {
 }
 
 const fmt = (n: number) => n.toLocaleString();
-
-// Centered stat: icon + label, big value, supporting line, optional pill or extra content
-function Stat({ icon, label, value, sub, children }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode; children?: ReactNode }) {
-  return (
-    <>
-      <h2 className="flex items-center justify-center gap-2 text-neutral-400 text-sm">
-        {icon}
-        {label}
-      </h2>
-      <p className="text-2xl font-bold text-white mt-3 tabular-nums">{value}</p>
-      {sub && <p className="text-sm text-neutral-400 mt-1">{sub}</p>}
-      {children}
-    </>
-  );
-}
 
 export function Partner() {
   usePageTitle('Partner');

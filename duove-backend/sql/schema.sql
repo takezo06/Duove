@@ -203,7 +203,8 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "last_active" timestamp with time zone DEFAULT "now"(),
     "avatar_url" "text",
     "display_name" "text" DEFAULT ''::"text",
-    "last_read_at" timestamp with time zone DEFAULT "now"()
+    "last_read_at" timestamp with time zone DEFAULT "now"(),
+    "has_periods" boolean
 );
 
 
@@ -701,18 +702,6 @@ CREATE POLICY "Partners can read love letters" ON "public"."love_letters" FOR SE
 
 
 
-CREATE POLICY "Partners can view cycle logs" ON "public"."cycle_logs" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "cycle_logs"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
-
-
-
-CREATE POLICY "Partners can view symptom logs" ON "public"."daily_symptom_logs" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "daily_symptom_logs"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
-
-
-
 CREATE POLICY "Sender can insert love letters" ON "public"."love_letters" FOR INSERT WITH CHECK ((("sender_id" = "auth"."uid"()) AND (EXISTS ( SELECT 1
    FROM "public"."relationships"
   WHERE (("relationships"."id" = "love_letters"."relationship_id") AND (("relationships"."user_id" = "auth"."uid"()) OR ("relationships"."partner_id" = "auth"."uid"())))))));
@@ -827,24 +816,13 @@ CREATE POLICY "cravings_update_own_relationship" ON "public"."cravings" FOR UPDA
 
 
 
-CREATE POLICY "cycle_couple_access" ON "public"."cycle_logs" USING ((("auth"."uid"() = "user_id") OR ("auth"."uid"() IN ( SELECT "relationships"."partner_id"
-   FROM "public"."relationships"
-  WHERE ("relationships"."user_id" = "cycle_logs"."user_id")))));
-
-
-
 ALTER TABLE "public"."cycle_logs" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "cycle_logs_insert_own_relationship" ON "public"."cycle_logs" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "cycle_logs"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
+ALTER TABLE "public"."cycle_tips" ENABLE ROW LEVEL SECURITY;
 
 
-
-CREATE POLICY "cycle_logs_select_own_relationship" ON "public"."cycle_logs" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "cycle_logs"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
+CREATE POLICY "Signed-in users can read tips" ON "public"."cycle_tips" FOR SELECT TO "authenticated" USING (true);
 
 
 

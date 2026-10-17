@@ -1,16 +1,21 @@
+import { addDays, today } from '../../src/lib/cycle';
 // Fake data for the mock preview. Pick a scenario with ?scenario=<name> on first load:
 //   (default) paired couple with activity
 //   empty     paired today, nothing logged yet
+//   returning like default, but neither has answered "Do you have periods?" (cycle page)
 //   unpaired  no relationship (pairing screens)
 export const scenario = new URLSearchParams(location.search).get('scenario') ?? 'default';
 export const paired = scenario !== 'unpaired';
 const empty = scenario === 'empty';
+// returning: neither has answered "Do you have periods?"; Jed has 3 old periods (shown without asking), Mika 1 (hidden)
+const returning = scenario === 'returning';
 
 const ago = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 
-export const me = { id: 'u1', email: 'jed@duove.app', display_name: 'Jed', avatar_url: 'https://i.pravatar.cc/160?img=12' };
-export const partner = { id: 'p1', display_name: 'Mika', avatar_url: null as string | null };
+// has_periods is the answer to "Do you have periods?" (null = not asked yet)
+export const me = { id: 'u1', email: 'jed@duove.app', display_name: 'Jed', avatar_url: 'https://i.pravatar.cc/160?img=12', has_periods: null as boolean | null };
+export const partner = { id: 'p1', display_name: 'Mika', avatar_url: null as string | null, has_periods: (empty || returning ? null : true) as boolean | null };
 
 const pairedAt = empty ? ago(2) : '2025-03-03T09:15:00Z';
 
@@ -84,15 +89,35 @@ export let letters = empty
 
 export const setLetters = (next: typeof letters) => { letters = next; };
 
-export const cycles = empty ? [] : [
-  { id: 'cy1', user_id: me.id, start_date: day(-54), end_date: day(-50) },
-  { id: 'cy2', user_id: me.id, start_date: day(-26), end_date: day(-22) },
-];
-
-export const prediction = empty ? null : {
-  nextPeriodStart: day(2), nextPeriodEnd: day(6), ovulationDay: day(-12),
-  fertileWindowStart: day(-14), fertileWindowEnd: day(-8),
-  cycleDay: 27, daysUntilPeriod: 2, phase: 'luteal', averageCycleLength: 28, averageBleedingDays: 5,
+// Periods and daily logs per person, in local calendar days. Mika's last cycles ran 28, 27 and 29 days,
+// so today is day 27 of 28 and her period is due in 2 days. Jed has none (he hasn't answered yet).
+const local = (offset: number) => addDays(today(), offset);
+export const periods: Record<string, { id: string; start_date: string; end_date: string | null }[]> = {
+  [me.id]: returning ? [
+    { id: '00000000-0000-4000-8000-000000000011', start_date: local(-70), end_date: local(-66) },
+    { id: '00000000-0000-4000-8000-000000000012', start_date: local(-41), end_date: local(-37) },
+    { id: '00000000-0000-4000-8000-000000000013', start_date: local(-12), end_date: local(-8) },
+  ] : [],
+  [partner.id]: returning ? [{ id: '00000000-0000-4000-8000-000000000021', start_date: local(-20), end_date: local(-16) }] : empty ? [] : [
+    { id: '00000000-0000-4000-8000-000000000001', start_date: local(-110), end_date: local(-106) },
+    { id: '00000000-0000-4000-8000-000000000002', start_date: local(-82), end_date: local(-78) },
+    { id: '00000000-0000-4000-8000-000000000003', start_date: local(-55), end_date: local(-50) },
+    { id: '00000000-0000-4000-8000-000000000004', start_date: local(-26), end_date: local(-22) },
+  ],
+};
+const symptomLog = (offset: number, fields: Record<string, unknown>) => ({
+  log_date: local(offset), bleeding_intensity: null, physical_symptoms: [], moods: [], discharge: null,
+  sex_drive: null, sexual_activity: [], lifestyle: {}, ...fields,
+});
+export const symptomLogs: Record<string, ReturnType<typeof symptomLog>[]> = {
+  [me.id]: [],
+  [partner.id]: empty ? [] : [-110, -82, -55, -26].flatMap((start) => [
+    symptomLog(start, { bleeding_intensity: 'heavy', physical_symptoms: ['cramps', 'fatigue'], moods: ['emotional'], lifestyle: { sleep_hours: 9, stress: 'medium' } }),
+    symptomLog(start + 1, { bleeding_intensity: 'medium', physical_symptoms: ['cramps', 'backache'], moods: ['calm'] }),
+    symptomLog(start + 3, { bleeding_intensity: 'light', moods: ['energetic'] }),
+    symptomLog(start + 13, { discharge: 'eggwhite', sex_drive: 'high', moods: ['happy', 'energetic'], sexual_activity: ['protected'] }),
+    symptomLog(start + 24, { physical_symptoms: ['bloating', 'breast tenderness'], moods: ['irritable'] }),
+  ]).concat(empty ? [] : [symptomLog(0, { physical_symptoms: ['bloating', 'headache'], moods: ['moody'], lifestyle: { sleep_hours: 6.5, stress: 'high', alcohol: false } })]),
 };
 
 export const question = empty ? null : {
