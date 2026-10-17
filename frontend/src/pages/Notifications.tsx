@@ -99,7 +99,8 @@ export function Notifications() {
           window.dispatchEvent(new Event('notifications-read'));
         }
       } catch (err: any) {
-        console.error('Error fetching notifications:', err);
+        // 404 means not paired yet: an expected state, not a failure
+        if (err.response?.status !== 404) console.error('Error fetching notifications:', err);
         setError(err.response?.status === 404 ? NO_RELATIONSHIP : "Couldn't load your notifications.");
       } finally {
         setLoading(false);

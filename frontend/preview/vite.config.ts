@@ -19,7 +19,6 @@ export default defineConfig({
     alias: [
       { find: /^(\.\.?\/)+lib\/supabase$/, replacement: path.resolve(__dirname, 'mocks/supabase.ts') },
       { find: /^axios$/, replacement: path.resolve(__dirname, 'mocks/axios.ts') },
-      { find: '@', replacement: path.resolve(__dirname, '../src') },
     ],
   },
   server: { port: 5199, strictPort: true, fs: { allow: [path.resolve(__dirname, '..')] } },
