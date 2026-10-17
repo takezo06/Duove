@@ -117,6 +117,8 @@ export const qaCategories = [
   { id: 'cat-memories', name: 'memories', description: 'Looking back at the two of you', icon: 'heart' },
 ];
 
+const OLDER_QUESTIONS = ['Where should our next trip be?', 'What is your favourite memory of us?', 'What do you want to learn together?', 'Which meal of mine is your favourite?'];
+
 const qa = (id: string, offset: number, text: string, mine: string | null, theirs: string | null) => ({
   id, assigned_date: day(offset), revealed_at: mine && theirs ? ago(-offset * 24) : null,
   question: { id: `q-${id}`, question_text: text, category_id: 'c' },
@@ -130,6 +132,10 @@ export const qaHistory = empty ? [] : [
   qa('h2', -1, 'Where would you take me for a perfect lazy Sunday?', 'The bookstore café, then a nap.', 'Pancakes at home, no phones until noon.'),
   qa('h3', -2, 'What song reminds you of us?', 'Anything from that road trip playlist.', null),
   qa('h4', -40, 'What did you think of me the first time we met?', 'That you laughed louder than anyone in the room.', 'You looked like you were about to say something smart.'),
+  // older history, so the list has more than one page to lazy load
+  ...Array.from({ length: 50 }, (_, i) =>
+    qa(`hx${i}`, -41 - i * 3, OLDER_QUESTIONS[i % OLDER_QUESTIONS.length], i % 4 === 3 ? null : 'Easy: the beach at sunrise.', i % 5 === 4 ? null : 'Somewhere quiet with you.'),
+  ),
 ];
 
 const OLDER_CRAVINGS = ['Mango sticky rice', 'A slow Sunday walk', 'Hot chocolate', 'Rewatching our first movie', 'Garlic bread'];

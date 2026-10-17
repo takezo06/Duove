@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Badge, Modal, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Badge, BadgeBar, InlineBar, Modal, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { EnvelopeCard, EnvelopeSkeleton } from '../components/love-letters/EnvelopeCard';
 import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -119,18 +119,7 @@ export function AllLoveLetters() {
   const show = (id: string) => { setOpenId(id); setReadingId(id); markRead(id); };
   const close = () => { setReadingId(null); setOpenId(null); };
 
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto space-y-6" aria-busy="true">
-        <div className={`${surface} h-36 animate-pulse`} />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-          {[...Array(8)].map((_, i) => <EnvelopeSkeleton key={i} />)}
-        </div>
-      </div>
-    );
-  }
-
-  const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
+  const partner = loading ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>;
   const index = letters.findIndex((l) => l.id === readingId);
   const reading = index >= 0 ? letters[index] : null;
   const first = letters[letters.length - 1];
@@ -149,12 +138,12 @@ export function AllLoveLetters() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">The envelope box</h1>
             <p className="text-neutral-400 mt-1">
-          {letters.length > 0
+          {loading || letters.length > 0
             ? <>Every letter you and {partner} have sent. Tap one to open it.</>
             : <>Letters you and {partner} send each other end up here.</>}
             </p>
           </div>
-          {!!total && (
+          {loading ? <BadgeBar /> : !!total && (
             <Badge tone="neutral">{plural(total, 'letter')} kept</Badge>
           )}
         </div>
@@ -169,7 +158,13 @@ export function AllLoveLetters() {
         )}
       </section>
 
-      {letters.length === 0 && !error && (
+      {loading && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6" aria-busy="true">
+          {[...Array(8)].map((_, i) => <EnvelopeSkeleton key={i} />)}
+        </div>
+      )}
+
+      {!loading && letters.length === 0 && !error && (
         <div className={`${surface} px-6 py-14 text-center`}>
           <p className="text-lg font-semibold text-white">No letters yet</p>
           <p className="text-neutral-400 mt-1">Write the first one and {partnerName} will see it right away.</p>

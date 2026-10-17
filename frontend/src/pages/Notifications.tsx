@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { Avatar, Badge, CategoryPill, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, BadgeBar, CategoryPill, InlineBar, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { categoryFor } from '../lib/cravingCategories';
 import { apiError } from '../lib/apiError';
 import { when } from '../lib/when';
@@ -158,31 +158,6 @@ export function Notifications() {
     return () => io.disconnect();
   }, [hasMore, moreError, loadMore]);
 
-  if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6 animate-pulse" aria-busy="true">
-        <div className={`${surface} p-6 md:p-8`}>
-          <div className="h-8 w-48 rounded bg-neutral-800" />
-          <div className="h-4 w-64 max-w-full rounded bg-neutral-800 mt-3" />
-        </div>
-        <div>
-          <div className="h-4 w-16 rounded bg-neutral-800 mx-1 mb-3" />
-          <div className={`${surface} p-2`}>
-            {['w-3/4', 'w-1/2', 'w-2/3'].map((w) => (
-              <div key={w} className="flex items-start gap-3 md:gap-4 p-3 md:p-4">
-                <div className="w-9 h-9 rounded-full bg-neutral-800 shrink-0" />
-                <div className="flex-1 space-y-2.5 pt-1">
-                  <div className={`h-4 ${w} rounded bg-neutral-800`} />
-                  <div className="h-3.5 w-24 rounded bg-neutral-800" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (error === NO_RELATIONSHIP) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -214,14 +189,16 @@ export function Notifications() {
             <p className="text-neutral-400 mt-1">
               What{' '}
               {partner === undefined ? (
-                <span className="inline-block h-4 w-14 rounded bg-neutral-800 animate-pulse align-middle" aria-hidden />
+                <InlineBar w="w-14" />
               ) : (
                 <span className="text-rose-400 font-semibold">{partnerName}</span>
               )}{' '}
               has been up to lately.
             </p>
           </div>
-          {unread > 0 ? (
+          {loading ? (
+            <BadgeBar />
+          ) : unread > 0 ? (
             <Badge tone="rose">{unread.toLocaleString()} new</Badge>
           ) : (
             notifications.length > 0 && <Badge tone="emerald">All caught up</Badge>
@@ -237,7 +214,7 @@ export function Notifications() {
           </div>
         )}
 
-        {!error && notifications.length === 0 && (
+        {!loading && !error && notifications.length === 0 && (
           <div className="mt-6 pt-6 border-t border-neutral-800">
             <p className="text-neutral-200">Quiet so far.</p>
             <p className="text-sm text-neutral-400 mt-1">
@@ -255,6 +232,23 @@ export function Notifications() {
         )}
 
       </section>
+
+      {loading && (
+        <div className="animate-pulse" aria-busy="true">
+          <div className="h-4 w-16 rounded bg-neutral-800 mx-1 mb-3" />
+          <div className={`${surface} p-2`}>
+            {['w-3/4', 'w-1/2', 'w-2/3'].map((w) => (
+              <div key={w} className="flex items-start gap-3 md:gap-4 p-3 md:p-4">
+                <div className="w-9 h-9 rounded-full bg-neutral-800 shrink-0" />
+                <div className="flex-1 space-y-2.5 pt-1">
+                  <div className={`h-4 ${w} rounded bg-neutral-800`} />
+                  <div className="h-3.5 w-24 rounded bg-neutral-800" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {groupByDay(notifications).map(([day, items]) => {
         const offset = notifications.indexOf(items[0]);

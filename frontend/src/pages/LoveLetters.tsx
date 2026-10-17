@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { Mails, PenLine } from 'lucide-react';
-import { Avatar, inverseButton, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, InlineBar, inverseButton, primaryButton, secondaryButton, surface } from '../components/Card';
 import { LetterReader, type Letter } from '../components/love-letters/LetterReader';
 import { RecentLetters } from '../components/love-letters/RecentLetters';
 import { EnvelopeCard } from '../components/love-letters/EnvelopeCard';
@@ -73,18 +73,6 @@ export function LoveLetters() {
     load();
   }, [attempt, highlightId]);
 
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto space-y-6" aria-busy="true">
-        <div className={`${surface} h-36 animate-pulse`} />
-        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6">
-          <div className={`${surface} h-96 animate-pulse`} />
-          <div className={`${surface} h-96 animate-pulse`} />
-        </div>
-      </div>
-    );
-  }
-
   if (unpaired) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -106,7 +94,7 @@ export function LoveLetters() {
   const isMine = (l: Letter) => l.sender_id === me.id;
   const latest = letters.find((l) => !isMine(l)) ?? letters[0];
   const open = picked ?? latest;
-  const partner = <span className="text-rose-400 font-semibold">{partnerName}</span>;
+  const partner = loading ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>;
 
   // A letter written to you stays sealed until you tap its envelope
   const sealed = open && !open.opened_at && !isMine(open);
@@ -145,7 +133,9 @@ export function LoveLetters() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">Love letters</h1>
             <p className="text-neutral-400 mt-1">Everything you and {partner} have put in writing.</p>
-            {counts && counts.sent + counts.received > 0 && (
+            {loading ? (
+              <p className="text-sm mt-1"><InlineBar w="w-40" /></p>
+            ) : counts && counts.sent + counts.received > 0 && (
               <p className="text-sm text-neutral-400 mt-1">
                 <span className="text-white font-medium tabular-nums">{counts.received.toLocaleString()}</span> from {partnerName}
                 <span aria-hidden> · </span>
@@ -153,7 +143,7 @@ export function LoveLetters() {
               </p>
             )}
           </div>
-          {letters.length > 0 && (
+          {(loading || letters.length > 0) && (
             <Link to="/letters/all" className={`${secondaryButton} shrink-0 self-start`}>
               <Mails className="w-4 h-4" aria-hidden />
               Open the envelope box
@@ -161,7 +151,7 @@ export function LoveLetters() {
           )}
         </div>
 
-        {letters.length === 0 && !error && (
+        {!loading && letters.length === 0 && !error && (
           <div className="mt-6 pt-6 border-t border-neutral-800">
             <p className="text-neutral-200">No letters yet.</p>
             <p className="text-sm text-neutral-400 mt-1">Write the first one and {partnerName} will see it right away.</p>
@@ -179,6 +169,13 @@ export function LoveLetters() {
           </div>
         )}
       </section>
+
+      {loading && (
+        <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6" aria-busy="true">
+          <div className={`${surface} h-96 animate-pulse`} />
+          <div className={`${surface} h-96 animate-pulse`} />
+        </div>
+      )}
 
       {open && (
         <div className="grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] gap-6 items-start">

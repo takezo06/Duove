@@ -6,7 +6,7 @@ import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { relationshipYear } from '../lib/relationshipYear';
 import { plural } from '../lib/plural';
-import { Avatar, Badge, CardHeader, focusRing, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, BadgeBar, CardHeader, InlineBar, focusRing, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
 import {
   Loader2,
   Heart,
@@ -219,17 +219,37 @@ export function Partner() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
-        <div className={`${surface} h-36 animate-pulse`} />
-        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`${surface} h-36 animate-pulse`} />
-          ))}
-        </div>
-        <div className="grid sm:grid-cols-3 gap-4 md:gap-6">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className={`${surface} h-28 animate-pulse`} />
-          ))}
+      <div className="max-w-4xl mx-auto space-y-6">
+        <section className={`${surface} p-6 md:p-8`}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            {/* Blank circles until the names land */}
+            <div className="flex -space-x-4">
+              <Avatar src={null} name="" />
+              <Avatar src={null} name="" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h1 className="text-2xl md:text-3xl font-bold text-white">
+                  You &amp; <InlineBar w="w-20" />
+                </h1>
+                <BadgeBar />
+              </div>
+              <p className="text-sm mt-1"><InlineBar w="w-36" /></p>
+            </div>
+          </div>
+        </section>
+        <div className="space-y-6" aria-busy="true">
+          <div className={`${surface} h-64 animate-pulse`} />
+          <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className={`${surface} h-44 animate-pulse`} />
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-3 md:gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className={`${surface} h-28 animate-pulse`} />
+            ))}
+          </div>
         </div>
       </div>
     );
