@@ -49,12 +49,13 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
     const older = q.before ? d.notifications.filter((n) => n.created_at < String(q.before)) : d.notifications;
     return ok(older.slice(0, Number(q.limit) || 30));
   }
-  if (path === '/profile') return ok({ ...d.me });
+  if (path === '/profile') return ok({ ...d.me, created_at: d.stats.user.account_created });
   console.warn('[mock axios] unmocked GET', path);
   return ok({});
 }
 
 async function patch(url: string, body: Record<string, string | null> = {}): Promise<Res> {
+  if (pathOf(url) === '/profile') return ok({ ...Object.assign(d.me, body), created_at: d.stats.user.account_created });
   if (pathOf(url) === '/qa/preferred-category' && d.question) d.question.preferredCategoryId = body.category_id;
   const m = pathOf(url).match(/^\/cravings\/(.+)\/toggle$/);
   if (m) d.setCravings(d.cravings.map((c) => (c.id === m[1] ? { ...c, fulfilled: !c.fulfilled, fulfilled_at: c.fulfilled ? null : new Date().toISOString() } : c)));

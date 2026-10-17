@@ -37,6 +37,7 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `CategoryPill` | Craving category pill (icon + label in the category tint) | Wherever a craving's category appears |
 | `iconButton` | 40px square, `rounded-lg`, `neutral-400` icon that turns white on a `neutral-800` hover | Every icon-only button (add an `aria-label`) |
 | `toggleRow` + `toggleRowOn` / `toggleRowOff` | A full-width row button, `p-3 md:p-4 rounded-xl`. On: `bg-rose-500/10 border-rose-400/20`. Off: transparent border, `neutral-800/60` fill and `neutral-700` border on hover | Rows you tap to open and tap again to close (`aria-pressed`). The heading inside turns `group-hover:text-rose-400` while off, and the on row also shows a `Badge` so state is never color alone |
+| `deleteButton` + `keepButton` | The inline confirm pair in section 7: rose `deleteButton`, quiet `keepButton`, both `min-h-10 rounded-lg text-sm` | A destructive action confirmed in place (Cravings delete, Profile leave relationship and delete account). Put focus on Keep when they appear |
 | `field` | The input style in section 7 | Every text input and textarea |
 | `Chip` | A `<button>` chip: `active`, optional `cat` for the category tint | Filters (`aria-pressed`) and single choice (`role="radio"`) |
 | `Modal` | Overlay, panel, close button, Escape and overlay click to close, focus moved in on open and back on close. `wide` gives `max-w-xl` | Every dialog |
@@ -232,7 +233,7 @@ Never `rounded-md`, `rounded-sm` or `rounded-3xl`.
 | Secondary | `secondaryButton` for Cancel, Copy, Try again, Load more, and the header action. |
 | Text action | `text-sm font-medium text-neutral-400 hover:text-rose-400 transition rounded ${focusRing}`, plus `ArrowRight w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none`. Rose variant for a call to action inside a stat: `text-rose-400 hover:text-rose-300`. |
 | Icon button | `iconButton` with a `w-4 h-4` or `w-5 h-5` icon and an `aria-label`. Destructive icon: `hover:text-rose-400`. |
-| Inline confirm | Delete: `px-3 py-2 min-h-10 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium`. Keep: same size, `text-neutral-400 hover:text-white`. Never `window.confirm`. |
+| Inline confirm | `deleteButton` (rose fill) beside `keepButton` (`text-neutral-400 hover:text-white`), both `px-3 py-2 min-h-10 rounded-lg text-sm font-medium`. The confirm label names the action ("Delete", "Leave"). Never `window.confirm`. |
 
 - **Loading:** `Loader2 w-4 h-4 animate-spin` replaces the leading icon, and the label stays or becomes the "-ing" verb ("Saving..."). Disable the button while busy.
 - **Disabled:** comes with the primitives (`disabled:opacity-50 disabled:cursor-not-allowed`).
@@ -449,10 +450,9 @@ This is older code that breaks the rules above. Fix it when you touch the file, 
 | File | Problem | Fix |
 |---|---|---|
 | `layouts/ProtectedLayout.tsx` (loader) | Gradients, gradient text, blurred glow, `animate-ping`, `tracking-wider` | Plain `neutral-950` screen with the logo and a skeleton or simple spinner |
-| `pages/Profile.tsx` + `components/profile/*` | Icon-in-square heading, `red-*` danger buttons, hand-typed buttons, `text-neutral-500` text, unlabelled icon buttons, page `px-4 py-8`, `max-w-2xl` | Header card with `Avatar`, rose destructive buttons with inline confirm, primitives |
 | `pages/CycleTracker.tsx` + `components/cycle/*` | `Sparkles` tip, blur in `CycleCircle`, hand-typed buttons, em dashes in `StatsCards` | Primitives, `CardHeader`, no em dashes |
 | `pages/CycleLog.tsx`, `pages/CycleAnalytics.tsx` | `red-*` error box, `max-w-2xl`, page padding, em dashes | Error-box spec, `max-w-4xl` |
 | `pages/NotFound.tsx` | Page padding, icon-in-square, `shadow-xl` card, hand-typed primary | Centered state card spec, primitives |
 | `pages/Login.tsx`, `pages/Signup.tsx` | `rounded-lg` inputs and buttons, hand-typed primary, logo in a tinted square | Input and button spec (auth pages keep their centered `max-w-md` layout) |
-| `pages/Cravings.tsx` | List headings use `mb-3` without the white label. Delete/Keep buttons are 28px tall. The trash button is 32px. | Section-heading spec, inline-confirm and icon-button sizes |
+| `pages/Cravings.tsx` | List headings use `mb-3` without the white label. The trash button is 32px. | Section-heading spec, `iconButton` |
 | `components/Sidebar.tsx` | Collapse and sign-out buttons are 32 to 36px | `w-10 h-10` |

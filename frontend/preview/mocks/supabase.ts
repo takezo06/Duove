@@ -30,6 +30,7 @@ export const supabase = {
     getSession: async () => ({ data: { session }, error: null }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
     signOut: async () => ({ error: null }),
+    resetPasswordForEmail: async () => ({ error: null }),
   },
   from: table,
   channel: () => channel,
