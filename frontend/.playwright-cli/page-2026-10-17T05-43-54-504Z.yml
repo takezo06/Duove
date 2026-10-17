@@ -1,0 +1,49 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e5]:
+      - generic [ref=e6]:
+        - link "Duove" [ref=e7] [cursor=pointer]:
+          - /url: /
+        - button "Collapse sidebar" [ref=e9] [cursor=pointer]
+      - navigation "Main" [ref=e13]:
+        - list [ref=e15]:
+          - listitem [ref=e16]:
+            - link "Dashboard" [ref=e17] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=e23]:
+            - link "Notifications" [ref=e24] [cursor=pointer]:
+              - /url: /notifications
+        - generic [ref=e30]:
+          - paragraph [ref=e31]: Together
+          - list [ref=e32]:
+            - listitem [ref=e33]:
+              - link "Daily Q&A" [ref=e34] [cursor=pointer]:
+                - /url: /qa
+            - listitem [ref=e40]:
+              - link "Love Letters" [ref=e41] [cursor=pointer]:
+                - /url: /letters
+            - listitem [ref=e47]:
+              - link "Cravings" [ref=e48] [cursor=pointer]:
+                - /url: /cravings
+            - listitem [ref=e54]:
+              - link "Cycle Tracker" [ref=e55] [cursor=pointer]:
+                - /url: /cycle
+            - listitem [ref=e60]:
+              - link "Partner" [ref=e61] [cursor=pointer]:
+                - /url: /partner
+      - generic [ref=e66]:
+        - link "Loading…" [ref=e67] [cursor=pointer]:
+          - /url: /profile
+        - button "Sign out" [ref=e71] [cursor=pointer]
+    - main [ref=e77]:
+      - generic [ref=e84]:
+        - heading "You &" [level=1] [ref=e86]
+        - paragraph [ref=e89]
+  - generic [ref=e101]:
+    - generic [ref=e102]: Mock
+    - link "default" [ref=e103] [cursor=pointer]:
+      - /url: /partner?scenario=default
+    - link "empty" [ref=e104] [cursor=pointer]:
+      - /url: /partner?scenario=empty
+    - link "unpaired" [ref=e105] [cursor=pointer]:
+      - /url: /partner?scenario=unpaired
