@@ -366,8 +366,10 @@ export function Partner() {
     ? Math.round((new Date().setHours(0, 0, 0, 0) - anniversary.yearStart.getTime()) / 86_400_000)
     : null;
 
-  // Exact time together from the pairing instant
-  const elapsed = rel.paired_at ? Math.max(0, now - new Date(rel.paired_at).getTime()) : 0;
+  // Together counts from the anniversary once it has passed, else from the pairing instant
+  const since = anniversary && anniversary.start.getTime() <= now ? anniversary : together;
+  const sinceTime = anniversary && since === anniversary ? anniversary.start.getTime() : rel.paired_at ? new Date(rel.paired_at).getTime() : now;
+  const elapsed = Math.max(0, now - sinceTime);
   const totalSeconds = Math.floor(elapsed / 1000);
   const units = [
     { label: 'Weeks', value: Math.floor(totalSeconds / 604_800) },
@@ -454,13 +456,13 @@ export function Partner() {
           <Heart className={iconClass} aria-hidden />
           Together
         </h2>
-        {together ? (
+        {since ? (
           <>
             <p className="text-4xl md:text-5xl font-bold text-white mt-3 tabular-nums">
               {fmt(Math.floor(totalSeconds / 86_400))} <span className="text-2xl md:text-3xl font-semibold text-neutral-300">days</span>
             </p>
             <p className="text-neutral-400 mt-2">
-              {span(together)} since {longDate(together.start)}
+              {span(since)} since {longDate(since.start)}
             </p>
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
               {units.map((u) => (
