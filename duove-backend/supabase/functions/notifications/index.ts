@@ -40,29 +40,39 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const partnerId = getPartnerId(relationship);
-    const { data: partnerProfile } = await admin
-      .from("profiles")
-      .select("display_name")
-      .eq("id", partnerId)
-      .single();
-    const partnerDisplay = partnerProfile?.display_name || "Your partner";
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "30") || 30, 1), 100);
+    // Cursor paging: `before` is the created_at of the oldest notification the client already has.
+    // Taking `limit` from each source, then the newest `limit` of the merge, is exact for a created_at cursor.
+    // ponytail: items sharing the exact same microsecond would be skipped; add an id tiebreak if that ever happens
+    const before = url.searchParams.get("before");
+    if (before && Number.isNaN(Date.parse(before))) {
+      return new Response(JSON.stringify({ error: "Invalid before cursor" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const { data: cravings } = await admin
+    let cravingsQuery = admin
       .from("cravings")
       .select("*")
       .eq("relationship_id", relationship.id)
-      .neq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    const { data: letters } = await admin
+      .neq("user_id", userId);
+    let lettersQuery = admin
       .from("love_letters")
       .select("*")
       .eq("relationship_id", relationship.id)
-      .neq("sender_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .neq("sender_id", userId);
+    if (before) {
+      cravingsQuery = cravingsQuery.lt("created_at", before);
+      lettersQuery = lettersQuery.lt("created_at", before);
+    }
+
+    const [{ data: partnerProfile }, { data: cravings }, { data: letters }] = await Promise.all([
+      admin.from("profiles").select("display_name").eq("id", getPartnerId(relationship)).single(),
+      cravingsQuery.order("created_at", { ascending: false }).limit(limit),
+      lettersQuery.order("created_at", { ascending: false }).limit(limit),
+    ]);
+    const partnerDisplay = partnerProfile?.display_name || "Your partner";
 
     const notifications = [];
     cravings?.forEach((c) => {
@@ -89,7 +99,7 @@ serve(async (req) => {
     });
 
     notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return new Response(JSON.stringify(notifications.slice(0, 50)), {
+    return new Response(JSON.stringify(notifications.slice(0, limit)), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
