@@ -417,6 +417,10 @@ Load what the view shows, nothing more, and never let a nice-to-have block the p
 ### Requests
 
 - **Independent requests go in one `Promise.all`** (relationship, list, profile), never one after another.
+- **Render per component, not per page.** Only the data the page frame needs (header, not-paired check) gates the page skeleton. Every other section fetches on its own and writes its slice with `setData((prev) => ({ ...prev, field }))` when it lands. Use `undefined` for still loading and `null` / `[]` for loaded but empty. While a section is `undefined`, show its own skeleton shaped like its content (bars for lines, a circle for an icon, a pill for a badge) so nothing jumps when it fills in. Reference: `useDashboardData.ts` + `BentoGrid.tsx`, `Notifications.tsx`.
+- **Don't wait on background writes.** Mark-as-read and similar POSTs fire after the page renders, never before.
+- **Dependent requests chain only on what they need.** Cravings wait for the relationship id, not for everything else.
+- **Check loading states with `?slow`** in `preview:mock`: every GET waits a random 1-3s.
 - **Nice-to-haves can't fail the page.** Totals from `/relationships/stats` are fetched with `.catch(() => null)`, and the UI simply hides what didn't arrive.
 - **Fetch in the effect, retry with a counter.** Write the async loader inside `useEffect` and re-run it by bumping an `attempt` state from the "Try again" button (this keeps the `set-state-in-effect` lint rule quiet).
 - **Small writes are optimistic and quiet.** Breaking a seal (`openLetter()` in `src/lib/openLetter.ts`, `POST /love-letters/:id/open`) updates local state right away and never blocks or reports: if it fails, the letter is simply sealed again next visit. Use this only for writes whose failure loses nothing.

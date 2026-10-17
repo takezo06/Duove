@@ -38,7 +38,11 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
     return ok({ prediction: d.prediction, calendar: [], lastPeriodStart: d.cycles.at(-1)?.start_date ?? null, partnerName: d.partner.display_name });
   if (path.startsWith('/cycles/')) return ok([]);
   if (path === '/notifications/unread-count') return ok({ count: d.notifications.filter((n) => !n.read).length });
-  if (path === '/notifications') return d.paired ? ok(d.notifications) : notFound();
+  if (path === '/notifications') {
+    if (!d.paired) return notFound();
+    const older = q.before ? d.notifications.filter((n) => n.created_at < String(q.before)) : d.notifications;
+    return ok(older.slice(0, Number(q.limit) || 30));
+  }
   if (path === '/profile') return ok({ ...d.me });
   console.warn('[mock axios] unmocked GET', path);
   return ok({});

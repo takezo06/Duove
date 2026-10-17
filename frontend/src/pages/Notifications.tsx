@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Avatar, Badge, CategoryPill, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
 import { categoryFor } from '../lib/cravingCategories';
-import { plural } from '../lib/plural';
+import { apiError } from '../lib/apiError';
 import { when } from '../lib/when';
-import { ArrowRight, Check, ListPlus, Mail, MessageCircle, Bell } from 'lucide-react';
+import { ArrowRight, Check, ListPlus, Mail, MessageCircle, Bell, Loader2 } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -19,6 +19,17 @@ interface Notification {
 }
 
 const NO_RELATIONSHIP = 'No active relationship found.';
+const PAGE = 30;
+
+// One page of notifications, newest first. `before` is the created_at of the oldest one already shown.
+async function fetchNotifications(before?: string): Promise<Notification[]> {
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/notifications`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { limit: PAGE, before, _t: Date.now() },
+  });
+  return res.data;
+}
 
 function dayLabel(iso: string) {
   const d = new Date(iso).toDateString();
@@ -55,66 +66,119 @@ export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
-  const [partner, setPartner] = useState<{ display_name: string } | null>(null);
+  // undefined = still loading, null = couldn't load
+  const [partner, setPartner] = useState<{ display_name: string } | null | undefined>(undefined);
   const [categoryById, setCategoryById] = useState<Record<string, string>>({});
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState('');
+  const busy = useRef(false);
+  const sentinel = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchNotifications = async () => {
+    const load = async () => {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        navigate('/login');
+        return;
+      }
+
+      const base = import.meta.env.VITE_BACKEND_URL;
+      const headers = { Authorization: `Bearer ${session.access_token}` };
+      const api = (path: string) => axios.get(`${base}${path}`, { headers });
+
+      // Extras only decorate the list: they fill in when they land and the page works if they fail.
+      // Cravings need the relationship id, so they start once /relationships/me is back.
+      api('/relationships/me')
+        .then(({ data: rel }) => {
+          setPartner(rel.partner ?? null);
+          return rel.relationship?.id && api(`/cravings?relationshipId=${rel.relationship.id}`);
+        })
+        .then((res) => {
+          if (res && Array.isArray(res.data))
+            setCategoryById(Object.fromEntries(res.data.map((c: { id: string; category: string }) => [c.id, c.category])));
+        })
+        .catch(() => setPartner((p) => p ?? null));
+
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          navigate('/login');
-          return;
-        }
-
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-
-        const api = (path: string) =>
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-        // Extras only decorate the list; the page still works if they fail
-        const extra = (path: string) => api(path).then((r) => r.data).catch(() => null);
-
         // Unread count must be read before marking everything read below
-        const [res, unreadRes, rel, cravings] = await Promise.all([
-          api(`/notifications?_t=${Date.now()}`),
-          extra('/notifications/unread-count'),
-          extra('/relationships/me'),
-          extra('/cravings'),
+        const [page, unreadRes] = await Promise.all([
+          fetchNotifications(),
+          api('/notifications/unread-count').then((r) => r.data).catch(() => null),
         ]);
-        setNotifications(res.data);
+        setNotifications(page);
+        setHasMore(page.length === PAGE);
         setUnread(unreadRes?.count ?? 0);
-        setPartner(rel?.partner ?? null);
-        if (Array.isArray(cravings))
-          setCategoryById(Object.fromEntries(cravings.map((c: { id: string; category: string }) => [c.id, c.category])));
+        setLoading(false);
 
-        // Mark as read after fetching
-        if (token) {
-          await axios.post(
-            `${import.meta.env.VITE_BACKEND_URL}/notifications/read`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          // Notify sidebar to refresh badge
-          window.dispatchEvent(new Event('notifications-read'));
-        }
+        // Mark as read in the background, then tell the sidebar to refresh its badge
+        axios
+          .post(`${base}/notifications/read`, {}, { headers })
+          .then(() => window.dispatchEvent(new Event('notifications-read')))
+          .catch((err) => console.warn('Could not mark notifications read', err));
       } catch (err: any) {
         // 404 means not paired yet: an expected state, not a failure
         if (err.response?.status !== 404) console.error('Error fetching notifications:', err);
         setError(err.response?.status === 404 ? NO_RELATIONSHIP : "Couldn't load your notifications.");
-      } finally {
         setLoading(false);
       }
     };
 
-    fetchNotifications();
+    load();
   }, [navigate]);
+
+  const loadMore = useCallback(async () => {
+    if (busy.current || notifications.length === 0) return;
+    busy.current = true;
+    setLoadingMore(true);
+    setMoreError('');
+    try {
+      const page = await fetchNotifications(notifications[notifications.length - 1].created_at);
+      setNotifications((prev) => [...prev, ...page]);
+      setHasMore(page.length === PAGE);
+    } catch (err) {
+      setMoreError(apiError(err, "Couldn't load older notifications. Try again."));
+    } finally {
+      busy.current = false;
+      setLoadingMore(false);
+    }
+  }, [notifications]);
+
+  // Lazy loading: fetch the next page while the end is still 600px below the fold.
+  // Re-observing after every page keeps filling a tall screen until it can scroll.
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasMore || moreError) return;
+    const io = new IntersectionObserver(([entry]) => entry.isIntersecting && loadMore(), {
+      root: el.closest('main'),
+      rootMargin: '0px 0px 600px 0px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, moreError, loadMore]);
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6" aria-busy="true">
-        <div className={`${surface} h-32 animate-pulse`} />
-        <div className={`${surface} h-64 animate-pulse`} />
+      <div className="max-w-4xl mx-auto space-y-6 animate-pulse" aria-busy="true">
+        <div className={`${surface} p-6 md:p-8`}>
+          <div className="h-8 w-48 rounded bg-neutral-800" />
+          <div className="h-4 w-64 max-w-full rounded bg-neutral-800 mt-3" />
+        </div>
+        <div>
+          <div className="h-4 w-16 rounded bg-neutral-800 mx-1 mb-3" />
+          <div className={`${surface} p-2`}>
+            {['w-3/4', 'w-1/2', 'w-2/3'].map((w) => (
+              <div key={w} className="flex items-start gap-3 md:gap-4 p-3 md:p-4">
+                <div className="w-9 h-9 rounded-full bg-neutral-800 shrink-0" />
+                <div className="flex-1 space-y-2.5 pt-1">
+                  <div className={`h-4 ${w} rounded bg-neutral-800`} />
+                  <div className="h-3.5 w-24 rounded bg-neutral-800" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -148,7 +212,13 @@ export function Notifications() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">Notifications</h1>
             <p className="text-neutral-400 mt-1">
-              What <span className="text-rose-400 font-semibold">{partnerName}</span> has been up to lately.
+              What{' '}
+              {partner === undefined ? (
+                <span className="inline-block h-4 w-14 rounded bg-neutral-800 animate-pulse align-middle" aria-hidden />
+              ) : (
+                <span className="text-rose-400 font-semibold">{partnerName}</span>
+              )}{' '}
+              has been up to lately.
             </p>
           </div>
           {unread > 0 ? (
@@ -190,10 +260,7 @@ export function Notifications() {
         const offset = notifications.indexOf(items[0]);
         return (
           <section key={day} aria-label={day}>
-            <h2 className="flex items-baseline justify-between text-sm px-1 mb-2">
-              <span className="font-semibold text-white">{day}</span>
-              <span className="text-neutral-400">{plural(items.length, 'update')}</span>
-            </h2>
+            <h2 className="text-sm font-semibold text-white px-1 mb-2">{day}</h2>
             <ul className={`${surface} p-2`}>
               {items.map((item, i) => {
                 const { icon: TypeIcon, color, action } = typeMeta[item.type] ?? { icon: Bell, color: 'text-neutral-300', action: 'Open' };
@@ -246,6 +313,28 @@ export function Notifications() {
           </section>
         );
       })}
+
+      {hasMore ? (
+        <div ref={sentinel} className="flex flex-col items-center gap-3">
+          {moreError && <p role="alert" className="text-sm text-rose-300">{moreError}</p>}
+          <button onClick={loadMore} disabled={loadingMore} className={secondaryButton}>
+            {loadingMore && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+            {loadingMore ? 'Loading...' : moreError ? 'Try again' : 'Load older notifications'}
+          </button>
+        </div>
+      ) : (
+        notifications.length > 0 && (
+          <p className="text-sm text-neutral-400 text-center">
+            That's everything, back to{' '}
+            {new Date(notifications[notifications.length - 1].created_at).toLocaleDateString(undefined, {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+            .
+          </p>
+        )
+      )}
     </div>
   );
 }

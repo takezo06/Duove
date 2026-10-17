@@ -132,9 +132,17 @@ export const qaHistory = empty ? [] : [
   qa('h4', -40, 'What did you think of me the first time we met?', 'That you laughed louder than anyone in the room.', 'You looked like you were about to say something smart.'),
 ];
 
+const OLDER_CRAVINGS = ['Mango sticky rice', 'A slow Sunday walk', 'Hot chocolate', 'Rewatching our first movie', 'Garlic bread'];
+
 export const notifications = empty ? [] : [
   { id: 'n1', type: 'letter_received', message: 'Mika sent you a letter', created_at: ago(0.3), link: '/letters', reference_id: 'l1', read: false },
   { id: 'n2', type: 'craving_added', message: 'Mika added a craving: "Spicy ramen from the corner place"', created_at: ago(2), link: '/cravings', reference_id: 'c1', read: false },
   { id: 'n3', type: 'craving_fulfilled', message: 'Mika fulfilled a craving: "Strawberry milk"', created_at: ago(30), link: '/cravings', reference_id: 'c5', read: true },
   { id: 'n4', type: 'craving_added', message: 'Mika added a craving: "A really long hug after work"', created_at: ago(80), link: '/cravings', reference_id: 'c3', read: true },
+  // older history, so the list has more than one page to lazy load
+  ...Array.from({ length: 50 }, (_, i) =>
+    i % 2
+      ? { id: `nx${i}`, type: 'letter_received', message: 'Mika sent you a letter', created_at: ago(100 + i * 40), link: '/letters', reference_id: `lx${i}`, read: true }
+      : { id: `nx${i}`, type: 'craving_added', message: `Mika added a craving: "${OLDER_CRAVINGS[(i / 2) % OLDER_CRAVINGS.length]}"`, created_at: ago(100 + i * 40), link: '/cravings', reference_id: `cx${i}`, read: true },
+  ),
 ];
