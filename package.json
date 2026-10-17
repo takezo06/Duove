@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "express-rate-limit": "^8.5.2",
-    "express-validator": "^7.3.2",
-    "ws": "^8.21.0"
-  }
-}

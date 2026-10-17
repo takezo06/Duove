@@ -76,7 +76,7 @@ A clean workspace displaying all core platform items at a glance:
 | Framer Motion | Spotify API integration | |
 
 **Key libraries:**
-- **Frontend**: `@supabase/supabase-js` v2 (auth + realtime), `axios` (API calls), `framer-motion` (animations), `lucide-react` (icons), `react-router-dom` v7
+- **Frontend**: `@supabase/supabase-js` v2 (auth + realtime), `axios` (API calls), `lucide-react` (icons), `react-router-dom` v7
 - **Backend**: `@supabase/supabase-js` v2 (two-client pattern: anon + service role)
 - **Database**: Full RLS policies on all tables, UUID primary keys, CASCADE deletes on relationships
 
@@ -167,7 +167,7 @@ VITE_BACKEND_URL=https://your-project-id.supabase.co/functions/v1
 ```
 duove/
 ├── frontend/
-│   ├── public/               # Static vector assets (logo, favicon, icons)
+│   ├── public/               # Static vector assets (logo, tab icon)
 │   ├── sql/
 │   │   └── schema.sql         # Master schema: 10 tables, indexes, RLS policies
 │   ├── supabase/
@@ -178,7 +178,6 @@ duove/
 │   │       ├── cycles/         # Cycle logging, symptoms, predictions, stats, tips
 │   │       ├── cravings/       # CRUD cravings board + auto-archive + toggle
 │   │       ├── health/         # Basic health ping
-│   │       ├── letters/        # (Empty - legacy, love-letters is the active endpoint)
 │   │       ├── love-letters/   # Primary love letters + Spotify song search
 │   │       ├── notifications/  # Unread count, read, notification feed
 │   │       ├── profile/        # GET/PATCH profile

@@ -93,7 +93,8 @@ export function CycleLog() {
           setAlcohol(false);
         }
       } catch (err) {
-        console.error('Error fetching existing log:', err);
+        // 404 means not paired yet: an expected state, not a failure
+        if ((err as { response?: { status?: number } } | null)?.response?.status !== 404) console.error('Error fetching existing log:', err);
       }
     };
     fetchExistingLog();

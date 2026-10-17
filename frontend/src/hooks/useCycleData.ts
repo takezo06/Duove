@@ -168,7 +168,8 @@ export function useCycleData() {
       calendarDays.sort((a, b) => a.date.localeCompare(b.date));
       setCalendar(calendarDays);
     } catch (err) {
-      console.error('Error fetching cycle data:', err);
+      // 404 means not paired yet: an expected state, not a failure
+      if ((err as { response?: { status?: number } } | null)?.response?.status !== 404) console.error('Error fetching cycle data:', err);
     } finally {
       setLoading(false);
     }

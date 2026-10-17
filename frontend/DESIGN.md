@@ -8,7 +8,7 @@ The reference for every UI change. Paths are relative to `frontend/`.
 
 **Deliberate choices.** These are intentional. Do not "fix" them, even if a generic design skill suggests it:
 - **Dark-only.** No light theme.
-- **System sans only.** A serif experiment was rejected. No custom fonts, and no Geist or Inter (the `@fontsource-variable/geist` dependency is unused).
+- **System sans only.** A serif experiment was rejected. No custom fonts, and no Geist or Inter.
 - **One accent, rose.** No second brand color.
 - **Expressive, never loud.** When a page should feel special (the love letters), the feeling comes from real-object details (stamps, wax seals, signatures, envelopes), color blocks that mean something (the rose "Your turn" card, wine envelopes for the partner's letters) and live, personal copy. It never comes from bigger type: every size, weight and spacing stays on the scales in sections 4 and 5. Inconsistent sizes are what make a page look generated.
 - **Tablets are first-class.** Layouts are designed for iPad portrait (820px) and landscape (1180px) as well as phone and desktop: use the extra width (a second column, more grid columns), don't just stretch a phone layout.
@@ -52,7 +52,6 @@ Helpers:
 
 **Adding a new shared style:** add it to `Card.tsx` (styles and components) or `src/lib/` (logic) the first time a second file needs it, then import it everywhere. `Card.tsx` may only export strings and components (fast refresh), so a style that takes arguments becomes a component, like `Chip`.
 
-**Do not use** `src/components/ui/*` (unused shadcn leftovers), or `src/App.css` (unused Vite template).
 
 ---
 
