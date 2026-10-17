@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 
+// Per-tile fields: undefined = still loading, null / [] = loaded, nothing there
 export interface DashboardData {
   userName: string;
   userAvatar: string | null;
@@ -9,21 +10,21 @@ export interface DashboardData {
   partnerAvatar: string | null;
   daysTogether: number;
   since: string | null; // anniversary date, or pairing date if none set
-  cycle: {
+  cycle?: {
     phase: string;
     daysUntilPeriod: number;
     cycleDay: number;
   } | null;
-  latestLetter: {
+  latestLetter?: {
     heading: string;
     sender_name: string;
   } | null;
-  currentQuestion: {
+  currentQuestion?: {
     question_text: string;
     youAnswered: boolean;
     partnerAnswered: boolean;
   } | null;
-  cravings: {
+  cravings?: {
     id: string;
     content: string;
     category: string;
@@ -41,149 +42,93 @@ export function useDashboardData(): DashboardData {
     partnerAvatar: null,
     daysTogether: 0,
     since: null,
-    cycle: null,
-    latestLetter: null,
-    currentQuestion: null,
-    cravings: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const set = (patch: Partial<typeof data>) => setData((prev) => ({ ...prev, ...patch }));
+
     const fetchAll = async () => {
-      try {
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        if (!token) {
-          setError('Not authenticated');
-          setLoading(false);
-          return;
-        }
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        setError('Not authenticated');
+        setLoading(false);
+        return;
+      }
 
-        const headers = { Authorization: `Bearer ${token}` };
+      const base = import.meta.env.VITE_BACKEND_URL;
+      const headers = { Authorization: `Bearer ${session.access_token}` };
+      const user = session.user;
 
-        // 1. Get my own profile (display_name + avatar_url)
-        const { data: { user } } = await supabase.auth.getUser();
-        const userId = user?.id;
-        let myDisplayName = user?.email?.split('@')[0] || 'You';
-        let myAvatarUrl: string | null = null;
-        if (userId) {
-          const { data: myProfile } = await supabase
-            .from('profiles')
-            .select('display_name, avatar_url')
-            .eq('id', userId)
-            .single();
-          if (myProfile) {
-            if (myProfile.display_name) myDisplayName = myProfile.display_name;
-            if (myProfile.avatar_url) myAvatarUrl = myProfile.avatar_url;
-          }
-        }
-
-        // 2. Relationship stats (partner name, id, dates)
-        const statsRes = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/relationships/stats`,
-          { headers }
-        );
-        const stats = statsRes.data;
-        const partnerName = stats.partner?.display_name || 'Your Partner';
-
-        // Compute days together from anniversary or paired_at
-        let daysTogether = 0;
-        const startDateStr = stats.relationship?.anniversary_date || stats.relationship?.paired_at;
-        if (startDateStr) {
-          const startDate = new Date(startDateStr);
-          const now = new Date();
-          const diffTime = now.getTime() - startDate.getTime();
-          daysTogether = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        }
-
-        // 3. Partner avatar from stats response
-        let partnerAvatarUrl = stats.partner?.avatar_url || null;
-
-        // 4. Cycle prediction
-        let cycleData = null;
-        try {
-          const cycleRes = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/cycles/stats`,
-            { headers }
-          );
-          const pred = cycleRes.data.prediction;
-          if (pred) {
-            cycleData = {
-              phase: pred.phase,
-              daysUntilPeriod: pred.daysUntilPeriod,
-              cycleDay: pred.cycleDay,
-            };
-          }
-        } catch (e) {
+      // Tiles: all start at once and fill in as each one lands
+      axios
+        .get(`${base}/cycles/stats`, { headers })
+        .then((res) => {
+          const pred = res.data.prediction;
+          set({ cycle: pred ? { phase: pred.phase, daysUntilPeriod: pred.daysUntilPeriod, cycleDay: pred.cycleDay } : null });
+        })
+        .catch(() => {
           console.warn('Cycle data not available');
-        }
+          set({ cycle: null });
+        });
 
-        // 5. Latest love letter
-        let latestLetter = null;
-        try {
-          const lettersRes = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/love-letters?limit=1`,
-            { headers }
-          );
-          const letters = lettersRes.data;
-          if (letters.length > 0) {
-            latestLetter = {
-              heading: letters[0].heading,
-              sender_name: letters[0].sender_name,
-            };
-          }
-        } catch (e) {
+      axios
+        .get(`${base}/love-letters?limit=1`, { headers })
+        .then((res) => {
+          const letter = res.data[0];
+          set({ latestLetter: letter ? { heading: letter.heading, sender_name: letter.sender_name } : null });
+        })
+        .catch(() => {
           console.warn('Love letters not available');
-        }
+          set({ latestLetter: null });
+        });
 
-        // 6. Current QA question
-        let currentQuestion = null;
-        try {
-          const qaRes = await axios.get(
-            `${import.meta.env.VITE_BACKEND_URL}/qa/current`,
-            { headers, params: { tz: Intl.DateTimeFormat().resolvedOptions().timeZone } }
-          );
-          const qa = qaRes.data;
-          if (qa && qa.question) {
-            currentQuestion = {
-              question_text: qa.question.question_text,
-              youAnswered: !!qa.yourAnswer,
-              partnerAnswered: !!qa.partnerAnswered,
-            };
-          }
-        } catch (e) {
+      axios
+        .get(`${base}/qa/current`, { headers, params: { tz: Intl.DateTimeFormat().resolvedOptions().timeZone } })
+        .then((res) => {
+          const qa = res.data;
+          set({
+            currentQuestion: qa?.question
+              ? { question_text: qa.question.question_text, youAnswered: !!qa.yourAnswer, partnerAnswered: !!qa.partnerAnswered }
+              : null,
+          });
+        })
+        .catch(() => {
           console.warn('QA not available');
+          set({ currentQuestion: null });
+        });
+
+      // Hero: my profile + relationship stats
+      try {
+        const [{ data: myProfile }, statsRes] = await Promise.all([
+          supabase.from('profiles').select('display_name, avatar_url').eq('id', user.id).single(),
+          axios.get(`${base}/relationships/stats`, { headers }),
+        ]);
+        const stats = statsRes.data;
+
+        // Cravings need the relationship id, so they start once stats is back
+        const relId = stats.relationship?.id;
+        if (relId) {
+          axios
+            .get(`${base}/cravings?relationshipId=${relId}`, { headers })
+            .then((res) => set({ cravings: (res.data || []).filter((c: { fulfilled: boolean }) => !c.fulfilled).slice(0, 3) }))
+            .catch(() => {
+              console.warn('Cravings not available');
+              set({ cravings: [] });
+            });
+        } else {
+          set({ cravings: [] });
         }
 
-        // 7. Cravings (recent unfulfilled)
-        let cravings: any[] = [];
-        try {
-          const relId = stats.relationship?.id;
-          if (relId) {
-            const cravingsRes = await axios.get(
-              `${import.meta.env.VITE_BACKEND_URL}/cravings?relationshipId=${relId}`,
-              { headers }
-            );
-            const allCravings = cravingsRes.data || [];
-            cravings = allCravings
-              .filter((c: any) => !c.fulfilled)
-              .slice(0, 3);
-          }
-        } catch (e) {
-          console.warn('Cravings not available');
-        }
-
-        setData({
-          userName: myDisplayName,
-          userAvatar: myAvatarUrl,
-          partnerName,
-          partnerAvatar: partnerAvatarUrl,
-          daysTogether,
+        const startDateStr = stats.relationship?.anniversary_date || stats.relationship?.paired_at;
+        set({
+          userName: myProfile?.display_name || user.email?.split('@')[0] || 'You',
+          userAvatar: myProfile?.avatar_url || null,
+          partnerName: stats.partner?.display_name || 'Your Partner',
+          partnerAvatar: stats.partner?.avatar_url || null,
+          daysTogether: startDateStr ? Math.floor((Date.now() - new Date(startDateStr).getTime()) / (1000 * 60 * 60 * 24)) : 0,
           since: startDateStr || null,
-          cycle: cycleData,
-          latestLetter,
-          currentQuestion,
-          cravings,
         });
       } catch (err: any) {
         // 404 means not paired yet: an expected state, not a failure

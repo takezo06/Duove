@@ -26,6 +26,55 @@ function greetingFor(hour: number) {
 
 const shortDate = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
+// Tile skeletons while each tile's own fetch is in flight, shaped like what lands there
+const bar = (cls: string) => <div className={`rounded bg-neutral-800 ${cls}`} />;
+const skeleton = (children: ReactNode) => (
+  <div className="animate-pulse" aria-busy="true">
+    {children}
+  </div>
+);
+const badgeSkeleton = <span className="block h-5 w-16 rounded-full bg-neutral-800 animate-pulse" aria-hidden />;
+
+const questionSkeleton = skeleton(
+  <>
+    <div className="space-y-2">
+      {bar('h-5 w-full')}
+      {bar('h-5 w-5/6')}
+      {bar('h-5 w-2/3')}
+    </div>
+    <div className="flex gap-4 mt-4">
+      {bar('h-4 w-14')}
+      {bar('h-4 w-16')}
+    </div>
+  </>
+);
+const cycleSkeleton = skeleton(
+  <>
+    {bar('h-5 w-36')}
+    {bar('h-4 w-28 mt-2')}
+    {bar('h-1.5 w-full mt-5 rounded-full')}
+  </>
+);
+const letterSkeleton = skeleton(
+  <>
+    <div className="space-y-2">
+      {bar('h-5 w-full')}
+      {bar('h-5 w-3/5')}
+    </div>
+    {bar('h-4 w-20 mt-3')}
+  </>
+);
+const cravingsSkeleton = skeleton(
+  <div className="space-y-3">
+    {['w-4/5', 'w-3/5', 'w-2/3'].map((w) => (
+      <div key={w} className="flex items-center gap-2.5">
+        {bar('w-4 h-4 shrink-0')}
+        {bar(`h-4 ${w}`)}
+      </div>
+    ))}
+  </div>
+);
+
 function Tile({
   to,
   icon,
@@ -109,7 +158,7 @@ export function BentoGrid() {
 
   // Daily question status
   const q = currentQuestion;
-  const qBadge = !q ? undefined : !q.youAnswered ? (
+  const qBadge = q === undefined ? badgeSkeleton : !q ? undefined : !q.youAnswered ? (
     <Badge tone="rose">Your turn</Badge>
   ) : q.partnerAnswered ? (
     <Badge tone="emerald">Both answered</Badge>
@@ -121,7 +170,7 @@ export function BentoGrid() {
   const phase = cycle ? phaseColors[cycle.phase as keyof typeof phaseColors] : undefined;
   const cycleLength = cycle ? cycle.cycleDay + Math.max(cycle.daysUntilPeriod, 0) : 0;
   const cycleProgress = cycle && cycleLength > 0 ? Math.min(100, (cycle.cycleDay / cycleLength) * 100) : 0;
-  const cycleBadge = !cycle ? undefined : cycle.daysUntilPeriod < 0 ? (
+  const cycleBadge = cycle === undefined ? badgeSkeleton : !cycle ? undefined : cycle.daysUntilPeriod < 0 ? (
     <Badge tone="rose">{plural(-cycle.daysUntilPeriod, 'day')} late</Badge>
   ) : cycle.daysUntilPeriod <= 3 ? (
     <Badge tone="rose">{cycle.daysUntilPeriod === 0 ? 'Period today' : 'Period soon'}</Badge>
@@ -232,7 +281,7 @@ export function BentoGrid() {
         badge={qBadge}
         action={q?.youAnswered ? 'See answers' : q ? 'Answer now' : 'Open Q&A'}
       >
-        {q ? (
+        {q === undefined ? questionSkeleton : q ? (
           <>
             <p className="text-lg font-semibold text-white leading-snug line-clamp-3">{q.question_text}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm">
@@ -259,13 +308,13 @@ export function BentoGrid() {
 
       {/* Cycle */}
       <Tile
-        to={cycle ? '/cycle' : '/cycle/log'}
+        to={cycle === null ? '/cycle/log' : '/cycle'}
         icon={<Activity className={iconClass} aria-hidden />}
         title="Cycle"
         badge={cycleBadge}
-        action={cycle ? 'Open tracker' : 'Log first cycle'}
+        action={cycle === null ? 'Log first cycle' : 'Open tracker'}
       >
-        {cycle ? (
+        {cycle === undefined ? cycleSkeleton : cycle ? (
           <>
             <p className="flex items-center gap-2 text-lg font-semibold text-white leading-snug">
               <span className={`w-2.5 h-2.5 rounded-full ${phase?.dot ?? 'bg-neutral-500'}`} aria-hidden />
@@ -299,9 +348,9 @@ export function BentoGrid() {
         to="/letters"
         icon={<Mails className={iconClass} aria-hidden />}
         title="Love letters"
-        action={latestLetter ? 'Read letters' : 'Write the first one'}
+        action={latestLetter === null ? 'Write the first one' : 'Read letters'}
       >
-        {latestLetter ? (
+        {latestLetter === undefined ? letterSkeleton : latestLetter ? (
           <>
             <p className="text-lg font-semibold text-white leading-snug line-clamp-2">“{latestLetter.heading}”</p>
             <p className="text-sm text-neutral-400 mt-1">
@@ -319,10 +368,10 @@ export function BentoGrid() {
         to="/cravings"
         icon={<Pizza className={iconClass} aria-hidden />}
         title="Cravings"
-        badge={cravings.length > 0 ? <Badge tone="rose">{cravings.length} open</Badge> : undefined}
-        action={cravings.length > 0 ? 'See all cravings' : 'Add a craving'}
+        badge={cravings === undefined ? badgeSkeleton : cravings.length ? <Badge tone="rose">{cravings.length} open</Badge> : undefined}
+        action={cravings?.length === 0 ? 'Add a craving' : 'See all cravings'}
       >
-        {cravings.length > 0 ? (
+        {cravings === undefined ? cravingsSkeleton : cravings.length > 0 ? (
           <ul className="space-y-2">
             {cravings.map((c) => (
               <li key={c.id} className="flex items-start gap-2.5 text-neutral-200 leading-snug">
