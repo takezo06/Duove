@@ -18,12 +18,13 @@ import {
   secondaryButton,
   surface,
 } from '../components/Card';
-import { ArrowRight, Camera, Check, Heart, KeyRound, Loader2, Mail, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, CalendarDays, Camera, Check, Heart, KeyRound, Loader2, Mail, Pencil, Trash2 } from 'lucide-react';
 
 interface ProfileRow {
   display_name: string;
   avatar_url: string | null;
   created_at?: string;
+  has_periods?: boolean | null; // "Do you have periods?", null until answered
 }
 
 const api = import.meta.env.VITE_BACKEND_URL;
@@ -123,6 +124,55 @@ function PasswordTile({ email }: { email: string }) {
           {state === 'sending' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Mail className="w-4 h-4" aria-hidden />}
           {state === 'sending' ? 'Sending...' : 'Email me a reset link'}
         </button>
+      )}
+      {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
+    </Tile>
+  );
+}
+
+// Whether Duove tracks a cycle for you. Off keeps your logs but hides them from your partner.
+function CycleTile({ value, partnerName, onChange }: { value: boolean | null | undefined; partnerName: string | null | undefined; onChange: (v: boolean) => Promise<void> }) {
+  const [busy, setBusy] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const set = async (v: boolean) => {
+    setBusy(v);
+    setError(null);
+    try {
+      await onChange(v);
+    } catch (err) {
+      setError(apiError(err, "That didn't save. Try again."));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const button = (v: boolean, label: string) => (
+    <button onClick={() => set(v)} disabled={busy !== null} className={secondaryButton}>
+      {busy === v && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+      {label}
+    </button>
+  );
+  const partner = partnerName ? <span className="text-rose-400 font-semibold">{partnerName}</span> : 'Your partner';
+
+  return (
+    <Tile icon={<CalendarDays className={iconClass} aria-hidden />} title="Cycle tracking">
+      {value === undefined ? (
+        <p className="mt-4 flex-1"><InlineBar w="w-44" /></p>
+      ) : (
+        <p className="text-neutral-200 mt-4 flex-1">
+          {value === true ? (
+            <>Duove tracks your cycle, and {partner} can see it.</>
+          ) : value === false ? (
+            <>Duove doesn't track a cycle for you. Anything you logged before stays saved, hidden from {partner}.</>
+          ) : (
+            "You haven't said whether you have periods yet."
+          )}
+        </p>
+      )}
+      {value !== undefined && (
+        <div className="mt-5 flex flex-wrap gap-3">
+          {value !== true && button(true, 'Track my cycle')}
+          {value !== false && button(false, value === null ? "I don't have periods" : 'Stop tracking my cycle')}
+        </div>
       )}
       {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
     </Tile>
@@ -359,20 +409,30 @@ export function Profile() {
         </Tile>
       </div>
 
-      <Tile icon={<Trash2 className={iconClass} aria-hidden />} title="Delete account">
-        <p className="text-neutral-200 mt-4">This signs you out and removes your account for good.</p>
-        <ConfirmAction
-          label="Delete my account"
-          confirmLabel="Delete"
-          question="Delete your account? It can't be undone."
-          fallback="Your account wasn't deleted. Try again."
-          onConfirm={async () => {
-            await axios.delete(`${api}/account`, { headers: await authHeaders() });
-            await supabase.auth.signOut();
-            window.location.href = '/login';
+      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+        <CycleTile
+          value={profile === undefined ? undefined : (profile?.has_periods ?? null)}
+          partnerName={partnerName}
+          onChange={async (has_periods) => {
+            const res = await axios.patch(`${api}/profile`, { has_periods }, { headers: await authHeaders() });
+            setProfile(res.data);
           }}
         />
-      </Tile>
+        <Tile icon={<Trash2 className={iconClass} aria-hidden />} title="Delete account">
+          <p className="text-neutral-200 mt-4 flex-1">This signs you out and removes your account for good.</p>
+          <ConfirmAction
+            label="Delete my account"
+            confirmLabel="Delete"
+            question="Delete your account? It can't be undone."
+            fallback="Your account wasn't deleted. Try again."
+            onConfirm={async () => {
+              await axios.delete(`${api}/account`, { headers: await authHeaders() });
+              await supabase.auth.signOut();
+              window.location.href = '/login';
+            }}
+          />
+        </Tile>
+      </div>
     </div>
   );
 }

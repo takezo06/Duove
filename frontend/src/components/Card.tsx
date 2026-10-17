@@ -184,3 +184,18 @@ export function Modal({ label, onClose, wide = false, className = '', children }
     </div>
   );
 }
+
+// Centered stat: icon + label, big value, supporting line, optional pill or extra content
+export function Stat({ icon, label, value, sub, children }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode; children?: ReactNode }) {
+  return (
+    <>
+      <h2 className="flex items-center justify-center gap-2 text-neutral-400 text-sm">
+        {icon}
+        {label}
+      </h2>
+      <p className="text-2xl font-bold text-white mt-3 tabular-nums">{value}</p>
+      {sub && <p className="text-sm text-neutral-400 mt-1">{sub}</p>}
+      {children}
+    </>
+  );
+}

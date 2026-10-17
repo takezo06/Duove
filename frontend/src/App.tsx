@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { ProtectedLayout } from './layouts/ProtectedLayout';
@@ -10,8 +10,6 @@ import { Profile } from './pages/Profile';
 import { QA } from './pages/QA';
 import { QAHistory } from './pages/QAHistory';
 import { CycleTracker } from './pages/CycleTracker';
-import { CycleAnalytics } from './pages/CycleAnalytics';
-import { CycleLog } from './pages/CycleLog';
 import { LoveLetters} from './pages/LoveLetters'
 import { AllLoveLetters } from './pages/AllLoveLetters';
 import { NotFound } from './pages/NotFound';
@@ -32,8 +30,9 @@ function App() {
           <Route path="/qa" element={<QA />} />
           <Route path="/qa/history" element={<QAHistory />} />
           <Route path="/cycle" element={<CycleTracker />} />
-          <Route path="/cycle/analytics" element={<CycleAnalytics />} />
-          <Route path="/cycle/log" element={<CycleLog />} />
+          {/* Logging and history live on the tracker now; old links still land there */}
+          <Route path="/cycle/analytics" element={<Navigate to="/cycle" replace />} />
+          <Route path="/cycle/log" element={<Navigate to="/cycle" replace />} />
           <Route path="/letters" element={<LoveLetters />} />
           <Route path="/letters/all" element={<AllLoveLetters />} />
           <Route path="*" element={<NotFound />} />

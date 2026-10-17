@@ -1,6 +1,7 @@
 // Stands in for axios: answers backend calls from mocks/data.ts, keyed by path.
 // Unknown paths resolve to an empty object and log a warning so gaps are easy to spot.
 import * as d from './data';
+import { showsCycle } from '../../src/lib/cycle';
 
 type Res = { data: unknown };
 const ok = (data: unknown): Res => ({ data });
@@ -40,9 +41,21 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
     return ok({ items: page, hasMore, nextCursor: hasMore ? page[page.length - 1].assigned_date : null, partner: q.before ? null : { display_name, avatar_url } });
   }
   if (path === '/qa/categories') return ok(d.qaCategories);
-  if (path === '/cycles/stats' || path === '/cycles/partner/stats')
-    return ok({ prediction: d.prediction, calendar: [], lastPeriodStart: d.cycles.at(-1)?.start_date ?? null, partnerName: d.partner.display_name });
-  if (path.startsWith('/cycles/')) return ok([]);
+  if (path === '/cycles/overview') {
+    // copies, like a real response, so later writes don't change what the page already holds
+    const periodsOf = (p: typeof d.me | typeof d.partner) => d.periods[p.id].map((x) => ({ ...x }));
+    const theirs = periodsOf(d.partner);
+    return ok({
+      me: { name: d.me.display_name, hasPeriods: d.me.has_periods, periods: periodsOf(d.me) },
+      // same rule as the function: a partner's periods only when their cycle is shared
+      partner: { name: d.partner.display_name, hasPeriods: d.partner.has_periods, periods: showsCycle(d.partner.has_periods, theirs.length) ? theirs : [] },
+    });
+  }
+  if (path === '/cycles/symptoms' || path === '/cycles/partner/symptoms') {
+    const owner = path === '/cycles/symptoms' ? d.me : d.partner;
+    if (owner === d.partner && !showsCycle(d.partner.has_periods, d.periods[d.partner.id].length)) return ok([]);
+    return ok(d.symptomLogs[owner.id].filter((l) => (!q.from || l.log_date >= String(q.from)) && (!q.to || l.log_date <= String(q.to))));
+  }
   if (path === '/notifications/unread-count') return ok({ count: d.notifications.filter((n) => !n.read).length });
   if (path === '/notifications') {
     if (!d.paired) return notFound();
@@ -55,6 +68,13 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
 }
 
 async function patch(url: string, body: Record<string, string | null> = {}): Promise<Res> {
+  const period = pathOf(url).match(/^\/cycles\/log\/(.+)$/);
+  if (period) {
+    const mine = d.periods[d.me.id];
+    const i = mine.findIndex((p) => p.id === period[1]);
+    mine[i] = { ...mine[i], ...body };
+    return ok(mine[i]);
+  }
   if (pathOf(url) === '/profile') return ok({ ...Object.assign(d.me, body), created_at: d.stats.user.account_created });
   if (pathOf(url) === '/qa/preferred-category' && d.question) d.question.preferredCategoryId = body.category_id;
   const m = pathOf(url).match(/^\/cravings\/(.+)\/toggle$/);
@@ -87,10 +107,27 @@ async function post(url: string, body: Record<string, string> = {}): Promise<Res
   if (path === '/qa/skip' && d.question)
     d.question.question = { id: 'q2', question_text: 'If we could spend one whole day doing nothing together, what would it look like?', category_id: 'cat-dreams' };
   if (path === '/relationships/invite') return ok({ invite_code: 'K7Q2M9XD' });
+  if (path === '/cycles/log') {
+    const row = { id: crypto.randomUUID(), start_date: body.start_date, end_date: body.end_date ?? null };
+    d.periods[d.me.id].push(row);
+    return ok(row);
+  }
+  if (path === '/cycles/symptoms') {
+    // Same as the function: one log per day, and an empty one clears the day
+    const logs = d.symptomLogs[d.me.id];
+    const rest = logs.filter((l) => l.log_date !== body.log_date);
+    const v = body as unknown as Record<string, unknown> & { lifestyle?: { sleep_hours?: unknown; stress?: unknown; alcohol?: unknown } };
+    const empty = !v.bleeding_intensity && !v.discharge && !v.sex_drive && !(v.physical_symptoms as string[])?.length && !(v.moods as string[])?.length &&
+      !(v.sexual_activity as string[])?.length && v.lifestyle?.sleep_hours == null && !v.lifestyle?.stress && !v.lifestyle?.alcohol;
+    d.symptomLogs[d.me.id] = empty ? rest : [...rest, body as unknown as (typeof logs)[number]];
+    return ok(empty ? null : body);
+  }
   return ok({});
 }
 
 async function del(url: string): Promise<Res> {
+  const period = pathOf(url).match(/^\/cycles\/log\/(.+)$/);
+  if (period) d.periods[d.me.id] = d.periods[d.me.id].filter((p) => p.id !== period[1]);
   const m = pathOf(url).match(/^\/cravings\/(.+)$/);
   if (m) d.setCravings(d.cravings.filter((c) => c.id !== m[1]));
   return ok({});

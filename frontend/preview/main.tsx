@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '../src/main';
 import { scenario } from './mocks/data';
 
-const scenarios = ['default', 'empty', 'unpaired'];
+const scenarios = ['default', 'empty', 'returning', 'unpaired'];
 
 // Inline styles: Tailwind only scans src/, so utility classes here would not be generated
 const bar = {

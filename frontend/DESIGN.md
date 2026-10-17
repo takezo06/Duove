@@ -40,6 +40,7 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `deleteButton` + `keepButton` | The inline confirm pair in section 7: rose `deleteButton`, quiet `keepButton`, both `min-h-10 rounded-lg text-sm` | A destructive action confirmed in place (Cravings delete, Profile leave relationship and delete account). Put focus on Keep when they appear |
 | `field` | The input style in section 7 | Every text input and textarea |
 | `Chip` | A `<button>` chip: `active`, optional `cat` for the category tint | Filters (`aria-pressed`) and single choice (`role="radio"`) |
+| `Stat` | Centered stat: icon + label, `text-2xl` value, sub line, children for a badge | Stat cards (Partner, the cycle tracker's three stats) |
 | `Modal` | Overlay, panel, close button, Escape and overlay click to close, focus moved in on open and back on close. `wide` gives `max-w-xl` | Every dialog |
 
 Helpers:
@@ -49,7 +50,8 @@ Helpers:
 - `src/lib/apiError.ts`: `apiError(err, fallback)` returns the backend's `{ error }` message or the fallback.
 - `src/lib/groupByDate.ts`: `groupByDate(items, { month: 'long', year: 'numeric' })` splits newest-first items under date headings.
 - `src/lib/when.ts`: `when(iso)` gives relative times ("3h ago", "Yesterday", "Mon", "3 Mar").
-- `components/cycle/constants.ts`: `phaseColors` for cycle phases.
+- `src/lib/cycle.ts`: all cycle math (averages, phases, predictions, late periods, what can be logged on a day), in local calendar days (`'YYYY-MM-DD'`, never `toISOString()`). The tracker and the dashboard tile both use `cycleModel()`. Verify changes with `node frontend/scripts/cycle.check.ts` (from the repo root).
+- `components/cycle/constants.ts`: `phaseColors` for cycle phases, the log options with `labelOf()`, and the cycle date formatters (`shortDay`, `longDay`, `dayRange`, `relativeDay`).
 
 **Adding a new shared style:** add it to `Card.tsx` (styles and components) or `src/lib/` (logic) the first time a second file needs it, then import it everywhere. `Card.tsx` may only export strings and components (fast refresh), so a style that takes arguments becomes a component, like `Chip`.
 
@@ -320,6 +322,15 @@ How the daily question plays out, as cards on a table. See `QA.tsx`.
 - The header card's meta line carries the live countdown ("Next question in 6h 42m"), never an `HH:MM:SS` clock.
 - The topic picker is a `Modal` of `toggleRow`s with `role="radio"`; the chosen one shows `Badge tone="neutral"` "Current".
 
+### Cycle tracker
+
+One page (`/cycle`); `/cycle/log` and `/cycle/analytics` redirect to it. See `CycleTracker.tsx`.
+- **Who has periods.** Everyone is asked "Do you have periods?" (`profiles.has_periods`, null until answered) before the page shows any cycle: until they answer, the page is only that question. The one exception is 2 or more logged periods, which count as a yes without asking (`showsCycle()` in `src/lib/cycle.ts`, mirrored in the cycles function). The page shows the cycle of whoever has one, yours first, with a `Chip` radiogroup ("You" / "Mika") only when both do. Someone who said no but whose partner tracks gets a "Have periods too? Track your cycle" text action in the header; with nobody to show, the header offers "Track my cycle". A partner's cycle is shared only by the same rule (the function sends nothing otherwise).
+- **Header:** title ("Your cycle", "**Mika**'s cycle"), the live meta line ("Day 27 · Luteal phase", "Period 3 days late"), the phase track (one `h-2` bar of phase segments, the current one lit, a white marker on today, the day ranges under it) and, under the divider, one sentence about today plus the page's one primary: "My period started today", or "Period ended today" while a period is open. Your partner's cycle is read-only.
+- **Stats:** three centered `Stat` cards: next period, fertile window, cycle length. Countdown badges follow section 3.
+- **Calendar + day:** a month grid of 40px day buttons (arrow keys move the day across months, swipe changes month on phones), the selected day's card beside it from `lg` (`grid lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]`), under it below. A logged period is a filled `red-500/20` day, a predicted one only a `red-500/50` border, ovulation a `rose-300/60` border, fertile days a `rose-300` dot, a logged day a `neutral-300` corner dot, and a legend explains them. The day card lists what was logged and the actions `cycleModel().actions(day)` allows, as `secondaryButton`s; removing a period confirms inline.
+- **Logging** is a wide `Modal` of chips (single choice is a `radio` you tap again to clear). Saving an empty log clears the day.
+
 ### Avatars
 
 `Avatar` (64px). An overlapping pair (you first, partner second) replaces a "hero icon". A missing partner uses `Avatar dashed`. The sidebar account chip is the one small avatar (`w-9 h-9`).
@@ -450,8 +461,6 @@ This is older code that breaks the rules above. Fix it when you touch the file, 
 | File | Problem | Fix |
 |---|---|---|
 | `layouts/ProtectedLayout.tsx` (loader) | Gradients, gradient text, blurred glow, `animate-ping`, `tracking-wider` | Plain `neutral-950` screen with the logo and a skeleton or simple spinner |
-| `pages/CycleTracker.tsx` + `components/cycle/*` | `Sparkles` tip, blur in `CycleCircle`, hand-typed buttons, em dashes in `StatsCards` | Primitives, `CardHeader`, no em dashes |
-| `pages/CycleLog.tsx`, `pages/CycleAnalytics.tsx` | `red-*` error box, `max-w-2xl`, page padding, em dashes | Error-box spec, `max-w-4xl` |
 | `pages/NotFound.tsx` | Page padding, icon-in-square, `shadow-xl` card, hand-typed primary | Centered state card spec, primitives |
 | `pages/Login.tsx`, `pages/Signup.tsx` | `rounded-lg` inputs and buttons, hand-typed primary, logo in a tinted square | Input and button spec (auth pages keep their centered `max-w-md` layout) |
 | `pages/Cravings.tsx` | List headings use `mb-3` without the white label. The trash button is 32px. | Section-heading spec, `iconButton` |

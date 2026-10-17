@@ -1,279 +1,167 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { useCycleData } from '../hooks/useCycleData';
-import { CycleCircle } from '../components/cycle/CycleCircle';
-import { CalendarGrid } from '../components/cycle/CalendarGrid';
-import { DateRangeSelector } from '../components/cycle/DateRangeSelector';
-import { StatsCards } from '../components/cycle/StatsCards';
-import { useDailyTip } from '../hooks/useDailyTip';
-import { CycleHeader } from '../components/cycle/CycleHeader';
-import { CyclePopup } from '../components/cycle/CyclePopup';
-import { CycleSkeleton } from '../components/cycle/CycleSkeleton';
-import { phaseColors } from '../components/cycle/constants';
-import { supabase } from '../lib/supabase';
-import axios from 'axios';
-import { Sparkles } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { mustAsk, tracks, useCycle, type Who } from '../hooks/useCycle';
+import { cycleModel, today } from '../lib/cycle';
+import { Avatar, primaryButton, secondaryButton, surface } from '../components/Card';
+import { CycleHeader, HeaderShell, HeaderSkeleton, TrackingOff, TrackingQuestion } from '../components/cycle/CycleHeader';
+import { CycleCalendar } from '../components/cycle/CycleCalendar';
+import { DayPanel } from '../components/cycle/DayPanel';
+import { CycleStats, MostLogged, PastCycles, TipCard } from '../components/cycle/CycleInsights';
+import { LogModal } from '../components/cycle/LogModal';
+
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function CycleTracker() {
   usePageTitle('Cycle Tracker');
-  const {
-    loading,
-    prediction,
-    calendar,
-    symptomLogs,
-    lastPeriodStart,
-    viewingPartner,
-    partnerName,
-    range,
-    setRange,
-    customStart,
-    setCustomStart,
-    customEnd,
-    setCustomEnd,
-    fetchData,
-    togglePartnerView,
-    earliestCycleStart,
-  } = useCycleData();
+  const navigate = useNavigate();
+  const todayIso = today();
+  const [pick, setPick] = useState<Who | null>(null);
+  const [month, setMonth] = useState(todayIso.slice(0, 7));
+  const [selected, setSelected] = useState(todayIso);
+  const [logging, setLogging] = useState<string | null>(null);
+  const calendar = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
 
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const [stickyDate, setStickyDate] = useState<string | null>(null);
-  const [popupSymptom, setPopupSymptom] = useState<any | null>(null);
-  const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
-  const [popupPosition, setPopupPosition] = useState<{
-    top: number;
-    left: number;
-    placement: 'top' | 'bottom';
-  } | null>(null);
+  const c = useCycle(pick, month);
+  const { overview } = c;
+  // Everyone answers "Do you have periods?" before seeing any cycle, unless 2+ logged periods already say yes
+  const askMe = !!overview && mustAsk(overview.me);
+  const who = askMe ? null : c.who;
+  const periods = who && overview ? overview[who].periods : undefined;
+  const model = useMemo(() => cycleModel(periods ?? [], todayIso), [periods, todayIso]);
+  const s = model.summary;
+  const mine = who === 'me';
+  const partnerName = overview?.partner.name ?? '';
+  const ready = (day: string) => !!c.logs && !!c.logsFrom && day >= c.logsFrom;
 
-  const popupRef = useRef<HTMLDivElement>(null);
-  const todayStr = new Date().toISOString().split('T')[0];
-  const activeDate = stickyDate || hoveredDate;
-
-  useEffect(() => {
-    const refreshFlag = localStorage.getItem('cycle-refresh');
-    if (refreshFlag) {
-      fetchData(range);
-      localStorage.removeItem('cycle-refresh');
-    }
-  }, []);
-
-  const fetchSymptomForDate = async (date: string): Promise<any> => {
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    if (!token) return null;
-
-    const endpoint = viewingPartner
-      ? `${import.meta.env.VITE_BACKEND_URL}/cycles/partner/symptoms`
-      : `${import.meta.env.VITE_BACKEND_URL}/cycles/symptoms`;
-
-    try {
-      const res = await axios.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { from: date, to: date },
-      });
-      const logs = res.data || [];
-      return logs.find((log: any) => log.log_date === date) || null;
-    } catch (err) {
-      console.error('Failed to fetch symptom for popup', err);
-      return null;
-    }
+  const select = (day: string, tapped?: boolean) => {
+    setSelected(day);
+    // Below lg the day sits under the calendar: bring it up after a tap
+    if (tapped && window.matchMedia('(max-width: 1023px)').matches)
+      requestAnimationFrame(() => panel.current?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' }));
+  };
+  const showInCalendar = (day: string) => {
+    setMonth(day.slice(0, 7));
+    setSelected(day);
+    calendar.current?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
   };
 
-  const handleDayHover = async (date: string | null, element: HTMLElement | null) => {
-    if (stickyDate) return;
-    if (date && element) {
-      setHoveredDate(date);
-      setTargetElement(element);
-      const symptom = await fetchSymptomForDate(date);
-      setPopupSymptom(symptom || null);
-    } else {
-      setHoveredDate(null);
-      setTargetElement(null);
-      setPopupSymptom(null);
-      setPopupPosition(null);
-    }
-  };
-
-  const handleDayClick = async (date: string, element: HTMLElement) => {
-    if (stickyDate === date) {
-      setStickyDate(null);
-      setHoveredDate(null);
-      setTargetElement(null);
-      setPopupSymptom(null);
-      setPopupPosition(null);
-    } else {
-      setStickyDate(date);
-      setHoveredDate(null);
-      setTargetElement(element);
-      const symptom = await fetchSymptomForDate(date);
-      setPopupSymptom(symptom || null);
-    }
-  };
-
-  useEffect(() => {
-    if (!targetElement) {
-      setPopupPosition(null);
-      return;
-    }
-    const updatePosition = () => {
-      const rect = targetElement.getBoundingClientRect();
-      const popupWidth = 288;
-      const popupHeight = popupRef.current ? popupRef.current.offsetHeight : 150;
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-      const spaceAbove = rect.top;
-      const spaceBelow = viewportHeight - rect.bottom;
-      let placement: 'top' | 'bottom' = spaceAbove >= popupHeight || spaceAbove > spaceBelow ? 'top' : 'bottom';
-      let top = 0;
-      if (placement === 'top') {
-        top = rect.top - popupHeight;
-        if (top < 8 && spaceBelow >= popupHeight) {
-          placement = 'bottom';
-          top = rect.bottom;
-        }
-      } else {
-        top = rect.bottom;
-        if (top + popupHeight > viewportHeight - 8 && spaceAbove >= popupHeight) {
-          placement = 'top';
-          top = rect.top - popupHeight;
-        }
-      }
-      let clampedTop = Math.max(8, Math.min(top, viewportHeight - popupHeight - 8));
-      if (clampedTop + popupHeight > rect.top && clampedTop < rect.bottom) {
-        clampedTop = placement === 'top' ? rect.top - popupHeight : rect.bottom;
-      }
-      const left = rect.left + rect.width / 2 - popupWidth / 2;
-      const clampedLeft = Math.max(8, Math.min(left, viewportWidth - popupWidth - 8));
-      setPopupPosition({ top: clampedTop, left: clampedLeft, placement });
-    };
-    updatePosition();
-    const frameId = requestAnimationFrame(updatePosition);
-    const timerId = setTimeout(updatePosition, 32);
-    return () => {
-      cancelAnimationFrame(frameId);
-      clearTimeout(timerId);
-    };
-  }, [targetElement, popupSymptom]);
-
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!stickyDate) return;
-      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-        setStickyDate(null);
-        setHoveredDate(null);
-        setTargetElement(null);
-        setPopupSymptom(null);
-        setPopupPosition(null);
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [stickyDate]);
-
-  const applyCustomRange = () => {
-    if (customStart && customEnd) {
-      fetchData('custom', customStart, customEnd);
-    }
-  };
-
-  const currentPhase = prediction?.phase || null;
-  const dbPhase = currentPhase === 'fertile' ? 'ovulatory' : currentPhase;
-  const { tip: dailyTip, loading: tipLoading } = useDailyTip(dbPhase, viewingPartner ? 'partner' : 'self');
-
-  const getCycleDayForPopupDate = (dateStr: string): number | null => {
-    if (!prediction?.averageCycleLength) return null;
-    const avgCycle = prediction.averageCycleLength;
-    let referenceStart = lastPeriodStart;
-    if (!referenceStart && prediction.cycleDay) {
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      const estStart = new Date(now.getTime() - (prediction.cycleDay - 1) * 86400000);
-      referenceStart = estStart.toISOString().split('T')[0];
-    }
-    if (!referenceStart) return null;
-    const start = new Date(referenceStart);
-    start.setHours(0, 0, 0, 0);
-    const date = new Date(dateStr);
-    date.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((date.getTime() - start.getTime()) / 86400000);
-    let cycleDay = (diffDays % avgCycle) + 1;
-    if (cycleDay <= 0) cycleDay += avgCycle;
-    return cycleDay;
-  };
-
-  const getPhaseKey = (cycleDay: number | null): keyof typeof phaseColors | null => {
-    if (!cycleDay || !prediction) return null;
-    const avgCycle = prediction.averageCycleLength || 28;
-    const bleeds = prediction.averageBleedingDays || 5;
-
-    if (cycleDay <= bleeds) return 'menstrual';
-
-    const remainingDays = avgCycle - bleeds;
-    const follicularDays = Math.ceil(remainingDays / 3);
-    const fertileDays = Math.max(1, Math.floor(remainingDays / 3));
-
-    const follicularEnd = bleeds + follicularDays;
-    const fertileEnd = follicularEnd + fertileDays;
-
-    if (cycleDay <= follicularEnd) return 'follicular';
-    if (cycleDay <= fertileEnd) return 'fertile';
-    return 'luteal';
-  };
-
-  const activeCycleDay = activeDate ? getCycleDayForPopupDate(activeDate) : null;
-  const activePhaseKey = getPhaseKey(activeCycleDay);
-
-  if (loading) return <CycleSkeleton />;
-
-  if (!prediction || !prediction.nextPeriodStart) {
+  if (overview === null) {
     return (
-      <div className="max-w-4xl mx-auto text-center py-16">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
-          <h2 className="text-2xl font-semibold text-white mb-2">
-            {viewingPartner ? `${partnerName || 'Partner'} has no cycle data yet` : 'No cycle data yet'}
-          </h2>
-          <p className="text-neutral-400">
-            {viewingPartner
-              ? 'Ask them to start tracking their cycle.'
-              : 'Start tracking by logging your first cycle.'}
-          </p>
-          {!viewingPartner && (
-            <Link to="/cycle/log" className="mt-4 inline-block px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition">
-              Log your first cycle
-            </Link>
-          )}
+      <div className="max-w-4xl mx-auto">
+        <div className={`${surface} p-8 md:p-12 text-center`}>
+          <div className="flex justify-center -space-x-4 mb-5">
+            <Avatar src={null} name="You" />
+            <Avatar src={null} name="Your partner" dashed />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Cycles are shared here</h1>
+          <p className="text-neutral-400 max-w-md mx-auto">Connect with your partner to track periods and see what's coming, together.</p>
+          <button onClick={() => navigate('/partner')} className={`${primaryButton} mt-6`}>
+            Connect with your partner
+          </button>
         </div>
       </div>
     );
   }
 
-  const { phase, cycleDay, nextPeriodStart, ovulationDay, fertileWindowStart, fertileWindowEnd, daysUntilPeriod, averageCycleLength } = prediction;
-
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 relative">
-      <CyclePopup
-        ref={popupRef}
-        activeDate={activeDate!}
-        activeCycleDay={activeCycleDay}
-        activePhaseKey={activePhaseKey}
-        popupPosition={popupPosition}
-        popupSymptom={popupSymptom}
-        stickyDate={stickyDate}
-      />
-      <CycleHeader viewingPartner={viewingPartner} partnerName={partnerName} togglePartnerView={togglePartnerView} />
-      <CycleCircle phase={phase} cycleDay={cycleDay} daysUntilPeriod={daysUntilPeriod} />
-      <StatsCards nextPeriodStart={nextPeriodStart} ovulationDay={ovulationDay} fertileWindowStart={fertileWindowStart} fertileWindowEnd={fertileWindowEnd} averageCycleLength={averageCycleLength} />
-      <DateRangeSelector range={range} setRange={setRange} showCustom={range === 'custom'} setShowCustom={() => {}} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} applyCustomRange={applyCustomRange} />
-      <CalendarGrid calendar={calendar} range={range} symptomLogs={symptomLogs} lastPeriodStart={lastPeriodStart} prediction={prediction} onDayHover={handleDayHover} onDayClick={handleDayClick} todayStr={todayStr} earliestCycleStart={earliestCycleStart} />
-      <div className="bg-neutral-800/30 rounded-xl p-3 border border-neutral-700/50 mt-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-rose-400" />
-          <p className="text-xs font-medium text-white">
-            {viewingPartner ? `Supporting ${partnerName || 'your partner'} during her ${phase} phase` : `Tip for your ${phase} phase`}
-          </p>
+    <div className="max-w-4xl mx-auto space-y-6">
+      {overview === undefined ? (
+        c.error ? (
+          <HeaderShell title="Cycle tracker" subtitle="Periods, symptoms and predictions for the two of you.">
+            <div className="mt-6 pt-6 border-t border-neutral-800">
+              <p role="alert" className="text-sm text-rose-300">{c.error}</p>
+              <button onClick={c.retry} className={`${secondaryButton} mt-4`}>Try again</button>
+            </div>
+          </HeaderShell>
+        ) : (
+          <HeaderSkeleton />
+        )
+      ) : askMe ? (
+        <HeaderShell
+          title="Cycle tracking"
+          subtitle={tracks(overview.partner) ? `One question about you, then ${partnerName}'s cycle.` : 'One question before you start.'}
+        >
+          <TrackingQuestion partnerName={partnerName} partnerTracks={tracks(overview.partner)} onAnswer={c.answerTracks} />
+        </HeaderShell>
+      ) : !who ? (
+        <TrackingOff partnerName={partnerName} partnerSaidNo={overview.partner.hasPeriods === false} onTurnOn={() => c.answerTracks(true)} />
+      ) : (
+        <CycleHeader
+          who={who}
+          options={c.options}
+          setWho={setPick}
+          partnerName={partnerName}
+          model={model}
+          todayIso={todayIso}
+          todayLogged={!!c.logs?.[todayIso]}
+          logsReady={ready(todayIso)}
+          onStart={c.startPeriod}
+          onUpdate={c.updatePeriod}
+          onLogToday={() => setLogging(todayIso)}
+          // Said no, but a cycle of your own can still be turned on from here
+          onTrackMine={!mine && overview.me.hasPeriods === false ? () => c.answerTracks(true) : undefined}
+        />
+      )}
+
+      {overview === undefined && !c.error && (
+        <div className="space-y-6" aria-busy="true">
+          <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+            {Array.from({ length: 3 }, (_, i) => <div key={i} className={`${surface} h-40 animate-pulse`} />)}
+          </div>
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] gap-6">
+            <div className={`${surface} h-96 animate-pulse`} />
+            <div className={`${surface} h-64 animate-pulse`} />
+          </div>
         </div>
-        {tipLoading ? <p className="text-xs text-neutral-400 mt-2 animate-pulse">Loading tip...</p> : <p className="text-xs text-neutral-400 mt-2">{dailyTip || 'Listen to your body today.'}</p>}
-      </div>
+      )}
+
+      {who && s && !s.stale && <CycleStats s={s} todayIso={todayIso} />}
+
+      {who && (
+        <div ref={calendar} className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] gap-6 items-start scroll-mt-4">
+          <CycleCalendar month={month} setMonth={setMonth} selected={selected} onSelect={select} model={model} logs={c.logs} todayIso={todayIso} />
+          <div ref={panel} className="scroll-mt-4">
+            <DayPanel
+              key={`${who}${selected}`}
+              day={selected}
+              todayIso={todayIso}
+              model={model}
+              periods={periods ?? []}
+              log={c.logs?.[selected]}
+              logsReady={ready(selected)}
+              logsError={c.logsError}
+              retryLogs={c.retryLogs}
+              editable={mine}
+              onLog={() => setLogging(selected)}
+              onStart={c.startPeriod}
+              onUpdate={c.updatePeriod}
+              onRemove={c.removePeriod}
+            />
+          </div>
+        </div>
+      )}
+
+      {who && s && (
+        <>
+          <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+            <PastCycles model={model} mine={mine} name={partnerName} onPick={showInCalendar} />
+            <MostLogged logs={c.logs} from={c.logsFrom} mine={mine} name={partnerName} />
+          </div>
+          <TipCard phase={s.phase} mine={mine} name={partnerName} />
+        </>
+      )}
+
+      {logging && (
+        <LogModal
+          day={logging}
+          isToday={logging === todayIso}
+          existing={c.logs?.[logging]}
+          onSave={(input) => c.saveLog(logging, input)}
+          onClose={() => setLogging(null)}
+        />
+      )}
     </div>
   );
 }

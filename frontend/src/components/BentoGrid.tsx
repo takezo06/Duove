@@ -156,9 +156,9 @@ export function BentoGrid() {
   );
 
   // Cycle status
-  const phase = cycle ? phaseColors[cycle.phase as keyof typeof phaseColors] : undefined;
-  const cycleLength = cycle ? cycle.cycleDay + Math.max(cycle.daysUntilPeriod, 0) : 0;
-  const cycleProgress = cycle && cycleLength > 0 ? Math.min(100, (cycle.cycleDay / cycleLength) * 100) : 0;
+  const phase = cycle?.phase ? phaseColors[cycle.phase] : undefined;
+  const cycleProgress = cycle ? Math.min(100, (cycle.cycleDay / cycle.length) * 100) : 0;
+  const periodWord = cycle?.whose ? `${cycle.whose}'s period` : 'Period';
   const cycleBadge = cycle === undefined ? badgeSkeleton : !cycle ? undefined : cycle.daysUntilPeriod < 0 ? (
     <Badge tone="rose">{plural(-cycle.daysUntilPeriod, 'day')} late</Badge>
   ) : cycle.daysUntilPeriod <= 3 ? (
@@ -317,24 +317,24 @@ export function BentoGrid() {
 
       {/* Cycle */}
       <Tile
-        to={cycle === null ? '/cycle/log' : '/cycle'}
+        to="/cycle"
         icon={<Activity className={iconClass} aria-hidden />}
         title="Cycle"
         badge={cycleBadge}
-        action={cycle === null ? 'Log first cycle' : 'Open tracker'}
+        action={cycle === null ? 'Set up tracking' : 'Open tracker'}
       >
         {cycle === undefined ? cycleSkeleton : cycle ? (
           <>
             <p className="flex items-center gap-2 text-lg font-semibold text-white leading-snug">
               <span className={`w-2.5 h-2.5 rounded-full ${phase?.dot ?? 'bg-neutral-500'}`} aria-hidden />
-              {phase?.label ?? cycle.phase} phase
+              {phase ? `${phase.label} phase` : `Day ${cycle.cycleDay}`}
             </p>
             <p className="text-sm text-neutral-400 mt-1">
               {cycle.daysUntilPeriod > 0
-                ? `Period in ${plural(cycle.daysUntilPeriod, 'day')}`
+                ? `${periodWord} in ${plural(cycle.daysUntilPeriod, 'day')}`
                 : cycle.daysUntilPeriod === 0
-                  ? 'Period expected today'
-                  : `Period ${plural(-cycle.daysUntilPeriod, 'day')} late`}
+                  ? `${periodWord} expected today`
+                  : `${periodWord} is ${plural(-cycle.daysUntilPeriod, 'day')} late`}
             </p>
             <div
               className="mt-4 h-1.5 rounded-full bg-neutral-800 overflow-hidden"

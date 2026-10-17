@@ -30,7 +30,7 @@ Rules:
 
 ## Working on the UI
 
-- `cd frontend && npm run preview:mock` serves the real app on http://localhost:5199 with Supabase and the backend faked (`frontend/preview/mocks/`). Scenarios: `?scenario=default|empty|unpaired`, or the switcher in the bottom-right corner. When a page calls a new endpoint, add it to `preview/mocks/axios.ts`.
+- `cd frontend && npm run preview:mock` serves the real app on http://localhost:5199 with Supabase and the backend faked (`frontend/preview/mocks/`). Scenarios: `?scenario=default|empty|returning|unpaired`, or the switcher in the bottom-right corner. When a page calls a new endpoint, add it to `preview/mocks/axios.ts`.
 - Screenshot with `playwright-cli` (`--browser=chromium` is set via `PLAYWRIGHT_MCP_BROWSER`): one desktop (1366px) and one phone (390px) shot per round, no more.
 - Before finishing: `npm run build` must pass. Then delete the files `tsc -b` leaves behind (`tsconfig*.tsbuildinfo`, `vite.config.js`, `vite.config.d.ts`) and stop the preview server.
 - Pre-existing lint errors (`any` types, effects calling setState) are known. Don't add new ones.

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { cycleModel, today, type Phase } from '../lib/cycle';
+import { tracks, type Overview } from './useCycle';
 
 // Per-tile fields: undefined = still loading, null / [] = loaded, nothing there
 export interface DashboardData {
@@ -10,10 +12,13 @@ export interface DashboardData {
   partnerAvatar: string | null;
   daysTogether: number;
   since: string | null; // anniversary date, or pairing date if none set
+  // The cycle the tracker opens on: yours if you track one, else your partner's (`whose` is their name)
   cycle?: {
-    phase: string;
+    phase: Phase | null;
     daysUntilPeriod: number;
     cycleDay: number;
+    length: number;
+    whose: string | null;
   } | null;
   latestLetter?: {
     heading: string;
@@ -63,15 +68,18 @@ export function useDashboardData(): DashboardData {
 
       // Tiles: all start at once and fill in as each one lands
       axios
-        .get(`${base}/cycles/stats`, { headers })
-        .then((res) => {
-          const pred = res.data.prediction;
-          set({ cycle: pred ? { phase: pred.phase, daysUntilPeriod: pred.daysUntilPeriod, cycleDay: pred.cycleDay } : null });
+        .get<Overview>(`${base}/cycles/overview`, { headers })
+        .then(({ data: o }) => {
+          const who = tracks(o.me) ? o.me : tracks(o.partner) ? o.partner : null;
+          const s = who && cycleModel(who.periods, today()).summary;
+          set({
+            cycle: s
+              ? { phase: s.phase, daysUntilPeriod: s.daysUntil, cycleDay: s.day, length: s.length, whose: who === o.me ? null : o.partner.name }
+              : null,
+          });
         })
-        .catch(() => {
-          console.warn('Cycle data not available');
-          set({ cycle: null });
-        });
+        // Not paired or not reachable: the tile shows its empty line
+        .catch(() => set({ cycle: null }));
 
       axios
         .get(`${base}/love-letters?limit=1`, { headers })
