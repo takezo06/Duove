@@ -18,6 +18,9 @@ export const iconButton = `w-10 h-10 shrink-0 flex items-center justify-center r
 export const toggleRow = `group w-full text-left p-3 md:p-4 rounded-xl border transition cursor-pointer ${focusRing}`;
 export const toggleRowOn = 'bg-rose-500/10 border-rose-400/20';
 export const toggleRowOff = 'border-transparent hover:bg-neutral-800/60 hover:border-neutral-700';
+// Inline confirm for a destructive action: the rose Delete and the quiet Keep beside it
+export const deleteButton = `inline-flex items-center justify-center gap-2 px-3 py-2 min-h-10 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
+export const keepButton = `inline-flex items-center justify-center px-3 py-2 min-h-10 rounded-lg text-neutral-400 hover:text-white text-sm font-medium transition cursor-pointer disabled:opacity-50 ${focusRing}`;
 export const field =
   'w-full bg-neutral-800/50 text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition';
 

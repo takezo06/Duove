@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import axios from 'axios';
-import { Avatar, Badge, BadgeBar, CategoryPill, Chip, InlineBar, field, focusRing, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Badge, BadgeBar, CategoryPill, Chip, InlineBar, deleteButton, field, focusRing, keepButton, primaryButton, secondaryButton, surface } from '../components/Card';
 import { Check, Plus, Trash2, Loader2 } from 'lucide-react';
 import { CATEGORIES, categoryFor } from '../lib/cravingCategories';
 import { when } from '../lib/when';
@@ -264,13 +264,13 @@ export function Cravings() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => handleDelete(craving.id)}
-                className={`px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-medium transition cursor-pointer ${focusRing}`}
+                className={deleteButton}
               >
                 Delete
               </button>
               <button
                 onClick={() => setConfirmingDelete(null)}
-                className={`px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white text-xs font-medium transition cursor-pointer ${focusRing}`}
+                className={keepButton}
               >
                 Keep
               </button>

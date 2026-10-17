@@ -1,357 +1,378 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import type { FormEvent, ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { ChangePassword } from '../components/profile/ChangePassword';
-import { DeleteRelationship } from '../components/profile/DeleteRelationship';
-import { DeleteAccount } from '../components/profile/DeleteAccount';
+import { apiError } from '../lib/apiError';
 import {
-  Loader2,
-  User,
-  Mail,
-  Calendar,
-  Camera,
-  Check,
-  X,
-  Edit2,
-} from 'lucide-react';
+  Avatar,
+  CardHeader,
+  InlineBar,
+  deleteButton,
+  field,
+  focusRing,
+  iconClass,
+  keepButton,
+  primaryButton,
+  secondaryButton,
+  surface,
+} from '../components/Card';
+import { ArrowRight, Camera, Check, Heart, KeyRound, Loader2, Mail, Pencil, Trash2 } from 'lucide-react';
 
-interface Profile {
+interface ProfileRow {
   display_name: string;
   avatar_url: string | null;
-  created_at: string;
+  created_at?: string;
+}
+
+const api = import.meta.env.VITE_BACKEND_URL;
+const authHeaders = async () => ({
+  Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+});
+const longDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+
+// A destructive action confirmed inline: the button turns into the rose confirm and Keep
+function ConfirmAction({ label, confirmLabel, question, fallback, onConfirm }: {
+  label: string;
+  confirmLabel: string;
+  question: string;
+  fallback: string;
+  onConfirm: () => Promise<void>;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (err) {
+      setError(apiError(err, fallback));
+      setBusy(false);
+      setAsking(false);
+    }
+  };
+
+  return (
+    <div className="mt-5">
+      {asking ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="text-sm text-neutral-200">{question}</p>
+          <div className="flex gap-2">
+            <button onClick={run} disabled={busy} className={deleteButton}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+              {confirmLabel}
+            </button>
+            <button onClick={() => setAsking(false)} disabled={busy} autoFocus className={keepButton}>
+              Keep
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAsking(true)} className={secondaryButton}>
+          {label}
+        </button>
+      )}
+      {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
+    </div>
+  );
+}
+
+function Tile({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <section className={`${surface} p-6 flex flex-col`}>
+      <CardHeader icon={icon} title={title} />
+      {children}
+    </section>
+  );
+}
+
+function PasswordTile({ email }: { email: string }) {
+  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  const send = async () => {
+    setState('sending');
+    setError(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    if (error) {
+      setError("The reset link didn't send. Try again.");
+      setState('idle');
+    } else setState('sent');
+  };
+
+  return (
+    <Tile icon={<KeyRound className={iconClass} aria-hidden />} title="Password">
+      <p className="text-neutral-200 mt-4 flex-1">
+        We'll email a link to change it to{' '}
+        {email ? <span className="text-white font-medium break-words">{email}</span> : <InlineBar w="w-40" />}.
+      </p>
+      {state === 'sent' ? (
+        <p role="status" className="mt-5 min-h-10 flex items-center gap-2 text-sm text-emerald-400">
+          <Check className="w-4 h-4" aria-hidden />
+          Sent. Check your inbox.
+        </p>
+      ) : (
+        <button onClick={send} disabled={!email || state === 'sending'} className={`${secondaryButton} mt-5 self-start`}>
+          {state === 'sending' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Mail className="w-4 h-4" aria-hidden />}
+          {state === 'sending' ? 'Sending...' : 'Email me a reset link'}
+        </button>
+      )}
+      {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
+    </Tile>
+  );
 }
 
 export function Profile() {
   usePageTitle('Profile');
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [email, setEmail] = useState<string>('');
+  const navigate = useNavigate();
+  // undefined = still loading, null = loaded but not there (no profile, not paired)
+  const [profile, setProfile] = useState<ProfileRow | undefined>();
+  const [email, setEmail] = useState('');
+  const [partnerName, setPartnerName] = useState<string | null | undefined>();
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
-  const [isEditingName, setIsEditingName] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const load = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           navigate('/login');
           return;
         }
-        setEmail(user.email || '');
-
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/profile`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
+        setEmail(user.email ?? '');
+        const headers = await authHeaders();
+        // ponytail: any failure here reads as "not paired"; the Partner page it links to shows the real state
+        axios
+          .get(`${api}/relationships/me`, { headers })
+          .then((res) => setPartnerName(res.data?.partner?.display_name || 'your partner'))
+          .catch(() => setPartnerName(null));
+        const res = await axios.get(`${api}/profile`, { headers });
         setProfile(res.data);
-        setDisplayName(res.data.display_name || '');
-        setAvatarPreview(res.data.avatar_url || null);
       } catch (err) {
-        console.error('Error fetching profile:', err);
-        setError('Failed to load profile.');
-      } finally {
-        setLoading(false);
+        setError(apiError(err, "Couldn't load your profile. Try again."));
       }
     };
+    load();
+  }, [navigate, attempt]);
 
-    fetchProfile();
-  }, [navigate]);
+  const startEdit = () => {
+    setDisplayName(profile?.display_name ?? '');
+    setSaveError(null);
+    setEditing(true);
+  };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const stopEdit = () => {
+    setEditing(false);
+    setAvatarFile(null);
+    setAvatarPreview(null);
+  };
+
+  const pickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
   };
 
-  const uploadAvatar = async (): Promise<string | null> => {
-    if (!avatarFile) return null;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, avatarFile, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        return null;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      return publicUrlData.publicUrl;
-    } catch (err) {
-      console.error('Avatar upload error:', err);
-      return null;
-    }
+  const uploadAvatar = async (file: File) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const path = `${user?.id}/${Date.now()}.${file.name.split('.').pop()}`;
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { cacheControl: '3600', upsert: true });
+    if (error) throw new Error(error.message);
+    return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
   };
 
-  const handleSave = async () => {
-    setUpdating(true);
-    setError(null);
-    setSuccess(null);
+  const name = displayName.trim();
+  const dirty = !!avatarFile || name !== profile?.display_name;
 
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!name || !dirty) return;
+    setSaving(true);
+    setSaveError(null);
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const updateData: any = {};
-
-      if (displayName !== profile?.display_name) {
-        updateData.display_name = displayName;
-      }
-
-      let avatarUrl = profile?.avatar_url;
-      if (avatarFile) {
-        const uploadedUrl = await uploadAvatar();
-        if (uploadedUrl) {
-          avatarUrl = uploadedUrl;
-          updateData.avatar_url = avatarUrl;
-        } else {
-          throw new Error('Failed to upload avatar');
-        }
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        setSuccess('No changes to save.');
-        setUpdating(false);
-        return;
-      }
-
-      const res = await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/profile`,
-        updateData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      const update: Partial<ProfileRow> = {};
+      if (name !== profile?.display_name) update.display_name = name;
+      if (avatarFile) update.avatar_url = await uploadAvatar(avatarFile);
+      const res = await axios.patch(`${api}/profile`, update, { headers: await authHeaders() });
       setProfile(res.data);
-      setDisplayName(res.data.display_name || '');
-      if (res.data.avatar_url) {
-        setAvatarPreview(res.data.avatar_url);
-      } else {
-        setAvatarPreview(null);
-      }
-      setSuccess('Profile updated successfully!');
-      setAvatarFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setIsEditingName(false);
-
+      stopEdit();
       window.dispatchEvent(new Event('profile-updated'));
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile.');
+    } catch (err) {
+      setSaveError(apiError(err, "Your changes didn't save. Try again."));
     } finally {
-      setUpdating(false);
+      setSaving(false);
     }
   };
 
-  const cancelEdit = () => {
-    setDisplayName(profile?.display_name || '');
-    setIsEditingName(false);
-    setAvatarFile(null);
-    setAvatarPreview(profile?.avatar_url || null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  const shownName = editing && name ? name : profile?.display_name ?? '';
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  // ---------- Loading ----------
-  if (loading) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-8 animate-pulse space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-neutral-800" />
-          <div className="h-8 w-40 bg-neutral-800 rounded" />
-        </div>
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 space-y-6">
-          <div className="flex items-center gap-6">
-            <div className="w-20 h-20 rounded-full bg-neutral-800" />
-            <div className="space-y-3 flex-1">
-              <div className="h-6 w-32 bg-neutral-800 rounded" />
-              <div className="h-4 w-48 bg-neutral-800 rounded" />
-            </div>
-          </div>
-          <div className="h-px bg-neutral-800" />
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 bg-neutral-800 rounded" />
-              <div className="h-4 w-40 bg-neutral-800 rounded" />
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 bg-neutral-800 rounded" />
-              <div className="h-4 w-40 bg-neutral-800 rounded" />
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <div className="flex-1 h-10 bg-neutral-800 rounded-xl" />
-            <div className="w-24 h-10 bg-neutral-800 rounded-xl" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ---------- Error (no profile) ----------
-  if (error && !profile) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-8">
-          <p className="text-neutral-400">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ---------- Main Profile ----------
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-rose-400/10 flex items-center justify-center border border-rose-400/20">
-          <User className="w-5 h-5 text-rose-400" />
-        </div>
-        <h1 className="text-2xl font-semibold text-white">Your Profile</h1>
-      </div>
-
-      {/* Avatar & Display Name Card */}
-      <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 space-y-5">
-        <div className="flex items-center gap-6">
-          {/* Avatar */}
-          <div className="relative flex-shrink-0">
-            <div className="w-20 h-20 rounded-full bg-neutral-800 border-2 border-neutral-700 overflow-hidden flex items-center justify-center">
-              {avatarPreview ? (
-                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-3xl font-medium text-neutral-500">
-                  {profile?.display_name?.charAt(0).toUpperCase() || 'U'}
-                </span>
+      <section className={`${surface} p-6 md:p-8`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+          <Avatar src={avatarPreview ?? profile?.avatar_url ?? null} name={shownName} />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-white break-words">
+              {profile ? shownName || 'You' : <InlineBar w="w-32" />}
+            </h1>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-400">
+              {email ? <span className="break-words">{email}</span> : <InlineBar w="w-40" />}
+              {profile?.created_at && (
+                <>
+                  <span aria-hidden className="hidden sm:inline">·</span>
+                  <span>
+                    Joined Duove on <time dateTime={profile.created_at}>{longDate(profile.created_at)}</time>
+                  </span>
+                </>
               )}
-            </div>
-            <label
-              htmlFor="avatar-upload"
-              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-rose-500 hover:bg-rose-600 cursor-pointer flex items-center justify-center border-2 border-neutral-900 transition"
-            >
-              <Camera className="w-3.5 h-3.5 text-white" />
-            </label>
-            <input
-              ref={fileInputRef}
-              id="avatar-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </div>
-
-          {/* Name & Edit */}
-          <div className="flex-1 min-w-0">
-            {isEditingName ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="flex-1 bg-neutral-800/50 text-sm text-white px-3 py-2 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50"
-                  placeholder="Your display name"
-                />
-                <button
-                  onClick={() => setIsEditingName(false)}
-                  className="p-2 text-neutral-400 hover:text-white rounded-lg transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-semibold text-white truncate">
-                  {profile?.display_name || 'User'}
-                </span>
-                <button
-                  onClick={() => setIsEditingName(true)}
-                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg transition"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-            <p className="text-sm text-neutral-500 mt-1">
-              {profile?.avatar_url ? 'Tap the camera to change your photo' : 'Add a profile photo'}
             </p>
           </div>
+          {profile && !editing && (
+            <button onClick={startEdit} className={`${secondaryButton} self-start sm:self-center`}>
+              <Pencil className="w-4 h-4 text-rose-400" aria-hidden />
+              Edit profile
+            </button>
+          )}
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-neutral-800/50" />
-
-        {/* Details */}
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-3 text-neutral-400">
-            <Mail className="w-4 h-4 text-neutral-500" />
-            <span className="truncate">{email || 'No email'}</span>
+        {error && (
+          <div className="mt-6 pt-6 border-t border-neutral-800">
+            <p role="alert" className="text-sm text-rose-300">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                setAttempt((a) => a + 1);
+              }}
+              className={`${secondaryButton} mt-4`}
+            >
+              Try again
+            </button>
           </div>
-          <div className="flex items-center gap-3 text-neutral-400">
-            <Calendar className="w-4 h-4 text-neutral-500" />
-            <span>Joined {profile?.created_at ? formatDate(profile.created_at) : 'N/A'}</span>
-          </div>
-        </div>
+        )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-3 pt-2">
-          <button
-            onClick={handleSave}
-            disabled={updating || (!avatarFile && displayName === profile?.display_name)}
-            className="flex-1 px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            {updating ? 'Saving...' : 'Save Changes'}
-          </button>
-          <button
-            onClick={cancelEdit}
-            className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl font-medium transition border border-neutral-700"
-          >
-            Cancel
-          </button>
-        </div>
+        {editing && (
+          <form onSubmit={save} className="mt-6 pt-6 border-t border-neutral-800">
+            <div className="grid md:grid-cols-2 gap-5">
+              <div>
+                <label htmlFor="display-name" className="block text-sm text-neutral-400 mb-2">
+                  Display name
+                </label>
+                <input
+                  id="display-name"
+                  type="text"
+                  autoFocus
+                  maxLength={40}
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="What should we call you?"
+                  className={field}
+                />
+                <p className="text-xs text-neutral-400 mt-2">
+                  {partnerName ? (
+                    <>
+                      This is the name <span className="text-rose-400 font-medium">{partnerName}</span> sees.
+                    </>
+                  ) : (
+                    'Your partner will see this name.'
+                  )}
+                </p>
+              </div>
+              <div>
+                <span className="block text-sm text-neutral-400 mb-2">Photo</span>
+                <button type="button" onClick={() => fileInput.current?.click()} className={secondaryButton}>
+                  <Camera className="w-4 h-4" aria-hidden />
+                  {avatarFile ? 'Choose another photo' : profile?.avatar_url ? 'Change photo' : 'Add a photo'}
+                </button>
+                <input ref={fileInput} type="file" accept="image/*" onChange={pickPhoto} className="hidden" aria-label="Profile photo" />
+                <p className="text-xs text-neutral-400 mt-2 truncate">
+                  {avatarFile ? `${avatarFile.name} shows above until you save.` : 'A square photo looks best.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <button type="submit" disabled={saving || !name || !dirty} className={primaryButton}>
+                {saving && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+                {saving ? 'Saving...' : 'Save changes'}
+              </button>
+              <button type="button" onClick={stopEdit} disabled={saving} className={secondaryButton}>
+                Cancel
+              </button>
+            </div>
+            {saveError && <p role="alert" className="mt-4 text-sm text-rose-300">{saveError}</p>}
+          </form>
+        )}
+      </section>
 
-        {/* Feedback */}
-        {error && <p className="text-rose-400 text-sm">{error}</p>}
-        {success && <p className="text-emerald-400 text-sm">{success}</p>}
+      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+        <PasswordTile email={email} />
+
+        <Tile icon={<Heart className={iconClass} aria-hidden />} title="Your relationship">
+          {partnerName === undefined ? (
+            <p className="mt-4 flex-1"><InlineBar w="w-44" /></p>
+          ) : partnerName ? (
+            <>
+              <p className="text-neutral-200 mt-4 flex-1">
+                You're paired with <span className="text-rose-400 font-semibold">{partnerName}</span>.
+              </p>
+              <ConfirmAction
+                label="Leave relationship"
+                confirmLabel="Leave"
+                question={`This ends it for you and ${partnerName}. It can't be undone.`}
+                fallback="The relationship wasn't removed. Try again."
+                onConfirm={async () => {
+                  await axios.delete(`${api}/relationships`, { headers: await authHeaders() });
+                  window.location.reload();
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <p className="text-neutral-200 mt-4 flex-1">You're not paired yet.</p>
+              <Link
+                to="/partner"
+                className={`group mt-5 self-start inline-flex items-center gap-2 text-sm font-medium text-rose-400 hover:text-rose-300 transition rounded ${focusRing}`}
+              >
+                Connect with your partner
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden />
+              </Link>
+            </>
+          )}
+        </Tile>
       </div>
 
-      {/* Security & Danger Cards */}
-      <ChangePassword />
-      <DeleteRelationship />
-      <DeleteAccount />
+      <Tile icon={<Trash2 className={iconClass} aria-hidden />} title="Delete account">
+        <p className="text-neutral-200 mt-4">This signs you out and removes your account for good.</p>
+        <ConfirmAction
+          label="Delete my account"
+          confirmLabel="Delete"
+          question="Delete your account? It can't be undone."
+          fallback="Your account wasn't deleted. Try again."
+          onConfirm={async () => {
+            await axios.delete(`${api}/account`, { headers: await authHeaders() });
+            await supabase.auth.signOut();
+            window.location.href = '/login';
+          }}
+        />
+      </Tile>
     </div>
   );
 }
