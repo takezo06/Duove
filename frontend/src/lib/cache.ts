@@ -1,8 +1,10 @@
-// Data several pages show, kept in memory and localStorage so a page paints it at once
-// and refetches it quietly. Keys start with the user id; sign-out clears everything.
+// Data several pages show, kept in memory (and in localStorage when the visitor allows "Faster loading")
+// so a page paints it at once and refetches it quietly. Keys start with the user id; sign-out clears everything.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { getConsent } from './consent';
 
 const PREFIX = 'duove:';
+const persist = () => getConsent()?.cache === true;
 const mem = new Map<string, unknown>();
 const inflight = new Map<string, Promise<unknown>>();
 const listeners = new Map<string, Set<() => void>>();
@@ -11,6 +13,7 @@ let generation = 0;
 
 export function peek<T>(key: string): T | undefined {
   if (mem.has(key)) return mem.get(key) as T;
+  if (!persist()) return undefined;
   try {
     const raw = localStorage.getItem(PREFIX + key);
     if (raw !== null) {
@@ -24,7 +27,9 @@ export function peek<T>(key: string): T | undefined {
 
 export function put<T>(key: string, value: T) {
   mem.set(key, value);
-  try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); } catch { /* memory only */ }
+  if (persist()) {
+    try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); } catch { /* memory only */ }
+  }
   listeners.get(key)?.forEach((l) => l());
 }
 
@@ -44,13 +49,18 @@ export function load<T>(key: string, fetch: () => Promise<T>, fresh = false): Pr
   return p;
 }
 
+// Drops the copies in localStorage (sign-out, or "Faster loading" turned off); memory keeps working
+export function forgetStored() {
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith(PREFIX)).forEach((k) => localStorage.removeItem(k));
+  } catch { /* nothing stored */ }
+}
+
 export function clearCache() {
   generation++;
   mem.clear();
   inflight.clear();
-  try {
-    Object.keys(localStorage).filter((k) => k.startsWith(PREFIX)).forEach((k) => localStorage.removeItem(k));
-  } catch { /* nothing stored */ }
+  forgetStored();
   listeners.forEach((set) => set.forEach((l) => l()));
 }
 
