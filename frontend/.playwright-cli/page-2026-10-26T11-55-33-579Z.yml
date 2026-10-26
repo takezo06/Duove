@@ -1,0 +1,116 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e3]:
+    - complementary [ref=f2e5]:
+      - generic [ref=f2e6]:
+        - link "Duove" [ref=f2e7] [cursor=pointer]:
+          - /url: /
+        - button "Collapse sidebar" [ref=f2e9] [cursor=pointer]
+      - navigation "Main" [ref=f2e13]:
+        - list [ref=f2e15]:
+          - listitem [ref=f2e16]:
+            - link "Dashboard" [ref=f2e17] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=f2e23]:
+            - link "Notifications 2" [ref=f2e24] [cursor=pointer]:
+              - /url: /notifications
+              - generic [ref=f2e29]: Notifications
+              - generic [ref=f2e30]: "2"
+        - generic [ref=f2e31]:
+          - paragraph [ref=f2e32]: Together
+          - list [ref=f2e33]:
+            - listitem [ref=f2e34]:
+              - link "Daily Q&A" [ref=f2e35] [cursor=pointer]:
+                - /url: /qa
+            - listitem [ref=f2e41]:
+              - link "Love Letters" [ref=f2e42] [cursor=pointer]:
+                - /url: /letters
+            - listitem [ref=f2e48]:
+              - link "Cravings" [ref=f2e49] [cursor=pointer]:
+                - /url: /cravings
+            - listitem [ref=f2e55]:
+              - link "Cycle Tracker" [ref=f2e56] [cursor=pointer]:
+                - /url: /cycle
+            - listitem [ref=f2e61]:
+              - link "Partner" [ref=f2e62] [cursor=pointer]:
+                - /url: /partner
+      - generic [ref=f2e67]:
+        - link "Jed jed@duove.app" [ref=f2e68] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=f2e70]:
+            - generic [ref=f2e71]: Jed
+            - generic [ref=f2e72]: jed@duove.app
+        - button "Sign out" [ref=f2e73] [cursor=pointer]
+    - main [ref=f2e79]:
+      - generic [ref=f2e80]:
+        - generic [ref=f2e82]:
+          - generic [ref=f2e83]:
+            - img "Jed" [ref=f2e84]
+            - generic "Mika" [ref=f2e85]: M
+          - generic [ref=f2e86]:
+            - generic [ref=f2e87]:
+              - heading "You & Mika" [level=1] [ref=f2e88]
+              - generic [ref=f2e89]: Connected
+            - paragraph [ref=f2e90]: Paired on March 3, 2025
+          - button "Edit anniversary" [ref=f2e91] [cursor=pointer]
+        - generic [ref=f2e95]:
+          - heading "Together" [level=2] [ref=f2e96]
+          - paragraph [ref=f2e99]: 619 days
+          - paragraph [ref=f2e100]: 1 year, 8 months since February 14, 2025
+          - generic [ref=f2e101]:
+            - generic [ref=f2e102]:
+              - definition [ref=f2e103]: "88"
+              - term [ref=f2e104]: Weeks
+            - generic [ref=f2e105]:
+              - definition [ref=f2e106]: 14,875
+              - term [ref=f2e107]: Hours
+            - generic [ref=f2e108]:
+              - definition [ref=f2e109]: 892,555
+              - term [ref=f2e110]: Minutes
+            - generic [ref=f2e111]:
+              - definition [ref=f2e112]: 53,553,333
+              - term [ref=f2e113]: Seconds
+        - generic [ref=f2e114]:
+          - generic [ref=f2e115]:
+            - heading "Since your anniversary" [level=2] [ref=f2e116]
+            - paragraph [ref=f2e119]: 254 days
+            - paragraph [ref=f2e120]: Celebrated every February 14
+            - generic [ref=f2e121]: Year 2
+          - generic [ref=f2e123]:
+            - heading "Next anniversary" [level=2] [ref=f2e124]
+            - paragraph [ref=f2e128]: February 14
+            - paragraph [ref=f2e129]: Your 2nd anniversary · 2027
+            - generic [ref=f2e130]: in 111 days
+          - generic [ref=f2e132]:
+            - heading "Next monthsary" [level=2] [ref=f2e133]
+            - paragraph [ref=f2e138]: November 14
+            - paragraph [ref=f2e139]: Every month on day 14
+            - progressbar "Progress to next monthsary" [ref=f2e140]
+            - generic [ref=f2e142]: in 19 days
+        - generic [ref=f2e144]:
+          - link [ref=f2e145] [cursor=pointer]:
+            - /url: /cravings
+            - paragraph [ref=f2e152]: "12"
+            - paragraph [ref=f2e153]: Cravings
+          - link [ref=f2e154] [cursor=pointer]:
+            - /url: /letters
+            - paragraph [ref=f2e158]: "15"
+            - paragraph [ref=f2e159]: Letters sent
+          - link [ref=f2e160] [cursor=pointer]:
+            - /url: /letters
+            - paragraph [ref=f2e165]: "30"
+            - paragraph [ref=f2e166]: Letters received
+        - generic [ref=f2e167]:
+          - paragraph [ref=f2e168]:
+            - generic [ref=f2e172]: You joined Duove on January 14, 2025
+          - paragraph [ref=f2e173]:
+            - generic [ref=f2e177]: Mika joined Duove on February 20, 2025
+  - generic [ref=f2e178]:
+    - generic [ref=f2e179]: Mock
+    - link "default" [ref=f2e180] [cursor=pointer]:
+      - /url: /partner?scenario=default
+    - link "empty" [ref=f2e181] [cursor=pointer]:
+      - /url: /partner?scenario=empty
+    - link "returning" [ref=f2e182] [cursor=pointer]:
+      - /url: /partner?scenario=returning
+    - link "unpaired" [ref=f2e183] [cursor=pointer]:
+      - /url: /partner?scenario=unpaired

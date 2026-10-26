@@ -6,6 +6,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { Loader2, MessageCircle } from 'lucide-react';
 import { Avatar, Badge, focusRing, inset, primaryButton, secondaryButton, surface } from '../components/Card';
 import { apiError } from '../lib/apiError';
+import { useMyProfile } from '../hooks/useShared';
 import { plural } from '../lib/plural';
 
 interface HistoryItem {
@@ -80,26 +81,15 @@ export function QAHistory() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState('');
-  // undefined = still loading
-  const [me, setMe] = useState<Person | undefined>(undefined);
+  // Your name and avatar only decorate the header and paint from the cache. undefined = still loading.
+  const profile = useMyProfile();
+  const me: Person | undefined = profile.data === undefined && !profile.error
+    ? undefined
+    : { name: profile.data?.display_name || 'You', avatar: profile.data?.avatar_url || null };
   const [partner, setPartner] = useState<Person | null>(null);
   const busy = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-
-  // Your name and avatar only decorate the header: they fill in when they land, and a retry doesn't refetch them
-  useEffect(() => {
-    const load = async () => {
-      const session = (await supabase.auth.getSession()).data.session;
-      if (!session) return;
-      const fallback = { name: 'You', avatar: null };
-      supabase.from('profiles').select('display_name, avatar_url').eq('id', session.user.id).maybeSingle().then(
-        ({ data }) => setMe(data ? { name: data.display_name || 'You', avatar: data.avatar_url || null } : fallback),
-        () => setMe(fallback),
-      );
-    };
-    load();
-  }, []);
 
   useEffect(() => {
     const load = async () => {

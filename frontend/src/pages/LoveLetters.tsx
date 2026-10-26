@@ -12,6 +12,8 @@ import { SendLetterModal } from '../components/love-letters/SendLetterModal';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
 import { daysAgo } from '../lib/when';
+import { useAuth } from '../context/AuthContext';
+import { useMyProfile, useRelationship, useStats } from '../hooks/useShared';
 
 const RECENT = 6;
 const READER_ID = 'open-letter';
@@ -27,12 +29,20 @@ export function LoveLetters() {
   const [letters, setLetters] = useState<Letter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [unpaired, setUnpaired] = useState(false);
-  const [me, setMe] = useState({ id: '', name: '' });
-  const [partnerName, setPartnerName] = useState('your partner');
+  const [lettersUnpaired, setUnpaired] = useState(false);
+  // Your name, your partner and the totals paint from the cache, then refresh
+  const meId = useAuth().user?.id ?? '';
+  const profile = useMyProfile();
+  const rel = useRelationship();
+  const stats = useStats();
+  const unpaired = lettersUnpaired || rel.data === null;
+  const me = { id: meId, name: profile.data?.display_name ?? '' };
+  const partnerName = rel.data?.partner?.display_name || 'your partner';
   const [picked, setPicked] = useState<Letter | null>(null);
   const [breaking, setBreaking] = useState(false);
-  const [counts, setCounts] = useState<{ sent: number; received: number } | null>(null);
+  // the totals are a nice-to-have; the page works without them
+  const totals = stats.data?.stats;
+  const counts = totals ? { sent: totals.letters_sent, received: totals.letters_received } : null;
   const [composing, setComposing] = useState(Boolean(compose));
   const [attempt, setAttempt] = useState(0);
   const reader = useRef<HTMLElement>(null);
@@ -40,22 +50,10 @@ export function LoveLetters() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
         const token = (await supabase.auth.getSession()).data.session?.access_token;
         const headers = { Authorization: `Bearer ${token}` };
         const api = import.meta.env.VITE_BACKEND_URL;
-        const [rel, list, profile, stats] = await Promise.all([
-          axios.get(`${api}/relationships/me`, { headers }),
-          axios.get(`${api}/love-letters?limit=${RECENT}`, { headers }),
-          supabase.from('profiles').select('display_name').eq('id', user?.id ?? '').single(),
-          // the totals are a nice-to-have; the page works without them
-          axios.get(`${api}/relationships/stats`, { headers }).catch(() => null),
-        ]);
-        const totals = stats?.data?.stats;
-        if (totals) setCounts({ sent: totals.letters_sent, received: totals.letters_received });
-        if (!rel.data?.relationship) { setUnpaired(true); return; }
-        setPartnerName(rel.data.partner?.display_name || 'your partner');
-        setMe({ id: user?.id ?? '', name: profile.data?.display_name ?? '' });
+        const list = await axios.get(`${api}/love-letters?limit=${RECENT}`, { headers });
         setLetters(list.data);
         // A notification deep link opens its letter, even one older than the recent few
         if (highlightId) {
@@ -94,7 +92,7 @@ export function LoveLetters() {
   const isMine = (l: Letter) => l.sender_id === me.id;
   const latest = letters.find((l) => !isMine(l)) ?? letters[0];
   const open = picked ?? latest;
-  const partner = loading ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>;
+  const partner = rel.data === undefined ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>;
 
   // A letter written to you stays sealed until you tap its envelope
   const sealed = open && !open.opened_at && !isMine(open);
@@ -235,6 +233,7 @@ export function LoveLetters() {
           onSent={(letter) => {
             setLetters((prev) => [letter, ...prev].slice(0, RECENT));
             setPicked(letter);
+            stats.reload();
           }}
         />
       )}

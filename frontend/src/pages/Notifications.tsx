@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
@@ -7,6 +7,7 @@ import { Avatar, Badge, BadgeBar, CategoryPill, InlineBar, focusRing, primaryBut
 import { categoryFor } from '../lib/cravingCategories';
 import { apiError } from '../lib/apiError';
 import { when } from '../lib/when';
+import { useCravings, useRelationship } from '../hooks/useShared';
 import { ArrowRight, Check, ListPlus, Mail, MessageCircle, Bell, Loader2 } from 'lucide-react';
 
 interface Notification {
@@ -66,9 +67,11 @@ export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
-  // undefined = still loading, null = couldn't load
-  const [partner, setPartner] = useState<{ display_name: string } | null | undefined>(undefined);
-  const [categoryById, setCategoryById] = useState<Record<string, string>>({});
+  // Extras only decorate the list and paint from the cache. undefined = still loading, null = couldn't load.
+  const rel = useRelationship();
+  const partner = rel.data === undefined ? (rel.error ? null : undefined) : (rel.data?.partner ?? null);
+  const cravings = useCravings(rel.data?.relationship.id).data;
+  const categoryById = useMemo(() => Object.fromEntries((cravings ?? []).map((c) => [c.id, c.category])), [cravings]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState('');
@@ -87,19 +90,6 @@ export function Notifications() {
       const base = import.meta.env.VITE_BACKEND_URL;
       const headers = { Authorization: `Bearer ${session.access_token}` };
       const api = (path: string) => axios.get(`${base}${path}`, { headers });
-
-      // Extras only decorate the list: they fill in when they land and the page works if they fail.
-      // Cravings need the relationship id, so they start once /relationships/me is back.
-      api('/relationships/me')
-        .then(({ data: rel }) => {
-          setPartner(rel.partner ?? null);
-          return rel.relationship?.id && api(`/cravings?relationshipId=${rel.relationship.id}`);
-        })
-        .then((res) => {
-          if (res && Array.isArray(res.data))
-            setCategoryById(Object.fromEntries(res.data.map((c: { id: string; category: string }) => [c.id, c.category])));
-        })
-        .catch(() => setPartner((p) => p ?? null));
 
       try {
         // Unread count must be read before marking everything read below

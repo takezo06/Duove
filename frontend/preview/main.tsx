@@ -1,4 +1,5 @@
 // Mock preview entry: the real app (src/main.tsx) with supabase + backend faked, plus a scenario switcher.
+import './resetCache';
 import { createRoot } from 'react-dom/client';
 import '../src/main';
 import { scenario } from './mocks/data';

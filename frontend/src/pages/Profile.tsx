@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
+import { refreshRelationship, useMyProfile, useRelationship } from '../hooks/useShared';
 import {
   Avatar,
   CardHeader,
@@ -185,7 +186,10 @@ export function Profile() {
   // undefined = still loading, null = loaded but not there (no profile, not paired)
   const [profile, setProfile] = useState<ProfileRow | undefined>();
   const [email, setEmail] = useState('');
-  const [partnerName, setPartnerName] = useState<string | null | undefined>();
+  // undefined = loading, null = not paired. Any failure reads as "not paired"; the Partner page it links to shows the real state.
+  const rel = useRelationship();
+  const partnerName = rel.data === undefined && !rel.error ? undefined : rel.data?.partner?.display_name || (rel.data ? 'your partner' : null);
+  const setMyProfile = useMyProfile().set;
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -200,18 +204,14 @@ export function Profile() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        // The local session, not getUser(): that one is a round trip before the profile can start
+        const user = (await supabase.auth.getSession()).data.session?.user;
         if (!user) {
           navigate('/login');
           return;
         }
         setEmail(user.email ?? '');
         const headers = await authHeaders();
-        // ponytail: any failure here reads as "not paired"; the Partner page it links to shows the real state
-        axios
-          .get(`${api}/relationships/me`, { headers })
-          .then((res) => setPartnerName(res.data?.partner?.display_name || 'your partner'))
-          .catch(() => setPartnerName(null));
         const res = await axios.get(`${api}/profile`, { headers });
         setProfile(res.data);
       } catch (err) {
@@ -263,8 +263,9 @@ export function Profile() {
       if (avatarFile) update.avatar_url = await uploadAvatar(avatarFile);
       const res = await axios.patch(`${api}/profile`, update, { headers: await authHeaders() });
       setProfile(res.data);
+      // The sidebar and every other page show the new name and photo from the cache
+      setMyProfile({ display_name: res.data.display_name, avatar_url: res.data.avatar_url });
       stopEdit();
-      window.dispatchEvent(new Event('profile-updated'));
     } catch (err) {
       setSaveError(apiError(err, "Your changes didn't save. Try again."));
     } finally {
@@ -390,6 +391,8 @@ export function Profile() {
                 fallback="The relationship wasn't removed. Try again."
                 onConfirm={async () => {
                   await axios.delete(`${api}/relationships`, { headers: await authHeaders() });
+                  // Drop the cached partner first, or the reload would still show them
+                  await refreshRelationship();
                   window.location.reload();
                 }}
               />

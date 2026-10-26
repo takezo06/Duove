@@ -1,0 +1,61 @@
+- generic [active] [ref=f6e1]:
+  - generic [ref=f6e3]:
+    - complementary [ref=f6e5]:
+      - generic [ref=f6e6]:
+        - link "Duove" [ref=f6e7] [cursor=pointer]:
+          - /url: /
+        - button "Collapse sidebar" [ref=f6e9] [cursor=pointer]
+      - navigation "Main" [ref=f6e13]:
+        - list [ref=f6e15]:
+          - listitem [ref=f6e16]:
+            - link "Dashboard" [ref=f6e17] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=f6e23]:
+            - link "Notifications" [ref=f6e24] [cursor=pointer]:
+              - /url: /notifications
+        - generic [ref=f6e30]:
+          - paragraph [ref=f6e31]: Together
+          - list [ref=f6e32]:
+            - listitem [ref=f6e33]:
+              - link "Daily Q&A" [ref=f6e34] [cursor=pointer]:
+                - /url: /qa
+            - listitem [ref=f6e40]:
+              - link "Love Letters" [ref=f6e41] [cursor=pointer]:
+                - /url: /letters
+            - listitem [ref=f6e47]:
+              - link "Cravings" [ref=f6e48] [cursor=pointer]:
+                - /url: /cravings
+            - listitem [ref=f6e54]:
+              - link "Cycle Tracker" [ref=f6e55] [cursor=pointer]:
+                - /url: /cycle
+            - listitem [ref=f6e60]:
+              - link "Partner" [ref=f6e61] [cursor=pointer]:
+                - /url: /partner
+      - generic [ref=f6e66]:
+        - link "Jed jed@duove.app" [ref=f6e67] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=f6e69]:
+            - generic [ref=f6e70]: Jed
+            - generic [ref=f6e71]: jed@duove.app
+        - button "Sign out" [ref=f6e72] [cursor=pointer]
+    - main [ref=f6e78]:
+      - generic [ref=f6e80]:
+        - generic [ref=f6e82]:
+          - heading "Cycle tracking" [level=1] [ref=f6e83]
+          - paragraph [ref=f6e84]: One question about you, then Mika's cycle.
+        - generic [ref=f6e85]:
+          - heading "Do you have periods?" [level=2] [ref=f6e86]
+          - paragraph [ref=f6e87]: Duove tracks a cycle only for whoever has one. You'll see Mika's either way.
+          - generic [ref=f6e88]:
+            - button "Yes, track my cycle" [ref=f6e89] [cursor=pointer]
+            - button "No, I don't" [ref=f6e90] [cursor=pointer]
+  - generic [ref=f6e91]:
+    - generic [ref=f6e92]: Mock
+    - link "default" [ref=f6e93] [cursor=pointer]:
+      - /url: /cycle?scenario=default
+    - link "empty" [ref=f6e94] [cursor=pointer]:
+      - /url: /cycle?scenario=empty
+    - link "returning" [ref=f6e95] [cursor=pointer]:
+      - /url: /cycle?scenario=returning
+    - link "unpaired" [ref=f6e96] [cursor=pointer]:
+      - /url: /cycle?scenario=unpaired

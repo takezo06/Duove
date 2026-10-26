@@ -11,6 +11,8 @@ import { apiError } from '../lib/apiError';
 import { groupByDate } from '../lib/groupByDate';
 import { openLetter as breakSeal } from '../lib/openLetter';
 import { plural } from '../lib/plural';
+import { useAuth } from '../context/AuthContext';
+import { useRelationship, useStats } from '../hooks/useShared';
 
 const PAGE = 30;
 
@@ -27,13 +29,16 @@ async function fetchLetters(before?: string): Promise<Letter[]> {
 export function AllLoveLetters() {
   usePageTitle('Envelope Box');
   const [letters, setLetters] = useState<Letter[]>([]);
-  const [meId, setMeId] = useState('');
-  const [partnerName, setPartnerName] = useState('your partner');
+  const meId = useAuth().user?.id ?? '';
+  const rel = useRelationship();
+  const partnerName = rel.data?.partner?.display_name || 'your partner';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState<number | null>(null);
+  // the total is a nice-to-have; the box works without it
+  const totals = useStats().data?.stats;
+  const total = totals ? totals.letters_sent + totals.letters_received : null;
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -44,19 +49,7 @@ export function AllLoveLetters() {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const headers = { Authorization: `Bearer ${token}` };
-        const [{ data: { user } }, rel, page, stats] = await Promise.all([
-          supabase.auth.getUser(),
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/relationships/me`, { headers }),
-          fetchLetters(),
-          // the total is a nice-to-have; the box works without it
-          axios.get(`${import.meta.env.VITE_BACKEND_URL}/relationships/stats`, { headers }).catch(() => null),
-        ]);
-        const totals = stats?.data?.stats;
-        if (totals) setTotal(totals.letters_sent + totals.letters_received);
-        setMeId(user?.id ?? '');
-        setPartnerName(rel.data?.partner?.display_name || 'your partner');
+        const page = await fetchLetters();
         setLetters(page);
         setHasMore(page.length === PAGE);
       } catch (err) {
@@ -119,7 +112,7 @@ export function AllLoveLetters() {
   const show = (id: string) => { setOpenId(id); setReadingId(id); markRead(id); };
   const close = () => { setReadingId(null); setOpenId(null); };
 
-  const partner = loading ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>;
+  const partner = rel.data === undefined ? <InlineBar w="w-14" /> : <span className="text-rose-400 font-semibold">{partnerName}</span>;
   const index = letters.findIndex((l) => l.id === readingId);
   const reading = index >= 0 ? letters[index] : null;
   const first = letters[letters.length - 1];

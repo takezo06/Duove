@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { relationshipYear } from '../lib/relationshipYear';
+import { useAuth } from '../context/AuthContext';
+import { refreshRelationship, useMyProfile, useStats } from '../hooks/useShared';
 import { plural } from '../lib/plural';
 import { Avatar, Badge, BadgeBar, CardHeader, InlineBar, Stat, focusRing, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
 import {
@@ -22,27 +24,6 @@ import {
   UserRound,
 } from 'lucide-react';
 
-// ---------- Types ----------
-interface Stats {
-  user: { id: string; account_created: string; account_age: string };
-  relationship: {
-    id: string;
-    paired_at: string | null;
-    anniversary_date: string | null;
-    together_duration: string;
-    together_conversion: string;
-    anniversary_duration: string;
-    anniversary_conversion: string;
-    next_anniversary: string | null;
-    days_until_anniversary: number | null;
-    next_monthsary: string | null;
-    days_until_monthsary: number | null;
-    status: string;
-  };
-  partner: { id: string; display_name: string; avatar_url?: string | null; account_created?: string | null };
-  stats: { cravings: number; letters_sent: number; letters_received: number };
-}
-
 const longDate = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
 const ordinal = (n: number) => n + (['st', 'nd', 'rd'][((((n + 90) % 100) - 10) % 10) - 1] || 'th');
 const monthDay = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
@@ -59,14 +40,19 @@ const fmt = (n: number) => n.toLocaleString();
 
 export function Partner() {
   usePageTitle('Partner');
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [me, setMe] = useState<{ name: string; avatar: string | null }>({ name: 'You', avatar: null });
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const profile = useMyProfile();
+  // null = not paired yet; a cached copy shows at once while it refreshes
+  const { data: stats, error: statsError, reload } = useStats();
+  const loading = stats === undefined && !statsError;
+  const error = stats === undefined && statsError ? 'Failed to load relationship data.' : null;
+  const me = {
+    name: profile.data?.display_name || user?.email?.split('@')[0] || 'You',
+    avatar: profile.data?.avatar_url || null,
+  };
   const [editingAnniversary, setEditingAnniversary] = useState(false);
   const [newAnniversaryDate, setNewAnniversaryDate] = useState('');
   const [updatingAnniversary, setUpdatingAnniversary] = useState(false);
-  const navigate = useNavigate();
 
   // ---- Invite / Join state ----
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -77,48 +63,6 @@ export function Partner() {
   const [copied, setCopied] = useState(false);
 
   // ---------- Data fetching ----------
-  const fetchStats = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle();
-      setMe({
-        name: profile?.display_name || user.email?.split('@')[0] || 'You',
-        avatar: profile?.avatar_url || null,
-      });
-
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      if (!token) throw new Error('Not authenticated');
-
-      const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/relationships/stats?_t=${Date.now()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setStats(res.data);
-      if (res.data.relationship.anniversary_date) {
-        setNewAnniversaryDate(res.data.relationship.anniversary_date);
-      }
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        setStats(null);
-        setError(null);
-      } else {
-        setError('Failed to load relationship data.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchPendingInvite = async () => {
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -131,7 +75,7 @@ export function Partner() {
     } catch { /* no pending invite */ }
   };
 
-  useEffect(() => { fetchStats(); fetchPendingInvite(); }, []);
+  useEffect(() => { fetchPendingInvite(); }, []);
 
   // Ticks once a second so the Together counters run live
   const [now, setNow] = useState(() => Date.now());
@@ -168,7 +112,7 @@ export function Partner() {
         { invite_code: joinCode.trim().toUpperCase() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      await fetchStats();
+      await refreshRelationship();
       setJoinCode('');
     } catch (err: any) {
       setJoinError(err.response?.data?.error || 'Failed to join. Check the code and try again.');
@@ -183,6 +127,11 @@ export function Partner() {
     }
   };
 
+  const editAnniversary = () => {
+    setNewAnniversaryDate(stats?.relationship.anniversary_date ?? '');
+    setEditingAnniversary(true);
+  };
+
   const updateAnniversary = async () => {
     if (!newAnniversaryDate) return;
     setUpdatingAnniversary(true);
@@ -193,7 +142,7 @@ export function Partner() {
         { anniversary_date: newAnniversaryDate },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      await fetchStats();
+      await refreshRelationship();
       setEditingAnniversary(false);
     } catch (err) { console.error('Error updating anniversary:', err); }
     finally { setUpdatingAnniversary(false); }
@@ -245,7 +194,7 @@ export function Partner() {
         <div className={`${surface} p-8 md:p-12 text-center`}>
           <h1 className="text-2xl font-semibold text-white mb-2">Couldn't load your relationship</h1>
           <p className="text-neutral-400 mb-6">{error}</p>
-          <button onClick={() => fetchStats()} className={primaryButton}>
+          <button onClick={reload} className={primaryButton}>
             Try again
           </button>
         </div>
@@ -393,7 +342,7 @@ export function Partner() {
             </p>
           </div>
           {!editingAnniversary && (
-            <button onClick={() => setEditingAnniversary(true)} className={`${secondaryButton} self-start sm:self-center`}>
+            <button onClick={editAnniversary} className={`${secondaryButton} self-start sm:self-center`}>
               <CalendarHeart className="w-4 h-4 text-rose-400" aria-hidden />
               {rel.anniversary_date ? 'Edit anniversary' : 'Set anniversary'}
             </button>
@@ -486,7 +435,7 @@ export function Partner() {
           ) : (
             <Stat icon={<CalendarDays className={iconClass} aria-hidden />} label="Since your anniversary" value="Not set">
               <button
-                onClick={() => setEditingAnniversary(true)}
+                onClick={editAnniversary}
                 className={`mt-3 mx-auto text-sm font-medium text-rose-400 hover:text-rose-300 transition cursor-pointer rounded ${focusRing}`}
               >
                 Set your anniversary date

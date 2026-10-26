@@ -1,0 +1,142 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e3]:
+    - complementary [ref=f5e5]:
+      - generic [ref=f5e6]:
+        - link "Duove" [ref=f5e7] [cursor=pointer]:
+          - /url: /
+        - button "Collapse sidebar" [ref=f5e9] [cursor=pointer]
+      - navigation "Main" [ref=f5e13]:
+        - list [ref=f5e15]:
+          - listitem [ref=f5e16]:
+            - link "Dashboard" [ref=f5e17] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=f5e23]:
+            - link "Notifications 2" [ref=f5e24] [cursor=pointer]:
+              - /url: /notifications
+              - generic [ref=f5e29]: Notifications
+              - generic [ref=f5e30]: "2"
+        - generic [ref=f5e31]:
+          - paragraph [ref=f5e32]: Together
+          - list [ref=f5e33]:
+            - listitem [ref=f5e34]:
+              - link "Daily Q&A" [ref=f5e35] [cursor=pointer]:
+                - /url: /qa
+            - listitem [ref=f5e41]:
+              - link "Love Letters" [ref=f5e42] [cursor=pointer]:
+                - /url: /letters
+            - listitem [ref=f5e48]:
+              - link "Cravings" [ref=f5e49] [cursor=pointer]:
+                - /url: /cravings
+            - listitem [ref=f5e55]:
+              - link "Cycle Tracker" [ref=f5e56] [cursor=pointer]:
+                - /url: /cycle
+            - listitem [ref=f5e61]:
+              - link "Partner" [ref=f5e62] [cursor=pointer]:
+                - /url: /partner
+      - generic [ref=f5e67]:
+        - link "Jed jed@duove.app" [ref=f5e68] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=f5e70]:
+            - generic [ref=f5e71]: Jed
+            - generic [ref=f5e72]: jed@duove.app
+        - button "Sign out" [ref=f5e73] [cursor=pointer]
+    - main [ref=f5e79]:
+      - generic [ref=f5e80]:
+        - generic [ref=f5e81]:
+          - generic [ref=f5e82]:
+            - generic [ref=f5e83]:
+              - heading "Cravings" [level=1] [ref=f5e84]
+              - paragraph [ref=f5e85]: What you and Mika are in the mood for.
+            - generic [ref=f5e86]: 4 open
+          - generic [ref=f5e87]:
+            - generic [ref=f5e88]: What are you craving?
+            - textbox "What are you craving?" [ref=f5e89]:
+              - /placeholder: Spicy ramen, a movie night, a long hug...
+            - generic [ref=f5e90]:
+              - radiogroup "Category" [ref=f5e91]:
+                - radio "Food" [ref=f5e92] [cursor=pointer]
+                - radio "Activity" [ref=f5e99] [cursor=pointer]
+                - radio "Emotional" [ref=f5e102] [cursor=pointer]
+                - radio "Material" [ref=f5e105] [cursor=pointer]
+                - radio "Other" [checked] [ref=f5e109] [cursor=pointer]
+              - button "Add craving" [disabled] [ref=f5e114]
+        - navigation "Filter by category" [ref=f5e116]:
+          - button "All 5" [pressed] [ref=f5e117] [cursor=pointer]:
+            - text: All
+            - generic [ref=f5e118]: "5"
+          - button "Food 2" [ref=f5e119] [cursor=pointer]:
+            - text: Food
+            - generic [ref=f5e126]: "2"
+          - button "Activity 1" [ref=f5e127] [cursor=pointer]:
+            - text: Activity
+            - generic [ref=f5e130]: "1"
+          - button "Emotional 1" [ref=f5e131] [cursor=pointer]:
+            - text: Emotional
+            - generic [ref=f5e134]: "1"
+          - button "Material 1" [ref=f5e135] [cursor=pointer]:
+            - text: Material
+            - generic [ref=f5e139]: "1"
+        - generic [ref=f5e140]:
+          - heading "Open · 4" [level=2] [ref=f5e141]
+          - list [ref=f5e142]:
+            - listitem [ref=f5e143]:
+              - button "Mark \"Spicy ramen from the corner place\" as done" [ref=f5e144] [cursor=pointer]
+              - generic [ref=f5e145]:
+                - paragraph [ref=f5e146]: Spicy ramen from the corner place
+                - paragraph [ref=f5e147]:
+                  - generic [ref=f5e148]: Food
+                  - generic [ref=f5e155]: Mika
+                  - generic [aria-hidden] [ref=f5e156]: ·
+                  - time [ref=f5e157]: 2h ago
+            - listitem [ref=f5e158]:
+              - button "Mark \"Movie night with the new Ghibli film, blankets and popcorn\" as done" [ref=f5e159] [cursor=pointer]
+              - generic [ref=f5e160]:
+                - paragraph [ref=f5e161]: Movie night with the new Ghibli film, blankets and popcorn
+                - paragraph [ref=f5e162]:
+                  - generic [ref=f5e163]: Activity
+                  - generic [ref=f5e166]: You
+                  - generic [aria-hidden] [ref=f5e167]: ·
+                  - time [ref=f5e168]: Yesterday
+              - button "Delete \"Movie night with the new Ghibli film, blankets and popcorn\"" [ref=f5e169] [cursor=pointer]
+            - listitem [ref=f5e173]:
+              - button "Mark \"A really long hug after work\" as done" [ref=f5e174] [cursor=pointer]
+              - generic [ref=f5e175]:
+                - paragraph [ref=f5e176]: A really long hug after work
+                - paragraph [ref=f5e177]:
+                  - generic [ref=f5e178]: Emotional
+                  - generic [ref=f5e181]: Mika
+                  - generic [aria-hidden] [ref=f5e182]: ·
+                  - time [ref=f5e183]: Fri
+            - listitem [ref=f5e184]:
+              - button "Mark \"That linen shirt from the thrift store\" as done" [ref=f5e185] [cursor=pointer]
+              - generic [ref=f5e186]:
+                - paragraph [ref=f5e187]: That linen shirt from the thrift store
+                - paragraph [ref=f5e188]:
+                  - generic [ref=f5e189]: Material
+                  - generic [ref=f5e193]: Mika
+                  - generic [aria-hidden] [ref=f5e194]: ·
+                  - time [ref=f5e195]: Thu
+        - generic [ref=f5e196]:
+          - heading "Fulfilled · 1" [level=2] [ref=f5e197]
+          - list [ref=f5e198]:
+            - listitem [ref=f5e199]:
+              - button "Mark \"Strawberry milk\" as not done" [pressed] [ref=f5e200] [cursor=pointer]
+              - generic [ref=f5e203]:
+                - paragraph [ref=f5e204]: Strawberry milk
+                - paragraph [ref=f5e205]:
+                  - generic [ref=f5e206]: Food
+                  - generic [ref=f5e213]: You
+                  - generic [aria-hidden] [ref=f5e214]: ·
+                  - time [ref=f5e215]: 5h ago
+              - button "Delete \"Strawberry milk\"" [ref=f5e216] [cursor=pointer]
+        - paragraph [ref=f5e220]: Cravings marked as done will be deleted after 24 hours.
+  - generic [ref=f5e221]:
+    - generic [ref=f5e222]: Mock
+    - link "default" [ref=f5e223] [cursor=pointer]:
+      - /url: /cravings?scenario=default
+    - link "empty" [ref=f5e224] [cursor=pointer]:
+      - /url: /cravings?scenario=empty
+    - link "returning" [ref=f5e225] [cursor=pointer]:
+      - /url: /cravings?scenario=returning
+    - link "unpaired" [ref=f5e226] [cursor=pointer]:
+      - /url: /cravings?scenario=unpaired

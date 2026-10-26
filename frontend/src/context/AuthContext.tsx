@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { clearCache } from '../lib/cache';
 import { Session, User } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -25,7 +26,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Listen for auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      // The cache holds the last user's names and data; the next person on this browser starts clean
+      if (event === 'SIGNED_OUT') clearCache();
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

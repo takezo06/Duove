@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -7,18 +7,8 @@ import { Avatar, Badge, BadgeBar, CategoryPill, Chip, InlineBar, deleteButton, f
 import { Check, Plus, Trash2, Loader2 } from 'lucide-react';
 import { CATEGORIES, categoryFor } from '../lib/cravingCategories';
 import { when } from '../lib/when';
-
-interface Craving {
-  id: string;
-  content: string;
-  category: string;
-  fulfilled: boolean;
-  user_id: string;
-  partner_id: string;
-  created_at: string;
-  updated_at: string;
-  archived_at: string | null;
-}
+import { useAuth } from '../context/AuthContext';
+import { useCravings, useRelationship, type Craving } from '../hooks/useShared';
 
 const categoryOf = (c: Craving) => categoryFor(c.category);
 
@@ -30,18 +20,27 @@ export function Cravings() {
   const location = useLocation();
   const highlightId = location.state?.highlightId;
 
-  const [cravings, setCravings] = useState<Craving[]>([]);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Other');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [relationshipId, setRelationshipId] = useState<string | null>(null);
-  const [partnerId, setPartnerId] = useState<string | null>(null);
-  const [partnerName, setPartnerName] = useState('Partner');
-  const [userId, setUserId] = useState<string | null>(null);
-  const [fetchingRelationship, setFetchingRelationship] = useState(true);
+  const [actionError, setError] = useState<string | null>(null);
+  const userId = useAuth().user?.id ?? null;
+  // The relationship and list paint from the cache, then refresh
+  const rel = useRelationship();
+  const relationshipId = rel.data?.relationship.id ?? null;
+  // partner.id is "the other person"; relationship.partner_id is only right for whoever sent the invite
+  const partnerId = rel.data ? (rel.data.partner?.id ?? rel.data.relationship.partner_id) : null;
+  const partnerName = rel.data?.partner?.display_name || 'Partner';
+  const fetchingRelationship = rel.data === undefined && !rel.error;
+  const list = useCravings(relationshipId);
+  const fetchCravings = list.reload;
+  const cravings = list.data ?? [];
+  const relError = rel.data === null ? 'No active relationship found.'
+    : rel.data === undefined && rel.error ? 'Could not fetch relationship details.'
+    : null;
+  const error = relError ?? (list.data === undefined && list.error ? 'Could not load cravings.' : actionError);
+  const loading = !relError && list.data === undefined && !list.error;
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
 
@@ -60,67 +59,6 @@ export function Cravings() {
       }
     }
   }, [highlightId, cravings]);
-
-  // Fetch user and relationship
-  useEffect(() => {
-    const fetchUserAndRelationship = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          navigate('/login');
-          return;
-        }
-        setUserId(user.id);
-
-        const token = (await supabase.auth.getSession()).data.session?.access_token;
-        const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/relationships/me`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.data && res.data.relationship) {
-          setRelationshipId(res.data.relationship.id);
-          // partner.id is "the other person"; relationship.partner_id is only right for whoever sent the invite
-          setPartnerId(res.data.partner?.id ?? res.data.relationship.partner_id);
-          if (res.data.partner?.display_name) setPartnerName(res.data.partner.display_name);
-        } else {
-          setError('No active relationship found.');
-          setLoading(false);
-        }
-      } catch (err: any) {
-        if (err.response?.status === 404) {
-          setError('No active relationship found.');
-        } else {
-          console.error('Error fetching relationship:', err);
-          setError('Could not fetch relationship details.');
-        }
-        setLoading(false);
-      } finally {
-        setFetchingRelationship(false);
-      }
-    };
-    fetchUserAndRelationship();
-  }, [navigate]);
-
-  // Fetch cravings
-  const fetchCravings = useCallback(async () => {
-    if (!relationshipId) return;
-    try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/cravings?relationshipId=${relationshipId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setCravings(res.data);
-    } catch {
-      setError('Could not load cravings.');
-    } finally {
-      setLoading(false);
-    }
-  }, [relationshipId]);
-
-  useEffect(() => {
-    if (relationshipId) fetchCravings();
-  }, [relationshipId, fetchCravings]);
 
   // Add craving
   const handleAddCraving = async (e: React.FormEvent) => {

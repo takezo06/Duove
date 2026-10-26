@@ -1,0 +1,133 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e3]:
+    - complementary [ref=f1e5]:
+      - generic [ref=f1e6]:
+        - link "Duove" [ref=f1e7] [cursor=pointer]:
+          - /url: /
+        - button "Collapse sidebar" [ref=f1e9] [cursor=pointer]
+      - navigation "Main" [ref=f1e13]:
+        - list [ref=f1e15]:
+          - listitem [ref=f1e16]:
+            - link "Dashboard" [ref=f1e17] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=f1e23]:
+            - link "Notifications 2" [ref=f1e24] [cursor=pointer]:
+              - /url: /notifications
+              - generic [ref=f1e29]: Notifications
+              - generic [ref=f1e30]: "2"
+        - generic [ref=f1e31]:
+          - paragraph [ref=f1e32]: Together
+          - list [ref=f1e33]:
+            - listitem [ref=f1e34]:
+              - link "Daily Q&A" [ref=f1e35] [cursor=pointer]:
+                - /url: /qa
+            - listitem [ref=f1e41]:
+              - link "Love Letters" [ref=f1e42] [cursor=pointer]:
+                - /url: /letters
+            - listitem [ref=f1e48]:
+              - link "Cravings" [ref=f1e49] [cursor=pointer]:
+                - /url: /cravings
+            - listitem [ref=f1e55]:
+              - link "Cycle Tracker" [ref=f1e56] [cursor=pointer]:
+                - /url: /cycle
+            - listitem [ref=f1e61]:
+              - link "Partner" [ref=f1e62] [cursor=pointer]:
+                - /url: /partner
+      - generic [ref=f1e67]:
+        - link "Jed jed@duove.app" [ref=f1e68] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=f1e70]:
+            - generic [ref=f1e71]: Jed
+            - generic [ref=f1e72]: jed@duove.app
+        - button "Sign out" [ref=f1e73] [cursor=pointer]
+    - main [ref=f1e79]:
+      - generic [ref=f1e80]:
+        - generic [ref=f1e81]:
+          - generic [ref=f1e82]:
+            - generic [ref=f1e83]:
+              - img "Jed" [ref=f1e84]
+              - generic "Mika" [ref=f1e85]: M
+            - generic [ref=f1e86]:
+              - heading "Good evening, Jed" [level=1] [ref=f1e87]
+              - paragraph [ref=f1e88]:
+                - text: Monday, October 26 ·
+                - generic [ref=f1e89]: 619 days
+                - text: with Mika
+            - link "Your relationship" [ref=f1e90] [cursor=pointer]:
+              - /url: /partner
+          - generic [ref=f1e93]:
+            - generic [ref=f1e94]:
+              - heading "Year 2 together" [level=2] [ref=f1e95]
+              - generic [ref=f1e98]: Month 9 of 12
+            - paragraph [ref=f1e99]: 111 days to your anniversary
+            - img "Month 9 of year 2. 111 days to your anniversary." [ref=f1e100]
+            - generic [ref=f1e116]:
+              - generic [ref=f1e117]: Feb 14
+              - generic [ref=f1e118]: Anniversary · Feb 14
+            - generic [ref=f1e119]:
+              - generic [ref=f1e120]:
+                - paragraph [ref=f1e121]: Next monthsary
+                - paragraph [ref=f1e122]:
+                  - text: Nov 14
+                  - generic [ref=f1e123]: in 19 days
+              - generic [ref=f1e124]:
+                - paragraph [ref=f1e125]: Together since
+                - paragraph [ref=f1e126]: February 14, 2025
+        - link "Daily question Your turn What is a small habit of mine you secretly love? You has not answered Mika answered Answer now" [ref=f1e127] [cursor=pointer]:
+          - /url: /qa
+          - generic [ref=f1e128]:
+            - heading "Daily question" [level=2] [ref=f1e129]
+            - generic [ref=f1e133]: Your turn
+          - generic [ref=f1e134]:
+            - paragraph [ref=f1e135]: What is a small habit of mine you secretly love?
+            - generic [ref=f1e136]:
+              - generic [ref=f1e137]:
+                - generic [ref=f1e139]: You
+                - generic [ref=f1e140]: has not answered
+              - generic [ref=f1e141]:
+                - generic [ref=f1e144]: Mika
+                - generic [ref=f1e145]: answered
+          - generic [ref=f1e146]: Answer now
+        - link "Cycle Period soon Luteal phase Mika's period in 2 days 96 Open tracker" [ref=f1e149] [cursor=pointer]:
+          - /url: /cycle
+          - generic [ref=f1e150]:
+            - heading "Cycle" [level=2] [ref=f1e151]
+            - generic [ref=f1e154]: Period soon
+          - generic [ref=f1e155]:
+            - paragraph [ref=f1e156]: Luteal phase
+            - paragraph [ref=f1e158]: Mika's period in 2 days
+            - progressbar "Cycle progress" [ref=f1e159]
+          - generic [ref=f1e161]: Open tracker
+        - link [ref=f1e164] [cursor=pointer]:
+          - /url: /letters
+          - heading "Love letters" [level=2] [ref=f1e166]
+          - generic [ref=f1e171]:
+            - paragraph [ref=f1e172]: “For the rainy Tuesday you made better”
+            - paragraph [ref=f1e173]: from Mika
+          - generic [ref=f1e174]: Read letters
+        - link "Cravings 3 open Food Spicy ramen from the corner place Activity Movie night with the new Ghibli film, blankets and popcorn Emotional A really long hug after work See all cravings" [ref=f1e177] [cursor=pointer]:
+          - /url: /cravings
+          - generic [ref=f1e178]:
+            - heading "Cravings" [level=2] [ref=f1e179]
+            - generic [ref=f1e186]: 3 open
+          - list [ref=f1e188]:
+            - listitem [ref=f1e189]:
+              - img "Food" [ref=f1e190]
+              - generic [ref=f1e196]: Spicy ramen from the corner place
+            - listitem [ref=f1e197]:
+              - img "Activity" [ref=f1e198]
+              - generic [ref=f1e200]: Movie night with the new Ghibli film, blankets and popcorn
+            - listitem [ref=f1e201]:
+              - img "Emotional" [ref=f1e202]
+              - generic [ref=f1e204]: A really long hug after work
+          - generic [ref=f1e205]: See all cravings
+  - generic [ref=f1e208]:
+    - generic [ref=f1e209]: Mock
+    - link "default" [ref=f1e210] [cursor=pointer]:
+      - /url: /?scenario=default
+    - link "empty" [ref=f1e211] [cursor=pointer]:
+      - /url: /?scenario=empty
+    - link "returning" [ref=f1e212] [cursor=pointer]:
+      - /url: /?scenario=returning
+    - link "unpaired" [ref=f1e213] [cursor=pointer]:
+      - /url: /?scenario=unpaired

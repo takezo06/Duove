@@ -5,6 +5,7 @@ import { History, Loader2, Send, Shuffle, SkipForward } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
+import { useMyProfile } from '../hooks/useShared';
 import { when } from '../lib/when';
 import { topicIcon, topicName, type Topic } from '../lib/qaTopics';
 import { Avatar, Badge, CardBack, CardHeader, Deck, InlineBar, Seal, field, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
@@ -83,7 +84,9 @@ export function QA() {
   const [current, setCurrent] = useState<CurrentQA | null>(null);
   // undefined = still loading
   const [topics, setTopics] = useState<Topic[] | undefined>(undefined);
-  const [myName, setMyName] = useState<string | undefined>(undefined);
+  // undefined = still loading; a cached name shows at once
+  const profile = useMyProfile();
+  const myName = profile.data === undefined && !profile.error ? undefined : profile.data?.display_name || 'You';
   const [secondsLeft, setSecondsLeft] = useState(0);
   // When the next question is due, as a timestamp; only a fetch of /qa/current moves it
   const [deadline, setDeadline] = useState(0);
@@ -127,7 +130,7 @@ export function QA() {
     load();
   }, [attempt, navigate, fetchCurrent]);
 
-  // Topics and your name only dress the page: each fills in when it lands, and the page works without them.
+  // Topics only dress the page: they fill in when they land, and the page works without them.
   // A retry doesn't refetch them.
   useEffect(() => {
     const load = async () => {
@@ -136,10 +139,6 @@ export function QA() {
       axios.get(`${api}/qa/categories`, { headers: await auth() }).then(
         (r) => setTopics(r.data as Topic[]),
         () => setTopics([]),
-      );
-      supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle().then(
-        ({ data }) => setMyName(data?.display_name || 'You'),
-        () => setMyName('You'),
       );
     };
     load();

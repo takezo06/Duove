@@ -3,6 +3,7 @@ import axios from 'axios';
 import { supabase } from '../lib/supabase';
 import { apiError } from '../lib/apiError';
 import { addDays, isoDay, showsCycle, today, type Period } from '../lib/cycle';
+import { useOverview } from './useShared';
 
 export type Who = 'me' | 'partner';
 export interface Person {
@@ -44,34 +45,15 @@ const firstLoadFrom = () => {
 
 // `pick` is whose cycle the viewer chose; it falls back to whoever tracks, you first
 export function useCycle(pick: Who | null, month: string) {
-  // undefined = loading, null = not paired
-  const [overview, setOverview] = useState<Overview | null | undefined>();
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  // undefined = loading, null = not paired. Shared with the dashboard tile through the cache.
+  const { data: overview, error: overviewError, reload, set: setOverview } = useOverview();
+  // A cached copy keeps the tracker up while a refresh fails
+  const error = overview === undefined && overviewError ? apiError(overviewError, "Couldn't load your cycle. Try again.") : null;
   // Each person's logs by day, and the first day they cover
   const [logs, setLogs] = useState<Partial<Record<Who, { from: string; byDay: Record<string, SymptomLog> }>>>({});
   const [logsError, setLogsError] = useState<{ who: Who; message: string } | null>(null);
   const [logsAttempt, setLogsAttempt] = useState(0);
   const loadingLogs = useRef(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await axios.get(`${api}/cycles/overview`, { headers: await headers() });
-        if (!cancelled) setOverview(res.data);
-      } catch (err) {
-        if (cancelled) return;
-        // Only "No active relationship" means not paired. Any other 404 (say, a function not yet
-        // deployed with this route) is an error, not a reason to send a paired couple to pairing.
-        if (apiError(err, '') === 'No active relationship') setOverview(null);
-        else setError(apiError(err, "Couldn't load your cycle. Try again."));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt]);
 
   const options = overview ? (['me', 'partner'] as const).filter((w) => tracks(overview[w])) : [];
   const who: Who | null = pick && options.includes(pick) ? pick : (options[0] ?? null);
@@ -104,7 +86,7 @@ export function useCycle(pick: Who | null, month: string) {
 
   const setMine = useCallback((change: (periods: Period[]) => Period[]) => {
     setOverview((o) => o && { ...o, me: { ...o.me, periods: change(o.me.periods) } });
-  }, []);
+  }, [setOverview]);
 
   const startPeriod = async (start_date: string) => {
     const res = await axios.post(`${api}/cycles/log`, { start_date }, { headers: await headers() });
@@ -140,10 +122,7 @@ export function useCycle(pick: Who | null, month: string) {
     who,
     options,
     error,
-    retry: () => {
-      setError(null);
-      setAttempt((a) => a + 1);
-    },
+    retry: reload,
     logs: who ? logs[who]?.byDay : undefined,
     logsFrom: have?.from,
     logsError: logsError?.who === who ? logsError.message : null,

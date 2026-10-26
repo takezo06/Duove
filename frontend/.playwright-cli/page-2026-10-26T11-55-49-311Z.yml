@@ -1,0 +1,84 @@
+- generic [active] [ref=f7e1]:
+  - generic [ref=f7e3]:
+    - complementary [ref=f7e5]:
+      - generic [ref=f7e6]:
+        - link "Duove" [ref=f7e7] [cursor=pointer]:
+          - /url: /
+        - button "Collapse sidebar" [ref=f7e9] [cursor=pointer]
+      - navigation "Main" [ref=f7e13]:
+        - list [ref=f7e15]:
+          - listitem [ref=f7e16]:
+            - link "Dashboard" [ref=f7e17] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=f7e23]:
+            - link "Notifications 2" [ref=f7e24] [cursor=pointer]:
+              - /url: /notifications
+              - generic [ref=f7e29]: Notifications
+              - generic [ref=f7e30]: "2"
+        - generic [ref=f7e31]:
+          - paragraph [ref=f7e32]: Together
+          - list [ref=f7e33]:
+            - listitem [ref=f7e34]:
+              - link "Daily Q&A" [ref=f7e35] [cursor=pointer]:
+                - /url: /qa
+            - listitem [ref=f7e41]:
+              - link "Love Letters" [ref=f7e42] [cursor=pointer]:
+                - /url: /letters
+            - listitem [ref=f7e48]:
+              - link "Cravings" [ref=f7e49] [cursor=pointer]:
+                - /url: /cravings
+            - listitem [ref=f7e55]:
+              - link "Cycle Tracker" [ref=f7e56] [cursor=pointer]:
+                - /url: /cycle
+            - listitem [ref=f7e61]:
+              - link "Partner" [ref=f7e62] [cursor=pointer]:
+                - /url: /partner
+      - generic [ref=f7e67]:
+        - link "Jed jed@duove.app" [ref=f7e68] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=f7e70]:
+            - generic [ref=f7e71]: Jed
+            - generic [ref=f7e72]: jed@duove.app
+        - button "Sign out" [ref=f7e73] [cursor=pointer]
+    - main [ref=f7e79]:
+      - generic [ref=f7e80]:
+        - generic [ref=f7e82]:
+          - generic [ref=f7e83]:
+            - heading "Daily Q&A" [level=1] [ref=f7e84]
+            - paragraph [ref=f7e85]: One question a day for you and Mika. Answers stay face down until you've both written one.
+            - paragraph [ref=f7e86]:
+              - time [ref=f7e87]: Monday, October 26
+              - text: · Next question in 6h 42m
+          - link "Past questions" [ref=f7e88] [cursor=pointer]:
+            - /url: /qa/history
+        - generic [ref=f7e96]:
+          - generic [ref=f7e97]:
+            - heading "Deep" [level=2] [ref=f7e98]
+            - generic [ref=f7e107]: Your turn
+          - heading "What is a small habit of mine you secretly love?" [level=2] [ref=f7e108]
+          - 'button "Topic: Random" [ref=f7e110] [cursor=pointer]'
+        - generic [ref=f7e118]:
+          - form "Your answer" [ref=f7e119]:
+            - generic [ref=f7e120]:
+              - generic [aria-hidden] [ref=f7e121]: J
+              - generic [ref=f7e122]:
+                - paragraph [ref=f7e123]: You
+                - paragraph [ref=f7e124]: Mika is waiting on you
+            - textbox "Your answer" [ref=f7e125]:
+              - /placeholder: Write what comes to mind first
+            - button "Send answer" [disabled] [ref=f7e126]
+          - region "Mika's answer, face down" [ref=f7e130]:
+            - generic [ref=f7e131]:
+              - generic [aria-hidden] [ref=f7e132]: M
+              - paragraph [ref=f7e133]: Mika answered
+              - paragraph [ref=f7e134]: It turns over when you send yours.
+  - generic [ref=f7e135]:
+    - generic [ref=f7e136]: Mock
+    - link "default" [ref=f7e137] [cursor=pointer]:
+      - /url: /qa?scenario=default
+    - link "empty" [ref=f7e138] [cursor=pointer]:
+      - /url: /qa?scenario=empty
+    - link "returning" [ref=f7e139] [cursor=pointer]:
+      - /url: /qa?scenario=returning
+    - link "unpaired" [ref=f7e140] [cursor=pointer]:
+      - /url: /qa?scenario=unpaired

@@ -1,0 +1,57 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e3]:
+    - complementary [ref=f4e5]:
+      - generic [ref=f4e6]:
+        - link "Duove" [ref=f4e7] [cursor=pointer]:
+          - /url: /
+        - button "Collapse sidebar" [ref=f4e9] [cursor=pointer]
+      - navigation "Main" [ref=f4e13]:
+        - list [ref=f4e15]:
+          - listitem [ref=f4e16]:
+            - link "Dashboard" [ref=f4e17] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=f4e23]:
+            - link "Notifications" [ref=f4e24] [cursor=pointer]:
+              - /url: /notifications
+        - generic [ref=f4e30]:
+          - paragraph [ref=f4e31]: Together
+          - list [ref=f4e32]:
+            - listitem [ref=f4e33]:
+              - link "Daily Q&A" [ref=f4e34] [cursor=pointer]:
+                - /url: /qa
+            - listitem [ref=f4e40]:
+              - link "Love Letters" [ref=f4e41] [cursor=pointer]:
+                - /url: /letters
+            - listitem [ref=f4e47]:
+              - link "Cravings" [ref=f4e48] [cursor=pointer]:
+                - /url: /cravings
+            - listitem [ref=f4e54]:
+              - link "Cycle Tracker" [ref=f4e55] [cursor=pointer]:
+                - /url: /cycle
+            - listitem [ref=f4e60]:
+              - link "Partner" [ref=f4e61] [cursor=pointer]:
+                - /url: /partner
+      - generic [ref=f4e66]:
+        - link "Jed jed@duove.app" [ref=f4e67] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=f4e69]:
+            - generic [ref=f4e70]: Jed
+            - generic [ref=f4e71]: jed@duove.app
+        - button "Sign out" [ref=f4e72] [cursor=pointer]
+    - main [ref=f4e78]:
+      - generic [ref=f4e80]:
+        - link "Love letters" [ref=f4e81] [cursor=pointer]:
+          - /url: /letters
+        - generic [ref=f4e85]:
+          - heading "The envelope box" [level=1] [ref=f4e86]
+          - paragraph [ref=f4e87]: Every letter you and Mika have sent. Tap one to open it.
+  - generic [ref=f4e98]:
+    - generic [ref=f4e99]: Mock
+    - link "default" [ref=f4e100] [cursor=pointer]:
+      - /url: /letters/all?scenario=default
+    - link "empty" [ref=f4e101] [cursor=pointer]:
+      - /url: /letters/all?scenario=empty
+    - link "returning" [ref=f4e102] [cursor=pointer]:
+      - /url: /letters/all?scenario=returning
+    - link "unpaired" [ref=f4e103] [cursor=pointer]:
+      - /url: /letters/all?scenario=unpaired

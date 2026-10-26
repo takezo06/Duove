@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { useMyProfile } from '../hooks/useShared';
 import {
   Home,
   CalendarDays,
@@ -56,11 +58,8 @@ export function Sidebar() {
     return saved === 'true';
   });
 
-  const [userName, setUserName] = useState<string>('');
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [userAvatar, setUserAvatar] = useState<string>('?');
-  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
+  const { user } = useAuth();
+  const { data: profile, error: profileError } = useMyProfile();
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
@@ -102,55 +101,16 @@ export function Sidebar() {
   }, []);
 
   // ---- User info ----
-  const fetchUser = async () => {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error('Error fetching user:', error);
-        setLoadingUser(false);
-        return;
-      }
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('display_name, avatar_url')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        let displayName = 'User';
-        let avatarUrl = null;
-
-        if (profile) {
-          if (profile.display_name) displayName = profile.display_name;
-          if (profile.avatar_url) avatarUrl = profile.avatar_url;
-        } else {
-          const meta = user.user_metadata || {};
-          displayName = meta.full_name || meta.name || meta.username || user.email?.split('@')[0] || 'User';
-        }
-
-        displayName = displayName
-          .split(' ')
-          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-          .join(' ');
-
-        setUserName(displayName);
-        setUserEmail(user.email || '');
-        setUserAvatar(displayName.charAt(0).toUpperCase());
-        setProfileAvatarUrl(avatarUrl);
-      }
-    } catch (err) {
-      console.error('Failed to fetch user:', err);
-    } finally {
-      setLoadingUser(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUser();
-    const handleProfileUpdate = () => fetchUser();
-    window.addEventListener('profile-updated', handleProfileUpdate);
-    return () => window.removeEventListener('profile-updated', handleProfileUpdate);
-  }, []);
+  // Your profile name, else a name from sign-up; the cache shows it at once on later visits
+  const meta = user?.user_metadata || {};
+  const userName = (profile?.display_name || meta.full_name || meta.name || meta.username || user?.email?.split('@')[0] || 'User')
+    .split(' ')
+    .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+  const userEmail = user?.email || '';
+  const userAvatar = userName.charAt(0).toUpperCase();
+  const profileAvatarUrl = profile?.avatar_url ?? null;
+  const loadingUser = profile === undefined && !profileError;
 
   // ---- Unread count ----
   const fetchUnreadCount = async () => {
