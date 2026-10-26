@@ -39,6 +39,7 @@ All shared styles live in `src/components/Card.tsx`. Import them and never copy 
 | `toggleRow` + `toggleRowOn` / `toggleRowOff` | A full-width row button, `p-3 md:p-4 rounded-xl`. On: `bg-rose-500/10 border-rose-400/20`. Off: transparent border, `neutral-800/60` fill and `neutral-700` border on hover | Rows you tap to open and tap again to close (`aria-pressed`). The heading inside turns `group-hover:text-rose-400` while off, and the on row also shows a `Badge` so state is never color alone |
 | `deleteButton` + `keepButton` | The inline confirm pair in section 7: rose `deleteButton`, quiet `keepButton`, both `min-h-10 rounded-lg text-sm` | A destructive action confirmed in place (Cravings delete, Profile leave relationship and delete account). Put focus on Keep when they appear |
 | `field` | The input style in section 7 | Every text input and textarea |
+| `textLink` | Rose, underlined, `hover:text-rose-300` | A link inside running text (policies, the sign-up terms line, the Spotify note). The underline is what sets it apart: rose and the body greys are too close in lightness. Standalone links use the text action in section 7 |
 | `Chip` | A `<button>` chip: `active`, optional `cat` for the category tint | Filters (`aria-pressed`) and single choice (`role="radio"`) |
 | `Stat` | Centered stat: icon + label, `text-2xl` value, sub line, children for a badge | Stat cards (Partner, the cycle tracker's three stats) |
 | `Modal` | Overlay, panel, close button, Escape and overlay click to close, focus moved in on open and back on close. `wide` gives `max-w-xl` | Every dialog |
@@ -52,6 +53,7 @@ Helpers:
 - `src/lib/when.ts`: `when(iso)` gives relative times ("3h ago", "Yesterday", "Mon", "3 Mar").
 - `src/lib/cycle.ts`: all cycle math (averages, phases, predictions, late periods, what can be logged on a day), in local calendar days (`'YYYY-MM-DD'`, never `toISOString()`). The tracker and the dashboard tile both use `cycleModel()`. Verify changes with `node frontend/scripts/cycle.check.ts` (from the repo root).
 - `components/cycle/constants.ts`: `phaseColors` for cycle phases, the log options with `labelOf()`, and the cycle date formatters (`shortDay`, `longDay`, `dayRange`, `relativeDay`).
+- `src/lib/consent.ts` + `hooks/useConsent.ts`: the visitor's cookie choice (`cache` for "Faster loading", `spotify` for Spotify players), `null` until they choose; `saveConsent()`, `openCookieSettings()`. Anything new that keeps data on the device or loads a third party that sets cookies goes through it and gets an item in `pages/CookiePolicy.tsx` (essential storage gets an item too). A new optional category is a new boolean field there, and everyone is asked again. Verify changes with `node frontend/scripts/consent.check.ts`.
 
 **Adding a new shared style:** add it to `Card.tsx` (styles and components) or `src/lib/` (logic) the first time a second file needs it, then import it everywhere. `Card.tsx` may only export strings and components (fast refresh), so a style that takes arguments becomes a component, like `Chip`.
 
@@ -221,7 +223,7 @@ Badge text is sentence case, short, live (a count or a countdown), and never tru
 Never `rounded-md`, `rounded-sm` or `rounded-3xl`.
 
 - **Borders:** always 1px, in `border-neutral-800` (cards, dividers) or `border-neutral-700` (inputs, controls). Dashed only for the missing-partner avatar. **No one-sided colored borders.**
-- **Elevation comes from borders and contrast, not shadows.** Cards have no shadow. A pile of cards (`Deck`) shows depth with lighter borders and a lighter back card, not a shadow. The only shadows are the rose glow built into `primaryButton`, `shadow-xl` on the sidebar tooltip, and `shadow-2xl` on a modal panel.
+- **Elevation comes from borders and contrast, not shadows.** Cards have no shadow. A pile of cards (`Deck`) shows depth with lighter borders and a lighter back card, not a shadow. The only shadows are the rose glow built into `primaryButton`, `shadow-xl` on the sidebar tooltip, and `shadow-2xl` on a modal panel and the cookie banner.
 
 ---
 
@@ -330,6 +332,18 @@ One page (`/cycle`); `/cycle/log` and `/cycle/analytics` redirect to it. See `Cy
 - **Stats:** three centered `Stat` cards: next period, fertile window, cycle length. Countdown badges follow section 3.
 - **Calendar + day:** a month grid of 40px day buttons (arrow keys move the day across months, swipe changes month on phones), the selected day's card beside it from `lg` (`grid lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]`), under it below. A logged period is a filled `red-500/20` day, a predicted one only a `red-500/50` border, ovulation a `rose-300/60` border, fertile days a `rose-300` dot, a logged day a `neutral-300` corner dot, and a legend explains them. The day card lists what was logged and the actions `cycleModel().actions(day)` allows, as `secondaryButton`s; removing a period confirms inline.
 - **Logging** is a wide `Modal` of chips (single choice is a `radio` you tap again to clear). Saving an empty log clears the day.
+
+### Legal pages
+
+`/privacy`, `/terms` and `/cookies` are public (outside `ProtectedLayout`), built from `components/Legal.tsx`:
+- `LegalPage` is the shell, standalone like the auth pages and scrolled by the window: the brand bar ("Back to Duove" or "Sign in"), a header card (title, "Last updated", "The short version"), the text in one `${surface} p-6 md:p-8` article, and `LegalLinks` as the footer. `max-w-3xl`, with text at `max-w-prose`. A new page starts at the top or at its `#section`.
+- `Section` (an `id` to link to, a `text-lg font-semibold` heading, base-size body), `Bullets`, `Term` (the bold word a bullet is about) and `ContactEmail`.
+- `LegalLinks` is the row of quiet links to the three policies plus "Cookie settings". It sits on the auth pages, the policy footers and the Profile "Privacy" tile.
+- Keep the policies true to the code. When what Duove collects, shares or stores on the device changes, update the text and its `updated` date.
+
+### Cookie banner
+
+`components/CookieConsent.tsx`, mounted once and first in `App`. While there's no choice, it shows a `bg-neutral-900 rounded-2xl border border-neutral-700 shadow-2xl p-5` card (the lighter border lifts it off the cards under it, as on the `Deck`) fixed to the bottom (`inset-x-4`, centered `max-w-xl` from `md`) with three equal `secondaryButton`s ("Essential only", "Choose", "Allow all"): saying no is never harder than saying yes. "Choose" and `openCookieSettings()` open the settings `Modal`: an `inset` row for essential storage (`Badge` "Always on") and one `toggleRow` per optional category with `role="switch"` and a `Badge` "On"/"Off". Everything optional is off until allowed. Something that waits on consent shows what it is and how to allow it in place (the Spotify note in `LetterReader`).
 
 ### Avatars
 

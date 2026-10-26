@@ -1,5 +1,8 @@
-import { ArrowLeft, ArrowRight, Music } from 'lucide-react';
-import { CardHeader, iconClass, secondaryButton } from '../Card';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Music, Play } from 'lucide-react';
+import { CardHeader, iconClass, inset, secondaryButton, textLink } from '../Card';
+import { useConsent } from '../../hooks/useConsent';
+import { saveConsent } from '../../lib/consent';
 
 export interface Letter {
   id: string;
@@ -27,6 +30,8 @@ interface LetterReaderProps {
 // One open letter: who wrote it, the letter itself, its song, and a way to the next one
 export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: LetterReaderProps) {
   const partner = <span className="text-rose-400 font-medium">{partnerName}</span>;
+  // Spotify's player sets Spotify's cookies, so it loads only once "Spotify players" is allowed
+  const consent = useConsent();
 
   return (
     <article>
@@ -61,15 +66,30 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
             icon={<Music className={iconClass} aria-hidden />}
             title={mine ? 'The song you added' : `${partnerName} added a song`}
           />
-          <iframe
-            title={`${letter.spotify_track_name ?? 'Song'} on Spotify`}
-            src={`https://open.spotify.com/embed/track/${letter.spotify_track_id}`}
-            width="100%"
-            height="80"
-            loading="lazy"
-            allow="encrypted-media"
-            className="mt-4 rounded-xl border-0"
-          />
+          {consent?.spotify ? (
+            <iframe
+              title={`${letter.spotify_track_name ?? 'Song'} on Spotify`}
+              src={`https://open.spotify.com/embed/track/${letter.spotify_track_id}`}
+              width="100%"
+              height="80"
+              loading="lazy"
+              allow="encrypted-media"
+              className="mt-4 rounded-xl border-0"
+            />
+          ) : (
+            <div className={`${inset} mt-4`}>
+              <p className="text-white font-medium break-words">{letter.spotify_track_name ?? 'A song'}</p>
+              {letter.spotify_artist_name && <p className="text-sm text-neutral-400 break-words">{letter.spotify_artist_name}</p>}
+              <p className="mt-3 text-sm text-neutral-400">
+                Spotify's player sets Spotify's cookies, so it waits for your OK.{' '}
+                <Link to="/cookies#spotify" className={textLink}>Cookie policy</Link>
+              </p>
+              <button onClick={() => saveConsent({ cache: consent?.cache ?? false, spotify: true })} className={`${secondaryButton} mt-4`}>
+                <Play className="w-4 h-4" aria-hidden />
+                Allow Spotify players
+              </button>
+            </div>
+          )}
         </div>
       )}
 

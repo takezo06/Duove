@@ -23,6 +23,8 @@ export const deleteButton = `inline-flex items-center justify-center gap-2 px-3 
 export const keepButton = `inline-flex items-center justify-center px-3 py-2 min-h-10 rounded-lg text-neutral-400 hover:text-white text-sm font-medium transition cursor-pointer disabled:opacity-50 ${focusRing}`;
 export const field =
   'w-full bg-neutral-800/50 text-white placeholder:text-neutral-500 px-4 py-3 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition';
+// A link inside running text: underlined, since rose and the body grey are too close in lightness to tell apart by color alone
+export const textLink = `text-rose-400 hover:text-rose-300 underline underline-offset-2 transition rounded ${focusRing}`;
 
 
 type Tone = 'rose' | 'emerald' | 'neutral';

@@ -13,14 +13,23 @@ import { CycleTracker } from './pages/CycleTracker';
 import { LoveLetters} from './pages/LoveLetters'
 import { AllLoveLetters } from './pages/AllLoveLetters';
 import { NotFound } from './pages/NotFound';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { CookiePolicy } from './pages/CookiePolicy';
+import { CookieConsent } from './components/CookieConsent';
 //okay
 
 function App() {
   return (
     <BrowserRouter>
+      <CookieConsent />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        {/* Public: readable signed in or out */}
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/cookies" element={<CookiePolicy />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/notifications" element={<Notifications />} />
