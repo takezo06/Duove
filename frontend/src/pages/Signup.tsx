@@ -1,8 +1,10 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { field, primaryButton, textLink } from '../components/Card';
+import { LegalLinks } from '../components/Legal';
 
 
 export function Signup() {
@@ -42,105 +44,94 @@ export function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-950 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-950 px-4 py-10">
       <div className="w-full max-w-md">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-rose-400/10 border border-rose-400/20 mb-4">
-              <img
-                src="/duove-logo.svg"
-                alt="Duove"
-                className="w-full h-full object-contain"
-              />
-          </div>
-          <h1 className="text-2xl font-semibold text-white">Create your account</h1>
-          <p className="text-neutral-400 text-sm mt-1">Start your journey together</p>
+          <img src="/duove-logo.svg" alt="Duove" className="w-16 h-16 mx-auto object-contain" />
+          <h1 className="mt-4 text-2xl font-bold text-white">Create your account</h1>
+          <p className="text-neutral-400 mt-1">Start your journey together</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-neutral-300 mb-1">
+            <label htmlFor="username" className="block text-sm text-neutral-400 mb-2">
               Username (optional)
             </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-              <input
-                id="username"
-                type="text"
-                placeholder="Your name"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-800/50 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-              />
-            </div>
+            <input
+              id="username"
+              type="text"
+              placeholder="Your name"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className={field}
+            />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-neutral-300 mb-1">
+            <label htmlFor="email" className="block text-sm text-neutral-400 mb-2">
               Email
             </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-              <input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-800/50 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-              />
-            </div>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className={field}
+            />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-neutral-300 mb-1">
+            <label htmlFor="password" className="block text-sm text-neutral-400 mb-2">
               Password
             </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-              <input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-800/50 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-              />
-            </div>
+            <input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className={field}
+            />
           </div>
 
           {error && (
-            <div className="bg-rose-500/10 border border-rose-400/30 text-rose-400 text-sm px-4 py-2 rounded-lg">
+            <p role="alert" className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
               {error}
-            </div>
+            </p>
           )}
 
           {success && (
-            <div className="bg-emerald-500/10 border border-emerald-400/30 text-emerald-400 text-sm px-4 py-2 rounded-lg">
+            <p role="status" className="text-sm text-emerald-400">
               Account created! Redirecting to login...
-            </div>
+            </p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          <button type="submit" disabled={loading} className={`${primaryButton} w-full`}>
+            {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
             {loading ? 'Creating account...' : 'Create account'}
           </button>
+
+          <p className="text-xs text-neutral-400 text-center">
+            By creating an account, you agree to the <Link to="/terms" className={textLink}>Terms of service</Link> and
+            confirm you're 18 or older. The <Link to="/privacy" className={textLink}>Privacy policy</Link> explains what
+            Duove keeps and who sees it.
+          </p>
         </form>
 
         {/* Login link */}
         <p className="text-center text-sm text-neutral-400 mt-6">
           Already have an account?{' '}
-          <Link to="/login" className="text-rose-400 hover:text-rose-300 transition">
+          <Link to="/login" className={textLink}>
             Sign in
           </Link>
         </p>
+
+        <LegalLinks className="mt-8 justify-center" />
       </div>
     </div>
   );

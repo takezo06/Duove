@@ -1,8 +1,14 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
+import { Mail, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { field, focusRing, primaryButton, textLink } from '../components/Card';
+import { LegalLinks } from '../components/Legal';
+
+const label = 'block text-sm text-neutral-400 mb-2';
+const errorBanner = 'rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300';
+const textAction = `inline-flex items-center justify-center gap-2 min-h-10 text-sm font-medium text-neutral-400 hover:text-rose-400 transition rounded cursor-pointer ${focusRing}`;
 
 export function Login() {
   usePageTitle('Login');
@@ -97,21 +103,19 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-950 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-950 px-4 py-10">
       <div className="w-full max-w-md">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-rose-400/10 border border-rose-400/20 mb-4">
-            <img src="/duove-logo.svg" alt="Duove" className="w-full h-full object-contain" />
-          </div>
-          <h1 className="text-2xl font-semibold text-white">
+          <img src="/duove-logo.svg" alt="Duove" className="w-16 h-16 mx-auto object-contain" />
+          <h1 className="mt-4 text-2xl font-bold text-white">
             {mode === 'recovery'
               ? 'Reset your password'
               : mode === 'forgot'
               ? 'Forgot password?'
               : 'Welcome back'}
           </h1>
-          <p className="text-neutral-400 text-sm mt-1">
+          <p className="text-neutral-400 mt-1">
             {mode === 'recovery'
               ? 'Choose a new password for your account.'
               : mode === 'forgot'
@@ -124,44 +128,29 @@ export function Login() {
         {mode === 'recovery' && (
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div>
-              <label htmlFor="new-password" className="block text-sm font-medium text-neutral-300 mb-1">
-                New Password
+              <label htmlFor="new-password" className={label}>
+                New password
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                <input
-                  id="new-password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-4 py-2.5 bg-neutral-800/50 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-                />
-              </div>
+              <input
+                id="new-password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className={field}
+              />
             </div>
 
-            {error && (
-              <div className="bg-rose-500/10 border border-rose-400/30 text-rose-400 text-sm px-4 py-2 rounded-lg">
-                {error}
-              </div>
-            )}
+            {error && <p role="alert" className={errorBanner}>{error}</p>}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+            <button type="submit" disabled={loading} className={`${primaryButton} w-full`}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <KeyRound className="w-4 h-4" aria-hidden />}
               {loading ? 'Updating...' : 'Update password'}
             </button>
 
-            <button
-              type="button"
-              onClick={goToLogin}
-              className="w-full flex items-center justify-center gap-2 text-neutral-400 hover:text-white text-sm transition"
-            >
-              <ArrowLeft className="w-4 h-4" />
+            <button type="button" onClick={goToLogin} className={`${textAction} w-full`}>
+              <ArrowLeft className="w-4 h-4" aria-hidden />
               Back to sign in
             </button>
           </form>
@@ -173,57 +162,35 @@ export function Login() {
             {!resetSent ? (
               <>
                 <div>
-                  <label htmlFor="reset-email" className="block text-sm font-medium text-neutral-300 mb-1">
+                  <label htmlFor="reset-email" className={label}>
                     Email
                   </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                    <input
-                      id="reset-email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full pl-10 pr-4 py-2.5 bg-neutral-800/50 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-                    />
-                  </div>
+                  <input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className={field}
+                  />
                 </div>
 
-                {error && (
-                  <div className="bg-rose-500/10 border border-rose-400/30 text-rose-400 text-sm px-4 py-2 rounded-lg">
-                    {error}
-                  </div>
-                )}
+                {error && <p role="alert" className={errorBanner}>{error}</p>}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                <button type="submit" disabled={loading} className={`${primaryButton} w-full`}>
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Mail className="w-4 h-4" aria-hidden />}
                   {loading ? 'Sending...' : 'Send reset link'}
                 </button>
               </>
             ) : (
-              <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg p-4 text-center">
-                <p className="text-emerald-400 text-sm">Reset link sent! Check your inbox.</p>
-                <button
-                  type="button"
-                  onClick={goToLogin}
-                  className="mt-3 text-rose-400 text-sm hover:underline"
-                >
-                  Back to sign in
-                </button>
-              </div>
+              <p role="status" className="text-sm text-emerald-400 text-center">
+                Reset link sent. Check your inbox.
+              </p>
             )}
 
-            <button
-              type="button"
-              onClick={goToLogin}
-              className="w-full flex items-center justify-center gap-2 text-neutral-400 hover:text-white text-sm transition"
-            >
-              <ArrowLeft className="w-4 h-4" />
+            <button type="button" onClick={goToLogin} className={`${textAction} w-full`}>
+              <ArrowLeft className="w-4 h-4" aria-hidden />
               Back to sign in
             </button>
           </form>
@@ -233,63 +200,49 @@ export function Login() {
         {mode === 'login' && (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-neutral-300 mb-1">
+              <label htmlFor="email" className={label}>
                 Email
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-4 py-2.5 bg-neutral-800/50 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-                />
-              </div>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className={field}
+              />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-neutral-300 mb-1">
+              <label htmlFor="password" className={label}>
                 Password
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                <input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-4 py-2.5 bg-neutral-800/50 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-rose-400/50 focus:border-transparent transition"
-                />
-              </div>
+              <input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className={field}
+              />
               {/* Forgot password link */}
               <p className="text-right mt-1">
                 <button
                   type="button"
                   onClick={() => { setMode('forgot'); setError(null); }}
-                  className="text-xs text-rose-400 hover:text-rose-300 transition"
+                  className={textAction}
                 >
                   Forgot password?
                 </button>
               </p>
             </div>
 
-            {error && (
-              <div className="bg-rose-500/10 border border-rose-400/30 text-rose-400 text-sm px-4 py-2 rounded-lg">
-                {error}
-              </div>
-            )}
+            {error && <p role="alert" className={errorBanner}>{error}</p>}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            <button type="submit" disabled={loading} className={`${primaryButton} w-full`}>
+              {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
@@ -299,11 +252,13 @@ export function Login() {
         {mode === 'login' && (
           <p className="text-center text-sm text-neutral-400 mt-6">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-rose-400 hover:text-rose-300 transition">
+            <Link to="/signup" className={textLink}>
               Create one
             </Link>
           </p>
         )}
+
+        <LegalLinks className="mt-8 justify-center" />
       </div>
     </div>
   );

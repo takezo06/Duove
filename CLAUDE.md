@@ -23,6 +23,10 @@ Rules:
 - Copy from the reference pages (Dashboard `BentoGrid.tsx`, Cravings, Partner, Notifications, QAHistory, Sidebar), never from files in DESIGN.md's "Known drift" table. When you fix a drift item, delete its row.
 - Banned: gradients, blur/glass, glow blobs, sparkle icons, emoji, icon-in-a-square decoration, uppercase tracked labels, hover scale/lift, undefined `animate-*` classes, em dashes in copy, `neutral-500` for readable text, `window.confirm`, `console.error`-only errors.
 
+## Privacy and cookies
+
+- New device storage (localStorage, cookies) or a third-party embed goes through `src/lib/consent.ts` and gets an item in `pages/CookiePolicy.tsx`. When what Duove collects, shares or stores changes, update the policies (`/privacy`, `/terms`, `/cookies`) and their `updated` date.
+
 ## Git
 
 - Commit only to the `new-feats` branch. Don't create new branches.

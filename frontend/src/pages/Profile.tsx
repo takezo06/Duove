@@ -19,7 +19,8 @@ import {
   secondaryButton,
   surface,
 } from '../components/Card';
-import { ArrowRight, CalendarDays, Camera, Check, Heart, KeyRound, Loader2, Mail, Pencil, Trash2 } from 'lucide-react';
+import { LegalLinks } from '../components/Legal';
+import { ArrowRight, CalendarDays, Camera, Check, Heart, KeyRound, Loader2, Mail, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
 
 interface ProfileRow {
   display_name: string;
@@ -436,6 +437,11 @@ export function Profile() {
           />
         </Tile>
       </div>
+
+      <Tile icon={<ShieldCheck className={iconClass} aria-hidden />} title="Privacy">
+        <p className="text-neutral-200 mt-4 flex-1">What Duove keeps, who sees it, and what stays on this device.</p>
+        <LegalLinks className="mt-3" />
+      </Tile>
     </div>
   );
 }

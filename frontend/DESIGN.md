@@ -476,6 +476,5 @@ This is older code that breaks the rules above. Fix it when you touch the file, 
 |---|---|---|
 | `layouts/ProtectedLayout.tsx` (loader) | Gradients, gradient text, blurred glow, `animate-ping`, `tracking-wider` | Plain `neutral-950` screen with the logo and a skeleton or simple spinner |
 | `pages/NotFound.tsx` | Page padding, icon-in-square, `shadow-xl` card, hand-typed primary | Centered state card spec, primitives |
-| `pages/Login.tsx`, `pages/Signup.tsx` | `rounded-lg` inputs and buttons, hand-typed primary, logo in a tinted square | Input and button spec (auth pages keep their centered `max-w-md` layout) |
 | `pages/Cravings.tsx` | List headings use `mb-3` without the white label. The trash button is 32px. | Section-heading spec, `iconButton` |
 | `components/Sidebar.tsx` | Collapse and sign-out buttons are 32 to 36px | `w-10 h-10` |

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { Loader2, Pencil, Plus } from 'lucide-react';
-import { Chip, InlineBar, focusRing, primaryButton, secondaryButton, surface } from '../Card';
+import { Chip, InlineBar, focusRing, primaryButton, secondaryButton, surface, textLink } from '../Card';
 import { apiError } from '../../lib/apiError';
 import { plural } from '../../lib/plural';
 import { parseDay, type CycleModel, type CycleSummary, type Phase } from '../../lib/cycle';
@@ -208,9 +209,11 @@ export function TrackingQuestion({ partnerName, partnerTracks, onAnswer }: {
   return (
     <div className="mt-6 pt-6 border-t border-neutral-800">
       <h2 className="text-lg font-semibold text-white leading-snug">Do you have periods?</h2>
+      {/* The consent moment for health data: say who sees it before the yes */}
       <p className="text-sm text-neutral-400 mt-1">
-        Duove tracks a cycle only for whoever has one.{' '}
-        {partnerTracks ? `You'll see ${partnerName}'s either way.` : 'You can change this later in your profile.'}
+        Duove tracks a cycle only for whoever has one. Saying yes shares your periods and day logs with {partnerName}.{' '}
+        {partnerTracks ? `You'll see ${partnerName}'s either way.` : 'You can change this later in your profile.'}{' '}
+        <Link to="/privacy#cycle" className={textLink}>How Duove handles health data</Link>
       </p>
       <div className="mt-5 flex flex-col sm:flex-row gap-3">
         <button onClick={run('yes', () => onAnswer(true), fallback)} disabled={!!busy} className={primaryButton}>
