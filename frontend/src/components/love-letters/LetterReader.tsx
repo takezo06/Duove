@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Music, Play } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Flower2, Music, Play } from 'lucide-react';
 import { CardHeader, iconClass, inset, secondaryButton, textLink } from '../Card';
 import { useConsent } from '../../hooks/useConsent';
 import { saveConsent } from '../../lib/consent';
+import { counts, countLabel, flowerOf, isBouquet, wrapOf, type Bouquet as BouquetValue } from '../../lib/bouquet';
+import { Bouquet } from '../flowers/Bouquet';
+import { FlowerIcon } from '../flowers/FlowerArt';
 
 export interface Letter {
   id: string;
@@ -17,6 +20,8 @@ export interface Letter {
   spotify_track_id?: string | null;
   spotify_track_name?: string | null;
   spotify_artist_name?: string | null;
+  // flowers sent with it, null without
+  bouquet?: BouquetValue | null;
 }
 
 interface LetterReaderProps {
@@ -59,6 +64,37 @@ export function LetterReader({ letter, mine, partnerName, onNewer, onOlder }: Le
           </div>
         )}
       </div>
+
+      {isBouquet(letter.bouquet) && (
+        <div className="mt-6 pt-6 border-t border-neutral-800">
+          <CardHeader
+            icon={<Flower2 className={iconClass} aria-hidden />}
+            title={mine ? 'The flowers you sent' : `${partnerName} sent you flowers`}
+          />
+          <div className="mt-4 grid sm:grid-cols-2 gap-6 items-start">
+            <Bouquet
+              bouquet={letter.bouquet}
+              to={letter.recipient_name ?? undefined}
+              from={letter.sender_name ?? undefined}
+              className="w-full max-w-xs mx-auto aspect-square"
+            />
+            <div>
+              <ul className="space-y-3">
+                {counts(letter.bouquet.stems).map(({ id, n }) => (
+                  <li key={id} className="flex items-start gap-3">
+                    <FlowerIcon id={id} className="w-8 h-8 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-white font-medium">{countLabel(id, n)}</p>
+                      <p className="text-sm text-neutral-400">{flowerOf(id).meaning}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-xs text-neutral-400">Wrapped in {wrapOf(letter.bouquet.wrap).phrase}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {letter.spotify_track_id && (
         <div className="mt-6 pt-6 border-t border-neutral-800">

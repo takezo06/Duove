@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import axios from 'axios';
-import { X, Search, Send, Loader2 } from 'lucide-react';
+import { X, Search, Send, Loader2, Flower2 } from 'lucide-react';
 import { Modal, field, focusRing, iconButton, inset, primaryButton, secondaryButton } from '../Card';
 import { apiError } from '../../lib/apiError';
 import type { Letter } from './LetterReader';
+import { Bouquet } from '../flowers/Bouquet';
+import { BouquetBuilder } from '../flowers/BouquetBuilder';
+import { listStems, wrapOf, type Bouquet as BouquetValue } from '../../lib/bouquet';
+import { plural } from '../../lib/plural';
 
 interface Track {
   id: string;
@@ -32,7 +36,18 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
   const [sending, setSending] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [sendError, setSendError] = useState('');
+  // Flowers are built in a second view of this modal; the letter keeps everything typed meanwhile
+  const [view, setView] = useState<'letter' | 'flowers'>('letter');
+  const [bouquet, setBouquet] = useState<BouquetValue | null>(null);
+  const flowersButton = useRef<HTMLButtonElement>(null);
+  const returning = useRef(false);
   const canSend = heading.trim() !== '' && body.trim() !== '' && !sending;
+
+  // Back from the builder: focus returns to the flowers field it was opened from
+  useEffect(() => {
+    if (view === 'letter' && returning.current) flowersButton.current?.focus();
+    returning.current = view === 'flowers';
+  }, [view]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -71,6 +86,7 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
           spotify_track_name: selectedSong?.name,
           spotify_artist_name: selectedSong?.artist,
           spotify_album_art: selectedSong?.albumArt,
+          bouquet: bouquet ?? undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -82,6 +98,21 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
       setSending(false);
     }
   };
+
+  if (view === 'flowers') {
+    return (
+      <Modal label={`Flowers for ${partnerName}`} onClose={onClose} wide>
+        <BouquetBuilder
+          initial={bouquet}
+          partnerName={partnerName}
+          to={recipientName.trim()}
+          from={senderName.trim()}
+          onUse={(b) => { setBouquet(b); setView('letter'); }}
+          onBack={() => setView('letter')}
+        />
+      </Modal>
+    );
+  }
 
   return (
     <Modal label={`Write to ${partnerName}`} onClose={onClose} wide>
@@ -122,6 +153,32 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
             placeholder={`Dear ${partnerName},`}
             className={`${field} h-48 md:h-64 resize-y leading-relaxed`}
           />
+        </div>
+
+        <div>
+          <p id="letter-flowers" className="block text-sm text-neutral-400 mb-2">Add flowers (optional)</p>
+          {bouquet ? (
+            <div className={`${inset} flex items-center gap-3`}>
+              <Bouquet bouquet={bouquet} size="thumb" className="w-10 h-12 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-medium line-clamp-2 break-words">{listStems(bouquet.stems)}</p>
+                <p className="text-neutral-400 text-xs">
+                  {plural(bouquet.stems.length, 'stem')} in {wrapOf(bouquet.wrap).phrase}
+                </p>
+              </div>
+              <button ref={flowersButton} type="button" onClick={() => setView('flowers')} aria-describedby="letter-flowers" className={`${secondaryButton} shrink-0`}>
+                Change
+              </button>
+              <button type="button" onClick={() => setBouquet(null)} aria-label="Remove flowers" className={iconButton}>
+                <X className="w-4 h-4" aria-hidden />
+              </button>
+            </div>
+          ) : (
+            <button ref={flowersButton} type="button" onClick={() => setView('flowers')} aria-describedby="letter-flowers" className={secondaryButton}>
+              <Flower2 className="w-4 h-4" aria-hidden />
+              Pick flowers
+            </button>
+          )}
         </div>
 
         <div>

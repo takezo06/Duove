@@ -7,3 +7,15 @@
     --radius: 0.5rem;   /* This is what Tailwind's rounded-lg uses */
   }
 }
+
+/* A stem settling into the bouquet as it's added (BouquetBuilder only, see DESIGN.md section 10) */
+@keyframes settle {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-settle {
+  animation: settle 200ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-settle { animation: none; }
+}

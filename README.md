@@ -37,6 +37,7 @@
 ### 💞 Love Letters with Spotify
 * Hardware-Accelerated Fluid Animations: Interactive love letter cards that scatter beautifully outward into place from a messy stack like real paper.
 * Seamless Streaming Embeds: Send heartfelt messages with attached Spotify tracks that playback right inside a realistic, lined-paper modal workspace.
+* Flowers in a letter: Build a bouquet of up to 12 stems, pick its wrap, and send it sealed with your letter. Every flower carries a meaning, and you both see the same arrangement.
 * Deep Links & Notifications: Automatic relationship sync ensures your partner gets unread notification counts instantly with immediate click-through logic.
 
 ### 🗓️ Cycle Tracker & Predictor

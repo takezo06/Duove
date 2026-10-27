@@ -9,7 +9,7 @@ export function PrivacyPolicy() {
   return (
     <LegalPage
       title="Privacy policy"
-      updated="2026-10-26"
+      updated="2026-10-27"
       summary={
         <Bullets>
           <li>What you put in Duove is shared with your partner, and with nobody else on Duove.</li>
@@ -47,7 +47,8 @@ export function PrivacyPolicy() {
           </li>
           <li>
             <Term>What you write.</Term> Love letters: the heading, the message, the names you sign with, any song you attach
-            (saved as its Spotify ID, title, artist and cover link) and when each letter was opened. Cravings, with their
+            (saved as its Spotify ID, title, artist and cover link), any flowers you add (which ones, their order and the
+            wrap) and when each letter was opened. Cravings, with their
             category and whether they're done. Your daily answers and the questions you skip. When you last read your
             notifications.
           </li>

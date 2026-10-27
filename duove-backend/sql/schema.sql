@@ -188,7 +188,8 @@ CREATE TABLE IF NOT EXISTS "public"."love_letters" (
     "heading" "text" DEFAULT 'Untitled'::"text" NOT NULL,
     "recipient_name" "text" DEFAULT 'My love'::"text" NOT NULL,
     "sender_name" "text",
-    "opened_at" timestamp with time zone
+    "opened_at" timestamp with time zone,
+    "bouquet" "jsonb"
 );
 
 

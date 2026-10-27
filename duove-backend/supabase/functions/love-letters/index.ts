@@ -3,6 +3,27 @@ import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import { createSupabaseClients } from "../_shared/supabase.ts";
 import { getUserId } from "../_shared/auth.ts";
 
+// The flowers and wraps a letter's bouquet can use. A copy of the ids in frontend/src/lib/bouquet.ts;
+// frontend/scripts/bouquet.check.ts fails when the two lists differ.
+const FLOWER_IDS = ["garden-rose", "peony", "ranunculus", "tulip", "anemone", "cosmos", "daisy", "carnation", "sweet-pea", "lily", "snapdragon", "babys-breath"];
+const WRAP_IDS = ["kraft", "wine", "charcoal", "tissue"];
+const MAX_STEMS = 12;
+
+// A bouquet is its stems in the order they were added, a wrap and the seed that places them.
+// undefined/null means no flowers; anything else malformed is rejected rather than half-saved.
+function cleanBouquet(v: unknown): { ok: true; value: unknown } | { ok: false } {
+  if (v === undefined || v === null) return { ok: true, value: null };
+  if (typeof v !== "object" || Array.isArray(v)) return { ok: false };
+  const b = v as Record<string, unknown>;
+  const stems = b.stems;
+  const valid = b.v === 1 &&
+    Array.isArray(stems) && stems.length >= 1 && stems.length <= MAX_STEMS &&
+    stems.every((s) => typeof s === "string" && FLOWER_IDS.includes(s)) &&
+    typeof b.wrap === "string" && WRAP_IDS.includes(b.wrap) &&
+    Number.isInteger(b.seed) && (b.seed as number) >= 0 && (b.seed as number) <= 2 ** 31 - 1;
+  return valid ? { ok: true, value: { v: 1, stems, wrap: b.wrap, seed: b.seed } } : { ok: false };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return handleOptions();
 
@@ -61,6 +82,8 @@ serve(async (req) => {
     const heading = text(body.heading, 120);
     const message = text(body.message, 5000);
     if (!heading || !message) return json({ error: "A letter needs a heading and a message" }, 400);
+    const bouquet = cleanBouquet(body.bouquet);
+    if (!bouquet.ok) return json({ error: "Those flowers didn't come through. Pick them again." }, 400);
     const relationship = await getActiveRelationship();
     if (!relationship) return json({ error: "Pair with your partner before sending letters" }, 400);
     // Only known columns: spreading the body let unknown keys fail the whole insert.
@@ -77,6 +100,7 @@ serve(async (req) => {
         spotify_track_name: text(body.spotify_track_name, 200) || null,
         spotify_artist_name: text(body.spotify_artist_name, 200) || null,
         spotify_album_art: text(body.spotify_album_art, 500) || null,
+        bouquet: bouquet.value,
       })
       .select().single();
     if (error) return json({ error: error.message }, 500);

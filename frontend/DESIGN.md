@@ -53,6 +53,7 @@ Helpers:
 - `src/lib/when.ts`: `when(iso)` gives relative times ("3h ago", "Yesterday", "Mon", "3 Mar").
 - `src/lib/cycle.ts`: all cycle math (averages, phases, predictions, late periods, what can be logged on a day), in local calendar days (`'YYYY-MM-DD'`, never `toISOString()`). The tracker and the dashboard tile both use `cycleModel()`. Verify changes with `node frontend/scripts/cycle.check.ts` (from the repo root).
 - `components/cycle/constants.ts`: `phaseColors` for cycle phases, the log options with `labelOf()`, and the cycle date formatters (`shortDay`, `longDay`, `dayRange`, `relativeDay`).
+- `src/lib/bouquet.ts`: the flower catalog (`FLOWERS`), the wraps (`WRAPS`), `arrange()` and `greenery()` (where each stem and sprig sits), `addStem`/`removeStem`/`rearrange`, and the words (`describe`, `listStems`, `countLabel`). Verify changes with `node frontend/scripts/bouquet.check.ts` (from the repo root); it also checks the love-letters function's copy of the ids.
 - `src/lib/consent.ts` + `hooks/useConsent.ts`: the visitor's cookie choice (`cache` for "Faster loading", `spotify` for Spotify players), `null` until they choose; `saveConsent()`, `openCookieSettings()`. Anything new that keeps data on the device or loads a third party that sets cookies goes through it and gets an item in `pages/CookiePolicy.tsx` (essential storage gets an item too). A new optional category is a new boolean field there, and everyone is asked again. Verify changes with `node frontend/scripts/consent.check.ts`.
 
 **Adding a new shared style:** add it to `Card.tsx` (styles and components) or `src/lib/` (logic) the first time a second file needs it, then import it everywhere. `Card.tsx` may only export strings and components (fast refresh), so a style that takes arguments becomes a component, like `Chip`.
@@ -109,6 +110,7 @@ Use rose for meaning, never decoration. One rose-filled primary action per view.
 - **Emerald = done or connected:** `text-emerald-400` check icons and `Badge tone="emerald"` ("Connected", "Both answered", "All caught up").
 - **Craving categories:** Food is amber, Activity is sky, Emotional is rose, Material is violet, Other is neutral. Always read them from `cravingCategories.ts` (`iconColor` for icons, `tint` for pills and selected chips). A category shows its color wherever it appears, and these colors mean nothing else.
 - **Cycle phases:** menstrual is `red-500`, follicular `teal-300`, fertile `rose-300`, luteal `purple-300`. Always read them from `phaseColors`.
+- **Flower art:** the bouquet drawings use `rose` for petals, `amber` for centers, pollen and kraft paper, warm whites (`neutral-50` to `neutral-300`, `amber-50`/`amber-100`, `white`), `neutral-600` to `neutral-900` for dark centers and charcoal paper, and `emerald-600` to `emerald-900` for stems and leaves. They live only inside `components/flowers/` and `WRAPS` in `src/lib/bouquet.ts`, as `fill-*`/`stroke-*` classes, and never style UI. Light comes from a lit and a shaded tone of each petal or fold, never a gradient.
 - **Destructive actions use rose, not red.** The confirm button is a rose fill (see Cravings Delete/Keep). `red-*` belongs to the menstrual phase only.
 
 ### Banned
@@ -310,6 +312,14 @@ How an open letter reads, on the desk and in the envelope box's modal:
 - Heading `text-xl font-bold leading-snug`. Body at base size, `leading-relaxed`, the greeting in `text-rose-400 font-semibold`, and the signature right-aligned in `font-semibold text-white` under a `w-10 h-px bg-rose-400/60` rule. Sections inside follow the normal `mt-6 pt-6 border-t` rhythm.
 - The letter is personal through these details, not through bigger type. Keep every size on the scale in section 4.
 
+### Bouquet (flowers in a letter)
+
+A letter can carry a bouquet, like it carries a song. See `components/flowers/`.
+- **Stored** on the letter as `{ v: 1, stems, wrap, seed }`: the stems in the order they were added (12 at most), the wrap, and a seed. The drawing comes from those alone (`arrange()` in `src/lib/bouquet.ts`, no screen-size checks), so the sender and the partner see the same bouquet, and a new stem never moves the ones already placed.
+- **Drawing** (`Bouquet`, 240 x 300): back sheet, greenery, stems, blooms back row first, two front flaps in the wrap's lit and shaded tones, the ribbon, and a paper tag on a string ("For **Mika**" / "from Jed", `text-xs`, HTML so it stays on the type scale). `size="thumb"` drops the tag. Each flower in `FlowerArt.tsx` is flat fills with one stem weight (2.5) and one fine-line weight (1.2), and three levels of detail: silhouette, inner petals, one small detail (a lily's freckles, a ranunculus's green eye). A new flower follows the same language and goes into `FLOWERS` and the function's `FLOWER_IDS`.
+- **Builder** (`BouquetBuilder`), a second view of the letter `Modal`: a back text action, the title "Flowers for **Mika**", then a sticky preview (the bouquet, a live "7 of 12 stems" and a `secondaryButton` "Rearrange"), a `grid-cols-2 sm:grid-cols-3` of flower tiles (the drawing, name, meaning; tap to add, a count and a − `iconButton` once picked, the picked tile in `bg-rose-500/10 border-rose-400/20`), the wrap as a `Chip` radiogroup, and the view's one primary, "Use these flowers". The letter form keeps everything typed while it's open; the letter shows the choice as an `inset` row with a thumbnail, "Change" and "Remove flowers".
+- **Reading:** a section after the signature (`mt-6 pt-6 border-t`): `CardHeader` with `Flower2` ("Mika sent you flowers"), the bouquet beside a list of what's in it (each kind with its drawing, "3 tulips" and its meaning) and "Wrapped in kraft paper". Envelopes with flowers show `Flower2` in their meta row, and a sealed one says "Mika sent you a letter and flowers".
+
 ### Turn card (Love letters desk)
 
 Live state for whose turn it is to write. When the partner wrote last: a solid `rounded-2xl bg-rose-600 p-6 text-white` block ("Your turn", "Mika wrote to you yesterday.") with a `text-sm` label, a `text-lg font-semibold leading-snug` line and a full-width `inverseButton`. This is the view's one rose primary. When you wrote last: a plain `${surface} p-6` "Waiting on Mika" card with a `secondaryButton`. Use `rose-600`, not `rose-500`, under white body text (4.7:1).
@@ -377,7 +387,7 @@ One page (`/cycle`); `/cycle/log` and `/cycle/analytics` redirect to it. See `Cy
 
 ## 9. Icons
 
-- **lucide-react only.** No emoji, no hand-drawn SVG icons, no `Sparkles`.
+- **lucide-react only.** No emoji, no hand-drawn SVG icons, no `Sparkles`. The bouquet drawings in `components/flowers/` are illustrations of the letter's flowers, not icons, and never stand in for a lucide icon in buttons, headers or nav.
 - **Sizes:** `w-4 h-4` default (buttons, card headers, inline). `w-5 h-5` for nav and the modal close button. `w-3.5 h-3.5` in chips and small links. `w-3 h-3` in `CategoryPill`.
 - **Color:** inherit from the text, `text-rose-400` in headers, category `iconColor` for categories, `text-emerald-400` for done.
 - Decorative icons get `aria-hidden`. Icon-only buttons get an `aria-label`.
@@ -391,7 +401,8 @@ One page (`/cycle`); `/cycle/log` and `/cycle/analytics` redirect to it. See `Cy
 - The only movement allowed is the arrow nudge: `group-hover:translate-x-0.5 motion-reduce:transform-none`.
 - `animate-pulse` only on skeletons. `animate-spin` only on `Loader2`.
 - There are no custom keyframes. Any `animate-*` class beyond Tailwind's built-ins must be defined in `index.css` before it is used.
-- **Envelope open** is the one exception, and only on `EnvelopeCard`. It runs on tap, never on hover: the flap turns up (`rotateX(180deg)`, 200ms), then the letter slides half out (200ms), then the reader opens in a `Modal` at 420ms. Closing plays it back. Under `prefers-reduced-motion` both the motion and the wait are skipped. Don't copy it anywhere else.
+- **Envelope open** is one of two exceptions, and only on `EnvelopeCard`. It runs on tap, never on hover: the flap turns up (`rotateX(180deg)`, 200ms), then the letter slides half out (200ms), then the reader opens in a `Modal` at 420ms. Closing plays it back. Under `prefers-reduced-motion` both the motion and the wait are skipped. Don't copy it anywhere else.
+- **Stem settle-in** is the other exception, and only in `BouquetBuilder`'s preview: the stem just added fades in and rises 8px (`animate-settle`, 200ms ease-out, defined in `index.css`). Rearranging, changing the wrap, the reader and thumbnails stay still, and under `prefers-reduced-motion` it doesn't move at all. Don't copy it anywhere else.
 - **Banned:** `hover:scale-*`, `-translate-y` lift on hover, `animate-ping`, pulsing dots, long `duration-300+` choreography, glow shadows on hover.
 
 ---
@@ -456,6 +467,7 @@ Load what the view shows, nothing more, and never let a nice-to-have block the p
 
 ### Backend and mock contract
 
+- A letter's flowers live in `love_letters.bouquet` (jsonb, null = none). The function accepts only known flower and wrap ids, 1 to 12 stems and an integer seed, and turns anything malformed away with a 400.
 - Read state lives in `love_letters.opened_at` (null = sealed). Only the recipient can set it, once; the endpoint is idempotent. Schema changes ship as a dated file in `duove-backend/sql/` (run it in the Supabase SQL editor) and are mirrored in `sql/schema.sql`. Backfill existing rows when a new column would otherwise change how old data looks (every letter from before `opened_at` counts as opened).
 - List endpoints take a capped `limit` and an optional `before` cursor, validate the cursor (400 on garbage) and keep returning a plain array, so older callers don't break.
 - After changing an edge function, deploy it (`supabase functions deploy <name>`) before shipping a frontend that depends on it. A frontend that sends `before` to an old function gets the first page again and shows duplicates.

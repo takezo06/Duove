@@ -215,7 +215,9 @@ export function LoveLetters() {
                 <div className="w-full max-w-sm">
                   <EnvelopeCard letter={open} mine={false} partnerName={partnerName} sealed open={breaking} onOpen={breakSeal} />
                 </div>
-                <h2 className="mt-6 text-lg font-semibold text-white leading-snug">{partnerName} sent you a letter</h2>
+                <h2 className="mt-6 text-lg font-semibold text-white leading-snug">
+                  {partnerName} sent you {open.bouquet ? 'a letter and flowers' : 'a letter'}
+                </h2>
                 <p className="mt-1 text-neutral-400">It's still sealed. Tap the envelope to open it.</p>
               </div>
             ) : (

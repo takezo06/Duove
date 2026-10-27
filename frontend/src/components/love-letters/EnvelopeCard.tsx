@@ -1,4 +1,4 @@
-import { Music } from 'lucide-react';
+import { Flower2, Music } from 'lucide-react';
 import { Badge, Seal, focusRing } from '../Card';
 import type { Letter } from './LetterReader';
 
@@ -75,6 +75,13 @@ export function EnvelopeCard({ letter, mine, partnerName, sealed, open, onOpen }
               <span aria-hidden>·</span>
               <Music className="w-3.5 h-3.5 shrink-0" aria-hidden />
               <span className="sr-only">with a song</span>
+            </>
+          )}
+          {letter.bouquet && (
+            <>
+              <span aria-hidden>·</span>
+              <Flower2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
+              <span className="sr-only">with flowers</span>
             </>
           )}
           {sealed && (
