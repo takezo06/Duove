@@ -4,6 +4,7 @@ import { Chip, Modal, field, primaryButton, secondaryButton } from '../Card';
 import { apiError } from '../../lib/apiError';
 import type { LogInput, SymptomLog } from '../../hooks/useCycle';
 import { BLEEDING, DISCHARGE, LEVELS, MOODS, SEX, SYMPTOMS, labelOf, longDay } from './constants';
+import { useOffline } from '../../hooks/useOffline';
 
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -54,6 +55,7 @@ export function LogModal({ day, isToday, existing, onSave, onClose }: {
   onSave: (input: LogInput) => Promise<void>;
   onClose: () => void;
 }) {
+  const offline = useOffline();
   const [log, setLog] = useState<LogInput>(() => ({
     bleeding_intensity: existing?.bleeding_intensity ?? null,
     physical_symptoms: existing?.physical_symptoms ?? [],
@@ -130,7 +132,7 @@ export function LogModal({ day, isToday, existing, onSave, onClose }: {
         </div>
 
         <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-col sm:flex-row gap-3">
-          <button type="submit" disabled={saving || sleepInvalid || (empty && !existing)} className={primaryButton}>
+          <button type="submit" disabled={saving || sleepInvalid || (empty && !existing) || offline} className={primaryButton}>
             {saving && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
             {saving ? 'Saving...' : empty && existing ? 'Clear this day' : 'Save'}
           </button>

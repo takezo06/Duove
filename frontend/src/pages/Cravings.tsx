@@ -9,12 +9,14 @@ import { CATEGORIES, categoryFor } from '../lib/cravingCategories';
 import { when } from '../lib/when';
 import { useAuth } from '../context/AuthContext';
 import { useCravings, useRelationship, type Craving } from '../hooks/useShared';
+import { useOffline } from '../hooks/useOffline';
 
 const categoryOf = (c: Craving) => categoryFor(c.category);
 
 const RELATIONSHIP_ERRORS = ['No active relationship found.', 'Could not fetch relationship details.'];
 
 export function Cravings() {
+  const offline = useOffline();
   usePageTitle('Cravings');
   const navigate = useNavigate();
   const location = useLocation();
@@ -174,9 +176,10 @@ export function Cravings() {
       >
         <button
           onClick={() => handleToggle(craving.id)}
+          disabled={offline}
           aria-pressed={craving.fulfilled}
           aria-label={craving.fulfilled ? `Mark "${craving.content}" as not done` : `Mark "${craving.content}" as done`}
-          className={`mt-0.5 w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition cursor-pointer ${focusRing} ${
+          className={`mt-0.5 w-6 h-6 shrink-0 rounded-full border-2 flex items-center justify-center transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${focusRing} ${
             craving.fulfilled ? 'bg-rose-500 border-rose-500' : 'border-neutral-600 hover:border-rose-400'
           }`}
         >
@@ -202,6 +205,7 @@ export function Cravings() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => handleDelete(craving.id)}
+                disabled={offline}
                 className={deleteButton}
               >
                 Delete
@@ -273,7 +277,7 @@ export function Cravings() {
                 </Chip>
               ))}
             </div>
-            <button type="submit" disabled={submitting || !newContent.trim()} className={`${primaryButton} shrink-0`}>
+            <button type="submit" disabled={submitting || !newContent.trim() || offline} className={`${primaryButton} shrink-0`}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
               Add craving
             </button>

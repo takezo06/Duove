@@ -9,6 +9,7 @@ import { Bouquet } from '../flowers/Bouquet';
 import { BouquetBuilder } from '../flowers/BouquetBuilder';
 import { listStems, wrapOf, type Bouquet as BouquetValue } from '../../lib/bouquet';
 import { plural } from '../../lib/plural';
+import { useOffline } from '../../hooks/useOffline';
 
 interface Track {
   id: string;
@@ -25,6 +26,7 @@ interface SendLetterModalProps {
 }
 
 export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLetterModalProps) {
+  const offline = useOffline();
   const [recipientName, setRecipientName] = useState(partnerName);
   const [senderName, setSenderName] = useState(myName);
   const [heading, setHeading] = useState('');
@@ -237,7 +239,7 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
 
         {sendError && <p role="alert" className="text-sm text-rose-300">{sendError}</p>}
 
-        <button type="submit" disabled={!canSend} className={`${primaryButton} w-full`}>
+        <button type="submit" disabled={!canSend || offline} className={`${primaryButton} w-full`}>
           {sending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
           {sending ? 'Sending...' : 'Send letter'}
         </button>

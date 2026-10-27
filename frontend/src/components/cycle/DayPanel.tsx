@@ -5,6 +5,7 @@ import { apiError } from '../../lib/apiError';
 import type { CycleModel, Period } from '../../lib/cycle';
 import type { SymptomLog } from '../../hooks/useCycle';
 import { dayRange, labelOf, longDay, phaseColors, relativeDay, shortDay } from './constants';
+import { useOffline } from '../../hooks/useOffline';
 
 const list = (xs: string[] | undefined) => (xs?.length ? xs.map(labelOf).join(', ') : null);
 
@@ -33,6 +34,7 @@ export function DayPanel({ day, todayIso, model, periods, log, logsReady, logsEr
   onUpdate: (id: string, patch: Partial<Omit<Period, 'id'>>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 }) {
+  const offline = useOffline();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -118,7 +120,7 @@ export function DayPanel({ day, todayIso, model, periods, log, logsReady, logsEr
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <p className="text-sm text-neutral-200">Remove this period? Your daily logs stay.</p>
               <div className="flex gap-2">
-                <button onClick={() => run('remove', () => onRemove(acts.remove!))} disabled={!!busy} className={deleteButton}>
+                <button onClick={() => run('remove', () => onRemove(acts.remove!))} disabled={!!busy || offline} className={deleteButton}>
                   {spin('remove')}
                   Remove
                 </button>
@@ -134,7 +136,7 @@ export function DayPanel({ day, todayIso, model, periods, log, logsReady, logsEr
               {acts.start && (
                 <button
                   onClick={() => run('start', () => (acts.start === 'new' ? onStart(day) : onUpdate(acts.start!, { start_date: day })))}
-                  disabled={!!busy}
+                  disabled={!!busy || offline}
                   className={secondaryButton}
                 >
                   {spin('start')}
@@ -142,13 +144,13 @@ export function DayPanel({ day, todayIso, model, periods, log, logsReady, logsEr
                 </button>
               )}
               {acts.end && (
-                <button onClick={() => run('end', () => onUpdate(acts.end!, { end_date: day }))} disabled={!!busy} className={secondaryButton}>
+                <button onClick={() => run('end', () => onUpdate(acts.end!, { end_date: day }))} disabled={!!busy || offline} className={secondaryButton}>
                   {spin('end')}
                   Period ended this day
                 </button>
               )}
               {acts.remove && (
-                <button onClick={() => setConfirming(true)} disabled={!!busy} className={secondaryButton}>
+                <button onClick={() => setConfirming(true)} disabled={!!busy || offline} className={secondaryButton}>
                   Remove this period
                 </button>
               )}

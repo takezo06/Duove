@@ -12,6 +12,7 @@ import { SendLetterModal } from '../components/love-letters/SendLetterModal';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
 import { daysAgo } from '../lib/when';
+import { saveLetters, savedLetters } from '../lib/savedLetters';
 import { useAuth } from '../context/AuthContext';
 import { useMyProfile, useRelationship, useStats } from '../hooks/useShared';
 
@@ -30,6 +31,8 @@ export function LoveLetters() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lettersUnpaired, setUnpaired] = useState(false);
+  // Couldn't reach the server, so the desk shows the letters saved on this device
+  const [fromDevice, setFromDevice] = useState(false);
   // Your name, your partner and the totals paint from the cache, then refresh
   const meId = useAuth().user?.id ?? '';
   const profile = useMyProfile();
@@ -55,6 +58,8 @@ export function LoveLetters() {
         const api = import.meta.env.VITE_BACKEND_URL;
         const list = await axios.get(`${api}/love-letters?limit=${RECENT}`, { headers });
         setLetters(list.data);
+        setFromDevice(false);
+        saveLetters(meId, list.data);
         // A notification deep link opens its letter, even one older than the recent few
         if (highlightId) {
           const linked = (list.data as Letter[]).find((l) => l.id === highlightId)
@@ -62,14 +67,20 @@ export function LoveLetters() {
           if (linked) setPicked(linked);
         }
       } catch (err) {
+        const saved = savedLetters(meId);
         if ((err as { response?: { status?: number } }).response?.status === 404) setUnpaired(true);
-        else setError(apiError(err, "Couldn't load your letters. Try again."));
+        else if (saved.length > 0) {
+          setLetters(saved.slice(0, RECENT));
+          setFromDevice(true);
+          const linked = highlightId && saved.find((l) => l.id === highlightId);
+          if (linked) setPicked(linked);
+        } else setError(apiError(err, "Couldn't load your letters. Try again."));
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [attempt, highlightId]);
+  }, [attempt, highlightId, meId]);
 
   if (unpaired) {
     return (
@@ -102,6 +113,7 @@ export function LoveLetters() {
     openLetter(open.id);
     const openedAt = new Date().toISOString();
     const id = open.id;
+    saveLetters(me.id, [{ ...open, opened_at: openedAt }]);
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Let the flap lift and the letter slide out before the page swaps to the letter itself
     window.setTimeout(() => {
@@ -164,6 +176,13 @@ export function LoveLetters() {
           <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
             <p role="alert" className="text-sm text-rose-300">{error}</p>
             <button onClick={() => { setError(''); setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>Try again</button>
+          </div>
+        )}
+
+        {fromDevice && (
+          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-neutral-400">Showing the letters saved on this device. New ones load when you're back online.</p>
+            <button onClick={() => { setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>Try again</button>
           </div>
         )}
       </section>
@@ -234,6 +253,7 @@ export function LoveLetters() {
           onClose={() => setComposing(false)}
           onSent={(letter) => {
             setLetters((prev) => [letter, ...prev].slice(0, RECENT));
+            saveLetters(me.id, [letter]);
             setPicked(letter);
             stats.reload();
           }}

@@ -28,7 +28,12 @@ export function peek<T>(key: string): T | undefined {
 export function put<T>(key: string, value: T) {
   mem.set(key, value);
   if (persist()) {
-    try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); } catch { /* memory only */ }
+    try {
+      localStorage.setItem(PREFIX + key, JSON.stringify(value));
+    } catch {
+      // Full or blocked: memory only, and drop the stored copy so it can't come back stale
+      try { localStorage.removeItem(PREFIX + key); } catch { /* nothing stored */ }
+    }
   }
   listeners.get(key)?.forEach((l) => l());
 }

@@ -7,6 +7,7 @@ import { plural } from '../../lib/plural';
 import { parseDay, type CycleModel, type CycleSummary, type Phase } from '../../lib/cycle';
 import type { Who } from '../../hooks/useCycle';
 import { phaseColors, relativeDay, shortDay } from './constants';
+import { useOffline } from '../../hooks/useOffline';
 
 const aroundDay = (day: string) => parseDay(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const value = (v: ReactNode) => <span className="text-white font-medium tabular-nums">{v}</span>;
@@ -108,6 +109,7 @@ export function CycleHeader({ who, options, setWho, partnerName, model, todayIso
   onLogToday: () => void;
   onTrackMine?: () => Promise<void>; // you said you don't have periods; this turns your own tracking on
 }) {
+  const offline = useOffline();
   const { busy, run, spin, alert } = useAction();
   const s = model.summary;
   const mine = who === 'me';
@@ -165,12 +167,12 @@ export function CycleHeader({ who, options, setWho, partnerName, model, todayIso
           {mine && (
             <div className={`${line ? 'mt-5' : ''} flex flex-col sm:flex-row gap-3`}>
               {endable ? (
-                <button onClick={run('end', () => onUpdate(endable.id, { end_date: todayIso }))} disabled={!!busy} className={primaryButton}>
+                <button onClick={run('end', () => onUpdate(endable.id, { end_date: todayIso }))} disabled={!!busy || offline} className={primaryButton}>
                   {spin('end')}
                   Period ended today
                 </button>
               ) : acts.start === 'new' ? (
-                <button onClick={run('start', () => onStart(todayIso))} disabled={!!busy} className={primaryButton}>
+                <button onClick={run('start', () => onStart(todayIso))} disabled={!!busy || offline} className={primaryButton}>
                   {spin('start')}
                   My period started today
                 </button>
@@ -184,7 +186,7 @@ export function CycleHeader({ who, options, setWho, partnerName, model, todayIso
           {onTrackMine && (
             <button
               onClick={run('mine', onTrackMine, "Your answer didn't save. Try again.")}
-              disabled={!!busy}
+              disabled={!!busy || offline}
               className={`${line ? 'mt-4' : ''} inline-flex items-center gap-2 text-sm font-medium text-neutral-400 hover:text-rose-400 transition rounded cursor-pointer disabled:opacity-50 ${focusRing}`}
             >
               {spin('mine')}
@@ -204,6 +206,7 @@ export function TrackingQuestion({ partnerName, partnerTracks, onAnswer }: {
   partnerTracks: boolean;
   onAnswer: (yes: boolean) => Promise<void>;
 }) {
+  const offline = useOffline();
   const { busy, run, spin, alert } = useAction();
   const fallback = "Your answer didn't save. Try again.";
   return (
@@ -216,11 +219,11 @@ export function TrackingQuestion({ partnerName, partnerTracks, onAnswer }: {
         <Link to="/privacy#cycle" className={textLink}>How Duove handles health data</Link>
       </p>
       <div className="mt-5 flex flex-col sm:flex-row gap-3">
-        <button onClick={run('yes', () => onAnswer(true), fallback)} disabled={!!busy} className={primaryButton}>
+        <button onClick={run('yes', () => onAnswer(true), fallback)} disabled={!!busy || offline} className={primaryButton}>
           {spin('yes')}
           Yes, track my cycle
         </button>
-        <button onClick={run('no', () => onAnswer(false), fallback)} disabled={!!busy} className={secondaryButton}>
+        <button onClick={run('no', () => onAnswer(false), fallback)} disabled={!!busy || offline} className={secondaryButton}>
           {spin('no')}
           No, I don't
         </button>
@@ -232,6 +235,7 @@ export function TrackingQuestion({ partnerName, partnerTracks, onAnswer }: {
 
 // Nobody's cycle to show: you said no, and your partner said no or hasn't set it up
 export function TrackingOff({ partnerName, partnerSaidNo, onTurnOn }: { partnerName: string; partnerSaidNo: boolean; onTurnOn: () => Promise<void> }) {
+  const offline = useOffline();
   const { busy, run, spin, alert } = useAction();
   return (
     <HeaderShell
@@ -241,7 +245,7 @@ export function TrackingOff({ partnerName, partnerSaidNo, onTurnOn }: { partnerN
       <div className="mt-6 pt-6 border-t border-neutral-800">
         <p className="text-neutral-200">Have periods after all?</p>
         <p className="text-sm text-neutral-400 mt-1">Turn tracking on for yourself here or in your profile.</p>
-        <button onClick={run('on', onTurnOn)} disabled={!!busy} className={`${secondaryButton} mt-5`}>
+        <button onClick={run('on', onTurnOn)} disabled={!!busy || offline} className={`${secondaryButton} mt-5`}>
           {spin('on')}
           Track my cycle
         </button>

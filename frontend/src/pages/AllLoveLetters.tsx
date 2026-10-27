@@ -11,6 +11,7 @@ import { apiError } from '../lib/apiError';
 import { groupByDate } from '../lib/groupByDate';
 import { openLetter as breakSeal } from '../lib/openLetter';
 import { plural } from '../lib/plural';
+import { saveLetters, savedLetters } from '../lib/savedLetters';
 import { useAuth } from '../context/AuthContext';
 import { useRelationship, useStats } from '../hooks/useShared';
 
@@ -36,6 +37,8 @@ export function AllLoveLetters() {
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  // Couldn't reach the server, so the box shows the letters saved on this device
+  const [fromDevice, setFromDevice] = useState(false);
   // the total is a nice-to-have; the box works without it
   const totals = useStats().data?.stats;
   const total = totals ? totals.letters_sent + totals.letters_received : null;
@@ -52,17 +55,26 @@ export function AllLoveLetters() {
         const page = await fetchLetters();
         setLetters(page);
         setHasMore(page.length === PAGE);
+        setFromDevice(false);
+        saveLetters(meId, page);
       } catch (err) {
         // 404 means not paired yet, which shows the same empty box as no letters
         if ((err as { response?: { status?: number } }).response?.status !== 404) {
-          setError(apiError(err, "Couldn't load your letters. Try again."));
+          const saved = savedLetters(meId);
+          if (saved.length > 0) {
+            setLetters(saved);
+            setHasMore(false);
+            setFromDevice(true);
+          } else {
+            setError(apiError(err, "Couldn't load your letters. Try again."));
+          }
         }
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [attempt]);
+  }, [attempt, meId]);
 
   const loadMore = useCallback(async () => {
     if (busy.current || letters.length === 0) return;
@@ -73,13 +85,14 @@ export function AllLoveLetters() {
       const page = await fetchLetters(letters[letters.length - 1].created_at);
       setLetters((prev) => [...prev, ...page]);
       setHasMore(page.length === PAGE);
+      saveLetters(meId, page);
     } catch (err) {
       setMoreError(apiError(err, "Couldn't load older letters. Try again."));
     } finally {
       busy.current = false;
       setLoadingMore(false);
     }
-  }, [letters]);
+  }, [letters, meId]);
 
   // Lazy loading: fetch the next page while the end is still 600px below the fold.
   // Re-observing after every page keeps filling a tall screen until it can scroll.
@@ -101,6 +114,7 @@ export function AllLoveLetters() {
     breakSeal(id);
     const openedAt = new Date().toISOString();
     setLetters((prev) => prev.map((l) => (l.id === id ? { ...l, opened_at: openedAt } : l)));
+    saveLetters(meId, [{ ...letter, opened_at: openedAt }]);
   };
   const openLetter = (id: string) => {
     if (openId) return;
@@ -145,6 +159,17 @@ export function AllLoveLetters() {
           <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
             <p role="alert" className="text-sm text-rose-300">{error}</p>
             <button onClick={() => { setError(''); setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {fromDevice && (
+          <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-neutral-400">
+              Showing the {plural(letters.length, 'letter')} saved on this device. Older ones load when you're back online.
+            </p>
+            <button onClick={() => { setLoading(true); setAttempt((a) => a + 1); }} className={secondaryButton}>
               Try again
             </button>
           </div>
@@ -196,7 +221,7 @@ export function AllLoveLetters() {
           </button>
         </div>
       ) : (
-        first && (
+        first && !fromDevice && (
           <p className="text-sm text-neutral-400 text-center">
             That's every letter, back to the first one on{' '}
             {new Date(first.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}.

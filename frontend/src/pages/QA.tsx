@@ -10,6 +10,7 @@ import { when } from '../lib/when';
 import { topicIcon, topicName, type Topic } from '../lib/qaTopics';
 import { Avatar, Badge, CardBack, CardHeader, Deck, InlineBar, Seal, field, iconClass, primaryButton, secondaryButton, surface } from '../components/Card';
 import { QACategoryModal } from '../components/qa/QACategoryModal';
+import { useOffline } from '../hooks/useOffline';
 
 interface Answer {
   answer_text: string;
@@ -75,6 +76,7 @@ function AnswerCard({ name, partner = false, answer }: { name?: string; partner?
 // Today's question on top of the deck, and the two answers under it: yours to write,
 // your partner's face down until you've both played your card.
 export function QA() {
+  const offline = useOffline();
   usePageTitle('Daily Q&A');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -272,7 +274,7 @@ export function QA() {
           <h2 className="mt-4 text-xl font-bold text-white leading-snug break-words">{question.question_text}</h2>
           <div className="mt-6 pt-6 border-t border-neutral-800 flex flex-wrap items-center gap-3">
             {canSkip && (
-              <button onClick={skip} disabled={skipping} className={secondaryButton}>
+              <button onClick={skip} disabled={skipping || offline} className={secondaryButton}>
                 {skipping ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <SkipForward className="w-4 h-4" aria-hidden />}
                 {skipping ? 'Skipping...' : 'Skip this question'}
               </button>
@@ -319,7 +321,7 @@ export function QA() {
                 placeholder="Write what comes to mind first"
                 className={`${field} mt-4 min-h-32 flex-1 resize-none`}
               />
-              <button type="submit" disabled={!answerText.trim() || submitting} className={`${primaryButton} mt-5 w-full`}>
+              <button type="submit" disabled={!answerText.trim() || submitting || offline} className={`${primaryButton} mt-5 w-full`}>
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
                 {submitting ? 'Sending...' : 'Send answer'}
               </button>

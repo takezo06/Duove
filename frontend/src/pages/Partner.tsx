@@ -23,6 +23,7 @@ import {
   Mails,
   UserRound,
 } from 'lucide-react';
+import { useOffline } from '../hooks/useOffline';
 
 const longDate = (d: Date) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
 const ordinal = (n: number) => n + (['st', 'nd', 'rd'][((((n + 90) % 100) - 10) % 10) - 1] || 'th');
@@ -39,6 +40,7 @@ function span(r: ReturnType<typeof relationshipYear>) {
 const fmt = (n: number) => n.toLocaleString();
 
 export function Partner() {
+  const offline = useOffline();
   usePageTitle('Partner');
   const { user } = useAuth();
   const profile = useMyProfile();
@@ -235,7 +237,7 @@ export function Partner() {
                 <p className="text-sm text-neutral-400 mt-3">You'll be connected as soon as they join.</p>
                 <button
                   onClick={generateInvite}
-                  disabled={generatingInvite}
+                  disabled={generatingInvite || offline}
                   className={`mt-auto pt-5 self-start text-sm font-medium text-neutral-400 hover:text-rose-400 transition disabled:opacity-50 cursor-pointer rounded ${focusRing}`}
                 >
                   Create a new code
@@ -244,7 +246,7 @@ export function Partner() {
             ) : (
               <>
                 <p className="text-neutral-300 mt-4 flex-1">Create a code and send it to your partner.</p>
-                <button onClick={generateInvite} disabled={generatingInvite} className={`${primaryButton} mt-5 w-full`}>
+                <button onClick={generateInvite} disabled={generatingInvite || offline} className={`${primaryButton} mt-5 w-full`}>
                   {generatingInvite ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : 'Create invite code'}
                 </button>
               </>
@@ -270,7 +272,7 @@ export function Partner() {
               />
               <button
                 onClick={joinRelationship}
-                disabled={joining || joinCode.trim().length !== 8}
+                disabled={joining || joinCode.trim().length !== 8 || offline}
                 className={primaryButton}
               >
                 {joining ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : 'Join'}
@@ -370,7 +372,7 @@ export function Partner() {
                 className="flex-1 bg-neutral-800/50 text-white px-4 py-2.5 rounded-xl border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-rose-400/50 [color-scheme:dark]"
               />
               <div className="flex gap-3">
-                <button type="submit" disabled={updatingAnniversary || !newAnniversaryDate} className={`${primaryButton} flex-1`}>
+                <button type="submit" disabled={updatingAnniversary || !newAnniversaryDate || offline} className={`${primaryButton} flex-1`}>
                   {updatingAnniversary && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
                   Save
                 </button>

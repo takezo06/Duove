@@ -21,6 +21,7 @@ import {
 } from '../components/Card';
 import { LegalLinks } from '../components/Legal';
 import { ArrowRight, CalendarDays, Camera, Check, Heart, KeyRound, Loader2, Mail, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
+import { useOffline } from '../hooks/useOffline';
 
 interface ProfileRow {
   display_name: string;
@@ -44,6 +45,7 @@ function ConfirmAction({ label, confirmLabel, question, fallback, onConfirm }: {
   fallback: string;
   onConfirm: () => Promise<void>;
 }) {
+  const offline = useOffline();
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,7 @@ function ConfirmAction({ label, confirmLabel, question, fallback, onConfirm }: {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <p className="text-sm text-neutral-200">{question}</p>
           <div className="flex gap-2">
-            <button onClick={run} disabled={busy} className={deleteButton}>
+            <button onClick={run} disabled={busy || offline} className={deleteButton}>
               {busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
               {confirmLabel}
             </button>
@@ -95,6 +97,7 @@ function Tile({ icon, title, children }: { icon: ReactNode; title: string; child
 }
 
 function PasswordTile({ email }: { email: string }) {
+  const offline = useOffline();
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -122,7 +125,7 @@ function PasswordTile({ email }: { email: string }) {
           Sent. Check your inbox.
         </p>
       ) : (
-        <button onClick={send} disabled={!email || state === 'sending'} className={`${secondaryButton} mt-5 self-start`}>
+        <button onClick={send} disabled={!email || state === 'sending' || offline} className={`${secondaryButton} mt-5 self-start`}>
           {state === 'sending' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Mail className="w-4 h-4" aria-hidden />}
           {state === 'sending' ? 'Sending...' : 'Email me a reset link'}
         </button>
@@ -134,6 +137,7 @@ function PasswordTile({ email }: { email: string }) {
 
 // Whether Duove tracks a cycle for you. Off keeps your logs but hides them from your partner.
 function CycleTile({ value, partnerName, onChange }: { value: boolean | null | undefined; partnerName: string | null | undefined; onChange: (v: boolean) => Promise<void> }) {
+  const offline = useOffline();
   const [busy, setBusy] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = async (v: boolean) => {
@@ -148,7 +152,7 @@ function CycleTile({ value, partnerName, onChange }: { value: boolean | null | u
     }
   };
   const button = (v: boolean, label: string) => (
-    <button onClick={() => set(v)} disabled={busy !== null} className={secondaryButton}>
+    <button onClick={() => set(v)} disabled={busy !== null || offline} className={secondaryButton}>
       {busy === v && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
       {label}
     </button>
@@ -182,6 +186,7 @@ function CycleTile({ value, partnerName, onChange }: { value: boolean | null | u
 }
 
 export function Profile() {
+  const offline = useOffline();
   usePageTitle('Profile');
   const navigate = useNavigate();
   // undefined = still loading, null = loaded but not there (no profile, not paired)
@@ -361,7 +366,7 @@ export function Profile() {
               </div>
             </div>
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <button type="submit" disabled={saving || !name || !dirty} className={primaryButton}>
+              <button type="submit" disabled={saving || !name || !dirty || offline} className={primaryButton}>
                 {saving && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
                 {saving ? 'Saving...' : 'Save changes'}
               </button>

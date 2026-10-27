@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Loader2, Shuffle } from 'lucide-react';
 import { Badge, Modal, iconClass, toggleRow, toggleRowOff, toggleRowOn } from '../Card';
 import { topicIcon, topicName, type Topic } from '../../lib/qaTopics';
+import { useOffline } from '../../hooks/useOffline';
 
 interface QACategoryModalProps {
   topics: Topic[];
@@ -13,6 +14,7 @@ interface QACategoryModalProps {
 
 // Pick the topic new questions come from. Random leaves it to chance.
 export function QACategoryModal({ topics, selectedId, error, onSelect, onClose }: QACategoryModalProps) {
+  const offline = useOffline();
   // The option being saved; undefined while nothing is
   const [pending, setPending] = useState<string | null | undefined>(undefined);
   const options = [
@@ -42,7 +44,7 @@ export function QACategoryModal({ topics, selectedId, error, onSelect, onClose }
               role="radio"
               aria-checked={on}
               onClick={() => pick(id)}
-              disabled={pending !== undefined}
+              disabled={pending !== undefined || offline}
               className={`${toggleRow} ${on ? toggleRowOn : toggleRowOff} disabled:cursor-wait`}
             >
               <span className="flex items-center justify-between gap-3">

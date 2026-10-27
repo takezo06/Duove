@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sidebar } from '../components/Sidebar';
+import { OfflineNotice } from '../components/OfflineNotice';
 import { Heart } from 'lucide-react';
 
 const LOADING_MESSAGES = [
@@ -91,6 +92,7 @@ export function ProtectedLayout() {
     <div className="flex h-screen bg-neutral-950">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <OfflineNotice />
         <Outlet />
       </main>
     </div>

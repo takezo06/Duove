@@ -133,5 +133,9 @@ async function del(url: string): Promise<Res> {
   return ok({});
 }
 
-const axios = { get, post, patch, put: patch, delete: del, isAxiosError: () => false };
+// Offline (DevTools, or `playwright-cli network-state-set offline`) every call fails like a real network error
+const online = <A extends unknown[]>(call: (...args: A) => Promise<Res>) => (...args: A) =>
+  navigator.onLine ? call(...args) : Promise.reject(Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' }));
+
+const axios = { get: online(get), post: online(post), patch: online(patch), put: online(patch), delete: online(del), isAxiosError: () => false };
 export default axios;

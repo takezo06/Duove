@@ -26,7 +26,7 @@ const options = [
     key: 'cache',
     name: 'Faster loading',
     icon: Zap,
-    description: 'Saves your profile, partner, cravings and cycle overview on this device so pages open at once. Deleted when you sign out.',
+    description: 'Saves your profile, partner, cravings, cycle overview and letters on this device so pages open at once and letters can be read offline. Deleted when you sign out.',
   },
   {
     key: 'spotify',

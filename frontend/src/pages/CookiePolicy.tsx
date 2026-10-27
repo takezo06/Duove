@@ -70,6 +70,9 @@ export function CookiePolicy() {
           <StorageItem name="Sidebar layout" storageKey="sidebar-width, sidebar-collapsed" by="Duove" lasts="Until you clear your browser data">
             Remembers how wide you made the sidebar, and whether you collapsed it.
           </StorageItem>
+          <StorageItem name="Offline reminder" storageKey="duove-offline-reminder" by="Duove" lasts="Until you clear your browser data">
+            Remembers that you chose "Don't remind me" when Duove told you letters aren't kept offline on this device.
+          </StorageItem>
           <StorageItem name="App files" storageKey="Service worker cache (workbox-precache-…)" by="Duove" lasts="Until the next Duove update replaces them">
             Keeps Duove's own code, styles and icons on this device, so it opens like an app and loads without a connection.
             It holds none of your letters or other data.
@@ -80,8 +83,9 @@ export function CookiePolicy() {
       <Section id="optional" title="Optional, off until you allow them">
         <ul className="space-y-3">
           <StorageItem name="Faster loading" storageKey="duove:…" by="Duove" lasts="Until you sign out or turn it off">
-            Keeps a copy of your profile, your partner's name, your relationship details and stats, your cravings and your
-            cycle overview on this device, so pages show them at once instead of waiting for the server.
+            Keeps a copy of your profile, your partner's name, your relationship details and stats, your cravings, your
+            cycle overview and the letters you've loaded on this device, so pages show them at once instead of waiting for
+            the server, and you can read those letters offline.
           </StorageItem>
           <StorageItem id="spotify" name="Spotify players" storageKey="Spotify's cookies" by="Spotify (open.spotify.com)" lasts="As long as Spotify sets">
             Lets the songs in letters play right on the page. When a player loads, Spotify sets its own cookies and uses them
