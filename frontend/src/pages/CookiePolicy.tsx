@@ -32,7 +32,7 @@ export function CookiePolicy() {
   return (
     <LegalPage
       title="Cookie policy"
-      updated="2026-10-26"
+      updated="2026-10-28"
       summary={
         <>
           <Bullets>
@@ -69,6 +69,10 @@ export function CookiePolicy() {
           </StorageItem>
           <StorageItem name="Sidebar layout" storageKey="sidebar-width, sidebar-collapsed" by="Duove" lasts="Until you clear your browser data">
             Remembers how wide you made the sidebar, and whether you collapsed it.
+          </StorageItem>
+          <StorageItem name="App files" storageKey="Service worker cache (workbox-precache-…)" by="Duove" lasts="Until the next Duove update replaces them">
+            Keeps Duove's own code, styles and icons on this device, so it opens like an app and loads without a connection.
+            It holds none of your letters or other data.
           </StorageItem>
         </ul>
       </Section>
