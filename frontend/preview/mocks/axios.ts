@@ -75,15 +75,30 @@ async function patch(url: string, body: Record<string, string | null> = {}): Pro
     mine[i] = { ...mine[i], ...body };
     return ok(mine[i]);
   }
-  if (pathOf(url) === '/profile') return ok({ ...Object.assign(d.me, body), created_at: d.stats.user.account_created });
+  if (pathOf(url) === '/profile') {
+    if (body.avatar_url) body = { ...body, avatar_url: photos.get(new URL(body.avatar_url).pathname) ?? body.avatar_url };
+    return ok({ ...Object.assign(d.me, body), created_at: d.stats.user.account_created });
+  }
   if (pathOf(url) === '/qa/preferred-category' && d.question) d.question.preferredCategoryId = body.category_id;
   const m = pathOf(url).match(/^\/cravings\/(.+)\/toggle$/);
   if (m) d.setCravings(d.cravings.map((c) => (c.id === m[1] ? { ...c, fulfilled: !c.fulfilled, fulfilled_at: c.fulfilled ? null : new Date().toISOString() } : c)));
   return ok({});
 }
 
-async function post(url: string, body: Record<string, string> = {}): Promise<Res> {
+// Photo uploads: the bytes stay in the browser as a blob address, with progress over about 1.2s
+const photos = new Map<string, string>();
+async function uploadPhoto(path: string, blob: Blob, onUploadProgress?: (e: { loaded: number; total: number }) => void) {
+  for (let i = 1; i <= 12; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    onUploadProgress?.({ loaded: (blob.size * i) / 12, total: blob.size });
+  }
+  photos.set(path.replace('/storage/v1/object/', '/storage/v1/object/public/'), URL.createObjectURL(blob));
+  return ok({ Key: path });
+}
+
+async function post(url: string, body: Record<string, string> = {}, config: { onUploadProgress?: (e: { loaded: number; total: number }) => void } = {}): Promise<Res> {
   const path = pathOf(url);
+  if (path.startsWith('/storage/v1/object/avatars/')) return uploadPhoto(path, body as unknown as Blob, config.onUploadProgress);
   if (path === '/cravings')
     d.setCravings([{ id: crypto.randomUUID(), content: body.content, category: body.category, fulfilled: false, user_id: d.me.id, created_at: new Date().toISOString() }, ...d.cravings]);
   const opening = path.match(/^\/love-letters\/(.+)\/open$/);

@@ -891,3 +891,21 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 
 
 
+
+
+
+-- Storage: the avatars bucket (public, so photos load by address without a sign-in). Browsers may only add new photos to their own folder. Nobody lists, overwrites or deletes
+-- through the browser; the profile function removes old photos with the service role.
+UPDATE "storage"."buckets"
+  SET "public" = true,
+      "file_size_limit" = 2097152,
+      "allowed_mime_types" = ARRAY['image/webp', 'image/jpeg', 'image/gif']
+  WHERE "id" = 'avatars';
+
+DROP POLICY IF EXISTS "Users can upload their own avatar" ON "storage"."objects";
+DROP POLICY IF EXISTS "Users can update their own avatar" ON "storage"."objects";
+DROP POLICY IF EXISTS "Users can view their own avatar" ON "storage"."objects";
+DROP POLICY IF EXISTS "Users can delete their own avatar" ON "storage"."objects";
+
+CREATE POLICY "Users can upload their own avatar" ON "storage"."objects" FOR INSERT TO "authenticated"
+  WITH CHECK ((("bucket_id" = 'avatars'::"text") AND (("storage"."foldername"("name"))[1] = (( SELECT "auth"."uid"() AS "uid"))::"text")));

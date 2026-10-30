@@ -9,7 +9,7 @@ export function PrivacyPolicy() {
   return (
     <LegalPage
       title="Privacy policy"
-      updated="2026-10-27"
+      updated="2026-10-31"
       summary={
         <Bullets>
           <li>What you put in Duove is shared with your partner, and with nobody else on Duove.</li>
@@ -38,8 +38,9 @@ export function PrivacyPolicy() {
           <li>
             <Term>Your account.</Term> Your email address and password, the username you give when you sign up (optional),
             your display name, your profile photo if you add one, and when you joined. Your password is stored as a secure
-            hash, so nobody at Duove can read it. Your photo sits at a web address that isn't listed anywhere, but anyone who
-            has that address can open it.
+            hash, so nobody at Duove can read it. A photo is cropped and shrunk on your device before it uploads, which also
+            removes its location and camera details. An animated GIF uploads as it is, so it keeps moving. It sits at a web address that isn't listed anywhere, but anyone who has
+            that address can open it. When you change or remove your photo, the old one is deleted right away.
           </li>
           <li>
             <Term>Your relationship.</Term> The invite code, who you're paired with, when you paired, your anniversary if you

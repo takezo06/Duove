@@ -284,6 +284,7 @@ Single choice uses `role="radiogroup"`/`radio` with `aria-checked`. Filters use 
 - Track: `h-1.5 rounded-full bg-neutral-800 overflow-hidden`. Fill: `h-full rounded-full bg-rose-500` (or the phase `dot` color).
 - Include `role="progressbar"` with `aria-label`, `aria-valuenow`, `aria-valuemin` and `aria-valuemax`.
 - The year track on the dashboard is the larger `h-2` version, with monthsary dots and a heart marker.
+- A photo upload shows progress as a ring over the photo itself (`AvatarProgress`), not a bar.
 
 ### Modals
 
@@ -401,8 +402,9 @@ One page (`/cycle`); `/cycle/log` and `/cycle/analytics` redirect to it. See `Cy
 - The only movement allowed is the arrow nudge: `group-hover:translate-x-0.5 motion-reduce:transform-none`.
 - `animate-pulse` only on skeletons. `animate-spin` only on `Loader2`.
 - There are no custom keyframes. Any `animate-*` class beyond Tailwind's built-ins must be defined in `index.css` before it is used.
-- **Envelope open** is one of two exceptions, and only on `EnvelopeCard`. It runs on tap, never on hover: the flap turns up (`rotateX(180deg)`, 200ms), then the letter slides half out (200ms), then the reader opens in a `Modal` at 420ms. Closing plays it back. Under `prefers-reduced-motion` both the motion and the wait are skipped. Don't copy it anywhere else.
+- **Envelope open** is one of three exceptions, and only on `EnvelopeCard`. It runs on tap, never on hover: the flap turns up (`rotateX(180deg)`, 200ms), then the letter slides half out (200ms), then the reader opens in a `Modal` at 420ms. Closing plays it back. Under `prefers-reduced-motion` both the motion and the wait are skipped. Don't copy it anywhere else.
 - **Stem settle-in** is the other exception, and only in `BouquetBuilder`'s preview: the stem just added fades in and rises 8px (`animate-settle`, 200ms ease-out, defined in `index.css`). Rearranging, changing the wrap, the reader and thumbnails stay still, and under `prefers-reduced-motion` it doesn't move at all. Don't copy it anywhere else.
+- **Photo saved** is the third exception, and only in `AvatarProgress` on the Profile page. While a new photo uploads, a `neutral-950/60` mask covers the local copy and a 3px `rose-500` ring fills with the real upload progress. When it's saved, the ring closes in `emerald-400`, a check draws in with a small spring (`animate-photo-pop`, `animate-photo-check`, 120 to 460ms), and the mask fades off the new photo at 800ms (`animate-photo-reveal`). Under `prefers-reduced-motion` nothing moves and the check shows for 700ms. Don't copy it anywhere else.
 - **Banned:** `hover:scale-*`, `-translate-y` lift on hover, `animate-ping`, pulsing dots, long `duration-300+` choreography, glow shadows on hover.
 
 ---

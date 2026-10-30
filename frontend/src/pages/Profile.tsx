@@ -6,8 +6,9 @@ import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { apiError } from '../lib/apiError';
 import { refreshRelationship, useMyProfile, useRelationship } from '../hooks/useShared';
+import { AvatarProgress, type PhotoPhase } from '../components/AvatarProgress';
+import { AvatarError, prepareAvatar, preload, uploadAvatar } from '../lib/avatar';
 import {
-  Avatar,
   CardHeader,
   InlineBar,
   deleteButton,
@@ -201,11 +202,19 @@ export function Profile() {
 
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // The photo saves on its own as soon as it's picked; the local copy shows while it uploads
+  const [photoPhase, setPhotoPhase] = useState<PhotoPhase>('idle');
+  const [photoProgress, setPhotoProgress] = useState(0);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [removingPhoto, setRemovingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoBusy = photoPhase === 'uploading' || removingPhoto;
+
+  // Drop the local copy once nothing shows it
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
   useEffect(() => {
     const load = async () => {
@@ -233,30 +242,60 @@ export function Profile() {
     setEditing(true);
   };
 
-  const stopEdit = () => {
-    setEditing(false);
-    setAvatarFile(null);
-    setAvatarPreview(null);
+  const stopEdit = () => setEditing(false);
+
+  // The sidebar and every other page show the new name and photo from the cache
+  const saved = (row: ProfileRow) => {
+    setProfile(row);
+    setMyProfile({ display_name: row.display_name, avatar_url: row.avatar_url });
   };
 
-  const pickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    if (!file || photoBusy) return;
+    setPhotoError(null);
+    setPhotoProgress(0);
+    setPhotoPhase('uploading');
+    try {
+      const blob = await prepareAvatar(file);
+      setPhotoPreview(URL.createObjectURL(blob));
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) throw new AvatarError('Your session ended. Sign in again.');
+      // The upload is most of the wait; the last stretch of the ring is the profile saving
+      const url = await uploadAvatar(blob, session.user.id, session.access_token, (f) => setPhotoProgress(f * 0.9));
+      const res = await axios.patch(`${api}/profile`, { avatar_url: url }, { headers: await authHeaders() });
+      // Swap in the saved photo only once it's ready to show, so it never flashes
+      await preload(res.data.avatar_url);
+      saved(res.data);
+      setPhotoPhase('done');
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => {
+        setPhotoPhase('idle');
+        setPhotoPreview(null);
+      }, reduce ? 700 : 1100);
+    } catch (err) {
+      setPhotoPhase('idle');
+      setPhotoPreview(null);
+      setPhotoError(err instanceof AvatarError ? err.message : apiError(err, "Your photo didn't save. Try again."));
+    }
   };
 
-  const uploadAvatar = async (file: File) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const path = `${user?.id}/${Date.now()}.${file.name.split('.').pop()}`;
-    const { error } = await supabase.storage.from('avatars').upload(path, file, { cacheControl: '3600', upsert: true });
-    if (error) throw new Error(error.message);
-    return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  const removePhoto = async () => {
+    setRemovingPhoto(true);
+    setPhotoError(null);
+    try {
+      const res = await axios.patch(`${api}/profile`, { avatar_url: null }, { headers: await authHeaders() });
+      saved(res.data);
+    } catch (err) {
+      setPhotoError(apiError(err, "Your photo wasn't removed. Try again."));
+    } finally {
+      setRemovingPhoto(false);
+    }
   };
 
   const name = displayName.trim();
-  const dirty = !!avatarFile || name !== profile?.display_name;
+  const dirty = name !== profile?.display_name;
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -264,13 +303,8 @@ export function Profile() {
     setSaving(true);
     setSaveError(null);
     try {
-      const update: Partial<ProfileRow> = {};
-      if (name !== profile?.display_name) update.display_name = name;
-      if (avatarFile) update.avatar_url = await uploadAvatar(avatarFile);
-      const res = await axios.patch(`${api}/profile`, update, { headers: await authHeaders() });
-      setProfile(res.data);
-      // The sidebar and every other page show the new name and photo from the cache
-      setMyProfile({ display_name: res.data.display_name, avatar_url: res.data.avatar_url });
+      const res = await axios.patch(`${api}/profile`, { display_name: name }, { headers: await authHeaders() });
+      saved(res.data);
       stopEdit();
     } catch (err) {
       setSaveError(apiError(err, "Your changes didn't save. Try again."));
@@ -280,13 +314,18 @@ export function Profile() {
   };
 
   const shownName = editing && name ? name : profile?.display_name ?? '';
+  const photoStatus =
+    photoPhase === 'uploading' ? `Saving your photo... ${Math.round(photoProgress * 100)}%`
+    : photoPhase === 'done' ? 'Photo saved.'
+    : removingPhoto ? 'Removing your photo...'
+    : 'It saves as soon as you pick one. A square photo looks best.';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <section className={`${surface} p-6 md:p-8`}>
         <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-          <Avatar src={avatarPreview ?? profile?.avatar_url ?? null} name={shownName} />
+          <AvatarProgress src={photoPreview ?? profile?.avatar_url ?? null} name={shownName} phase={photoPhase} progress={photoProgress} />
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl md:text-3xl font-bold text-white break-words">
               {profile ? shownName || 'You' : <InlineBar w="w-32" />}
@@ -355,14 +394,33 @@ export function Profile() {
               </div>
               <div>
                 <span className="block text-sm text-neutral-400 mb-2">Photo</span>
-                <button type="button" onClick={() => fileInput.current?.click()} className={secondaryButton}>
-                  <Camera className="w-4 h-4" aria-hidden />
-                  {avatarFile ? 'Choose another photo' : profile?.avatar_url ? 'Change photo' : 'Add a photo'}
-                </button>
-                <input ref={fileInput} type="file" accept="image/*" onChange={pickPhoto} className="hidden" aria-label="Profile photo" />
-                <p className="text-xs text-neutral-400 mt-2 truncate">
-                  {avatarFile ? `${avatarFile.name} shows above until you save.` : 'A square photo looks best.'}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInput.current?.click()}
+                    disabled={photoBusy || offline}
+                    aria-describedby="photo-status"
+                    className={secondaryButton}
+                  >
+                    {photoPhase === 'uploading' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Camera className="w-4 h-4" aria-hidden />}
+                    {profile?.avatar_url ? 'Change photo' : 'Add a photo'}
+                  </button>
+                  {profile?.avatar_url && (
+                    <button type="button" onClick={removePhoto} disabled={photoBusy || offline} className={keepButton}>
+                      {removingPhoto && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+                      Remove photo
+                    </button>
+                  )}
+                </div>
+                <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic" onChange={pickPhoto} className="hidden" aria-label="Profile photo" />
+                <p
+                  id="photo-status"
+                  role="status"
+                  className={`text-xs mt-2 ${photoPhase === 'done' ? 'text-emerald-400' : 'text-neutral-400'}`}
+                >
+                  {photoStatus}
                 </p>
+                {photoError && <p role="alert" className="mt-2 text-sm text-rose-300">{photoError}</p>}
               </div>
             </div>
             <div className="mt-6 flex flex-col sm:flex-row gap-3">

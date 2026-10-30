@@ -19,3 +19,33 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-settle { animation: none; }
 }
+
+/* A profile photo saving (AvatarProgress only, see DESIGN.md section 10):
+   the ring fills with the upload, closes in emerald, a check draws in, then the mask lifts */
+.photo-ring {
+  transition: stroke-dashoffset 200ms ease-out, stroke 200ms ease-out;
+}
+@keyframes photo-pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
+.animate-photo-pop {
+  animation: photo-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) 120ms both;
+}
+@keyframes photo-check {
+  from { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  to { stroke-dasharray: 1; stroke-dashoffset: 0; }
+}
+.animate-photo-check {
+  animation: photo-check 280ms cubic-bezier(0.65, 0, 0.35, 1) 180ms both;
+}
+@keyframes photo-reveal {
+  to { opacity: 0; }
+}
+.animate-photo-reveal {
+  animation: photo-reveal 250ms ease-out 800ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-ring { transition: none; }
+  .animate-photo-pop, .animate-photo-check, .animate-photo-reveal { animation: none; }
+}
