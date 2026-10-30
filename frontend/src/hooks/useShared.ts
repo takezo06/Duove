@@ -59,7 +59,13 @@ const fetchProfile = async (): Promise<MyProfile | null> => {
   if (error) throw error;
   return data;
 };
-const fetchRelationship = () => get<Relationship>('/relationships/me').catch(unpairedAsNull);
+// Pages read relationship.id unguarded: a body without it (an empty "" mid-deploy) is an error, never cached
+const fetchRelationship = () => get<Relationship>('/relationships/me')
+  .then((r) => {
+    if (!r?.relationship) throw new Error('Unexpected relationship response');
+    return r;
+  })
+  .catch(unpairedAsNull);
 // Every page reads stats.relationship unguarded: a body without it is an error, never cached
 const fetchStats = () => get<Stats>('/relationships/stats', { _t: Date.now() })
   .then((s) => {
@@ -80,7 +86,11 @@ const useKey = (name: string | null) => {
 };
 
 export const useMyProfile = () => useCached(useKey('profile'), fetchProfile);
-export const useRelationship = () => useCached(useKey('relationship'), fetchRelationship);
+export const useRelationship = () => {
+  const r = useCached(useKey('relationship'), fetchRelationship);
+  // A cached copy without the relationship (an empty body "" saved before the check above) counts as not loaded yet; null is unpaired
+  return r.data !== null && !r.data?.relationship ? { ...r, data: undefined } : r;
+};
 export const useStats = () => {
   const s = useCached(useKey('stats'), fetchStats);
   // A cached copy without the relationship (an older build's, or an empty body "") counts as not loaded yet; null is unpaired
