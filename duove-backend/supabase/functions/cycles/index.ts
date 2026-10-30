@@ -49,6 +49,11 @@ async function handle(req: Request) {
   const userId = await getUserId(req);
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  // Database errors name tables and columns: log them here, never send them to the browser
+  const failed = (error: unknown) => {
+    console.error("cycles failed", req.method, new URL(req.url).pathname, error);
+    return json({ error: "Something went wrong. Try again." }, 500);
+  };
   if (!userId) return json({ error: "Unauthorized" }, 401);
 
   const url = new URL(req.url);
@@ -112,7 +117,7 @@ async function handle(req: Request) {
       periodsOf(userId),
       periodsOf(partnerId),
     ]);
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     const profile = (id: string) => profiles?.find((p) => p.id === id);
     const partnerHasPeriods = hasPeriodsOf(profile(partnerId));
     return json({
@@ -141,7 +146,7 @@ async function handle(req: Request) {
     if (from) query = query.gte("log_date", from);
     if (to) query = query.lte("log_date", to);
     const { data, error } = await query.order("log_date", { ascending: true });
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     return json(data || []);
   }
 
@@ -159,7 +164,7 @@ async function handle(req: Request) {
       .insert({ user_id: userId, relationship_id: relationship.id, start_date: body.start_date, end_date: end })
       .select("id, start_date, end_date")
       .single();
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     return json(data, 201);
   }
 
@@ -171,7 +176,7 @@ async function handle(req: Request) {
     if (!existing) return json({ error: "That period isn't there anymore." }, 404);
     if (req.method === "DELETE") {
       const { error } = await admin.from("cycle_logs").delete().eq("id", existing.id);
-      if (error) return json({ error: error.message }, 500);
+      if (error) return failed(error);
       return json({ id: existing.id });
     }
     const body = await req.json().catch(() => null);
@@ -186,7 +191,7 @@ async function handle(req: Request) {
       .eq("id", existing.id)
       .select("id, start_date, end_date")
       .single();
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     return json(data);
   }
 
@@ -216,7 +221,7 @@ async function handle(req: Request) {
       !row.lifestyle.alcohol && !row.physical_symptoms.length && !row.moods.length && !row.sexual_activity.length;
     if (empty) {
       const { error } = await admin.from("daily_symptom_logs").delete().eq("user_id", userId).eq("log_date", body.log_date);
-      if (error) return json({ error: error.message }, 500);
+      if (error) return failed(error);
       return json(null);
     }
     const relationship = await getActiveRelationship();
@@ -229,7 +234,7 @@ async function handle(req: Request) {
       )
       .select()
       .single();
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     return json(data, 201);
   }
 

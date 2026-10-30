@@ -25,6 +25,7 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
   INSERT INTO public.profiles (id, display_name)
@@ -696,6 +697,13 @@ CREATE POLICY "Users can view questions" ON "public"."qa_questions" FOR SELECT U
 ALTER TABLE "public"."cravings" ENABLE ROW LEVEL SECURITY;
 
 
+-- Read-only, for the live updates on the Cravings page (Supabase Realtime only delivers rows the
+-- subscriber may SELECT). Every write still goes through the cravings function.
+CREATE POLICY "cravings_select_own_relationship" ON "public"."cravings" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."relationships" "r"
+  WHERE (("r"."id" = "cravings"."relationship_id") AND ("r"."status" = 'active'::"text") AND (("r"."user_id" = ( SELECT "auth"."uid"() AS "uid")) OR ("r"."partner_id" = ( SELECT "auth"."uid"() AS "uid")))))));
+
+
 
 
 
@@ -774,8 +782,8 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
+-- Only the sign-up trigger runs it; nobody calls it through the API
+REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC, "anon", "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 

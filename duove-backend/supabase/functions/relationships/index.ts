@@ -15,6 +15,23 @@ async function isPaired(admin: any, userId: string): Promise<boolean> {
   return (data?.length ?? 0) > 0;
 }
 
+// 32 characters with the look-alikes (0/O, 1/I) left out. 256 is a multiple of 32, so every
+// character is equally likely; 8 of them give about a trillion codes.
+const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function newInviteCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => INVITE_ALPHABET[b % 32]).join("");
+}
+
+function serverError(where: string, error: unknown): Response {
+  // Database errors name tables and columns: log them here, never send them to the browser
+  console.error("relationships failed", where, error);
+  return new Response(JSON.stringify({ error: "Something went wrong. Try again." }), {
+    status: 500,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 function alreadyPaired(message: string): Response {
   return new Response(JSON.stringify({ error: message }), {
     status: 409,
@@ -291,6 +308,7 @@ serve(async (req) => {
       .select("invite_code")
       .eq("user_id", userId)
       .eq("status", "pending")
+      .limit(1)
       .maybeSingle();
     if (!data) {
       return new Response(JSON.stringify({ error: "No pending invite" }), {
@@ -308,17 +326,28 @@ serve(async (req) => {
     if (await isPaired(admin, userId)) {
       return alreadyPaired("You're already paired");
     }
-    const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-    const { data, error } = await admin
+    // One open invite per person: hand back the one that exists instead of piling up codes
+    const { data: existing } = await admin
       .from("relationships")
-      .insert({ user_id: userId, invite_code: inviteCode, status: "pending" })
-      .select()
-      .single();
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
+      .select("invite_code")
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .limit(1)
+      .maybeSingle();
+    if (existing) {
+      return new Response(JSON.stringify({ invite_code: existing.invite_code }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    let inviteCode = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      inviteCode = newInviteCode();
+      const { error } = await admin
+        .from("relationships")
+        .insert({ user_id: userId, invite_code: inviteCode, status: "pending" });
+      if (!error) break;
+      // 23505: the code is already taken (unique invite_code), so draw another
+      if (error.code !== "23505" || attempt === 2) return serverError("invite", error);
     }
     return new Response(JSON.stringify({ invite_code: inviteCode }), {
       status: 201,
@@ -401,12 +430,7 @@ serve(async (req) => {
       .from("relationships")
       .delete()
       .eq("id", relationship?.id);
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (error) return serverError("leave", error);
     return new Response(JSON.stringify({ message: "Relationship deleted" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

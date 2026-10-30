@@ -40,6 +40,11 @@ serve(async (req) => {
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  // Database errors name tables and columns: log them here, never send them to the browser
+  const failed = (error: unknown) => {
+    console.error("love-letters failed", req.method, path, error);
+    return json({ error: "Something went wrong. Try again." }, 500);
+  };
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
   async function getActiveRelationship() {
@@ -71,7 +76,7 @@ serve(async (req) => {
       query = query.order("created_at", { ascending: false }).limit(limit);
     }
     const { data, error } = await query;
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     return json(data || []);
   }
 
@@ -103,7 +108,7 @@ serve(async (req) => {
         bouquet: bouquet.value,
       })
       .select().single();
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     return json(data, 201);
   }
 
@@ -128,7 +133,7 @@ serve(async (req) => {
       .is("opened_at", null)
       .select("id, opened_at")
       .maybeSingle();
-    if (error) return json({ error: error.message }, 500);
+    if (error) return failed(error);
     // null means a second tab opened it a moment earlier; either way it's open now
     return json(data ?? { id: letter.id, opened_at: new Date().toISOString() });
   }

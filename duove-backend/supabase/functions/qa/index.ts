@@ -289,9 +289,8 @@ serve(async (req) => {
 
     return json({ error: "Not found" }, 404);
   } catch (err) {
-    // Supabase errors are plain objects, so pull the message out explicitly.
-    const message = (err as any)?.message ?? String(err);
+    // Database errors name tables and columns: log them here, never send them to the browser
     console.error("qa function failed", req.method, path, JSON.stringify(err));
-    return json({ error: `Something went wrong: ${message}` }, 500);
+    return json({ error: "Something went wrong. Try again." }, 500);
   }
 });
