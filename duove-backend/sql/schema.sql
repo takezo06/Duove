@@ -37,23 +37,46 @@ $$;
 
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "public"."enforce_one_active_relationship"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+BEGIN
+  IF NEW.status <> 'active' THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.partner_id IS NULL OR NEW.partner_id = NEW.user_id THEN
+    RAISE EXCEPTION 'An active relationship needs two different people'
+      USING ERRCODE = '23514';
+  END IF;
+
+  -- Lock both people in a fixed order so two joins at once can't both pass.
+  PERFORM pg_advisory_xact_lock(hashtext(LEAST(NEW.user_id::text, NEW.partner_id::text)));
+  PERFORM pg_advisory_xact_lock(hashtext(GREATEST(NEW.user_id::text, NEW.partner_id::text)));
+
+  IF EXISTS (
+    SELECT 1 FROM relationships r
+    WHERE r.status = 'active'
+      AND r.id <> NEW.id
+      AND (r.user_id IN (NEW.user_id, NEW.partner_id)
+        OR r.partner_id IN (NEW.user_id, NEW.partner_id))
+  ) THEN
+    RAISE EXCEPTION 'Already in an active relationship'
+      USING ERRCODE = '23505';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."enforce_one_active_relationship"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
-
-
-CREATE TABLE IF NOT EXISTS "public"."audit_logs" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "action" "text" NOT NULL,
-    "metadata" "jsonb",
-    "ip_address" "inet",
-    "user_agent" "text",
-    "created_at" timestamp with time zone DEFAULT "now"()
-);
-
-
-ALTER TABLE "public"."audit_logs" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."cravings" (
@@ -146,33 +169,6 @@ CREATE TABLE IF NOT EXISTS "public"."daily_symptom_logs" (
 
 
 ALTER TABLE "public"."daily_symptom_logs" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."daily_usage" (
-    "user_id" "uuid" NOT NULL,
-    "date" "date" NOT NULL,
-    "letter_count" integer DEFAULT 0,
-    "qa_count" integer DEFAULT 0,
-    "craving_count" integer DEFAULT 0
-);
-
-
-ALTER TABLE "public"."daily_usage" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."letters" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "relationship_id" "uuid" NOT NULL,
-    "sender_id" "uuid" NOT NULL,
-    "recipient_id" "uuid" NOT NULL,
-    "content" "text",
-    "image_url" "text",
-    "spotify_id" "text",
-    "created_at" timestamp with time zone DEFAULT "now"()
-);
-
-
-ALTER TABLE "public"."letters" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."love_letters" (
@@ -268,19 +264,6 @@ CREATE TABLE IF NOT EXISTS "public"."qa_questions" (
 ALTER TABLE "public"."qa_questions" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."refresh_tokens" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "token_hash" "text" NOT NULL,
-    "expires_at" timestamp with time zone NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "revoked" boolean DEFAULT false
-);
-
-
-ALTER TABLE "public"."refresh_tokens" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."relationships" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -302,9 +285,6 @@ ALTER TABLE "public"."relationships" OWNER TO "postgres";
 ALTER TABLE ONLY "public"."cycle_tips" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."cycle_tips_id_seq"'::"regclass");
 
 
-
-ALTER TABLE ONLY "public"."audit_logs"
-    ADD CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id");
 
 
 
@@ -343,13 +323,7 @@ ALTER TABLE ONLY "public"."daily_symptom_logs"
 
 
 
-ALTER TABLE ONLY "public"."daily_usage"
-    ADD CONSTRAINT "daily_usage_pkey" PRIMARY KEY ("user_id", "date");
 
-
-
-ALTER TABLE ONLY "public"."letters"
-    ADD CONSTRAINT "letters_pkey" PRIMARY KEY ("id");
 
 
 
@@ -398,13 +372,7 @@ ALTER TABLE ONLY "public"."qa_questions"
 
 
 
-ALTER TABLE ONLY "public"."refresh_tokens"
-    ADD CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id");
 
-
-
-ALTER TABLE ONLY "public"."refresh_tokens"
-    ADD CONSTRAINT "refresh_tokens_token_hash_key" UNIQUE ("token_hash");
 
 
 
@@ -418,11 +386,7 @@ ALTER TABLE ONLY "public"."relationships"
 
 
 
-CREATE INDEX "idx_audit_logs_created_at" ON "public"."audit_logs" USING "btree" ("created_at");
 
-
-
-CREATE INDEX "idx_audit_logs_user_id" ON "public"."audit_logs" USING "btree" ("user_id");
 
 
 
@@ -482,11 +446,7 @@ CREATE INDEX "idx_cycle_user_dates" ON "public"."cycle_logs" USING "btree" ("use
 
 
 
-CREATE INDEX "idx_daily_usage_date" ON "public"."daily_usage" USING "btree" ("date");
 
-
-
-CREATE INDEX "idx_daily_usage_user_date" ON "public"."daily_usage" USING "btree" ("user_id", "date");
 
 
 
@@ -494,27 +454,15 @@ CREATE INDEX "idx_invite_code" ON "public"."relationships" USING "btree" ("invit
 
 
 
-CREATE INDEX "idx_letters_created_at" ON "public"."letters" USING "btree" ("created_at" DESC);
 
 
 
-CREATE INDEX "idx_letters_recipient_id" ON "public"."letters" USING "btree" ("recipient_id");
 
 
 
-CREATE INDEX "idx_letters_relationship" ON "public"."letters" USING "btree" ("relationship_id");
 
 
 
-CREATE INDEX "idx_letters_relationship_id" ON "public"."letters" USING "btree" ("relationship_id");
-
-
-
-CREATE INDEX "idx_letters_sender_id" ON "public"."letters" USING "btree" ("sender_id");
-
-
-
-CREATE INDEX "idx_letters_sender_recipient" ON "public"."letters" USING "btree" ("sender_id", "recipient_id");
 
 
 
@@ -526,11 +474,7 @@ CREATE INDEX "idx_qa_assignments_skipped" ON "public"."qa_assignments" USING "bt
 
 
 
-CREATE INDEX "idx_refresh_tokens_expires_at" ON "public"."refresh_tokens" USING "btree" ("expires_at");
 
-
-
-CREATE INDEX "idx_refresh_tokens_user_id" ON "public"."refresh_tokens" USING "btree" ("user_id");
 
 
 
@@ -558,12 +502,13 @@ CREATE UNIQUE INDEX "idx_unique_pair" ON "public"."relationships" USING "btree" 
 
 
 
+CREATE OR REPLACE TRIGGER "relationships_one_active" BEFORE INSERT OR UPDATE OF "status", "user_id", "partner_id" ON "public"."relationships" FOR EACH ROW EXECUTE FUNCTION "public"."enforce_one_active_relationship"();
+
+
+
 CREATE UNIQUE INDEX "qa_assignments_one_per_day" ON "public"."qa_assignments" USING "btree" ("relationship_id", "assigned_date");
 
 
-
-ALTER TABLE ONLY "public"."audit_logs"
-    ADD CONSTRAINT "audit_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -602,23 +547,11 @@ ALTER TABLE ONLY "public"."daily_symptom_logs"
 
 
 
-ALTER TABLE ONLY "public"."daily_usage"
-    ADD CONSTRAINT "daily_usage_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
-ALTER TABLE ONLY "public"."letters"
-    ADD CONSTRAINT "letters_recipient_id_fkey" FOREIGN KEY ("recipient_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
-
-ALTER TABLE ONLY "public"."letters"
-    ADD CONSTRAINT "letters_relationship_id_fkey" FOREIGN KEY ("relationship_id") REFERENCES "public"."relationships"("id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."letters"
-    ADD CONSTRAINT "letters_sender_id_fkey" FOREIGN KEY ("sender_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
 
 
@@ -677,9 +610,6 @@ ALTER TABLE ONLY "public"."qa_questions"
 
 
 
-ALTER TABLE ONLY "public"."refresh_tokens"
-    ADD CONSTRAINT "refresh_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
-
 
 
 ALTER TABLE ONLY "public"."relationships"
@@ -709,11 +639,7 @@ CREATE POLICY "Sender can insert love letters" ON "public"."love_letters" FOR IN
 
 
 
-CREATE POLICY "Users can delete their own relationships" ON "public"."relationships" FOR DELETE USING ((("auth"."uid"() = "user_id") OR ("auth"."uid"() = "partner_id")));
 
-
-
-CREATE POLICY "Users can insert own audit logs" ON "public"."audit_logs" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -721,11 +647,7 @@ CREATE POLICY "Users can insert own profile" ON "public"."profiles" FOR INSERT W
 
 
 
-CREATE POLICY "Users can insert own refresh tokens" ON "public"."refresh_tokens" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
 
-
-
-CREATE POLICY "Users can insert their own answers" ON "public"."qa_answers" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -741,10 +663,6 @@ CREATE POLICY "Users can update own profile" ON "public"."profiles" FOR UPDATE U
 
 
 
-CREATE POLICY "Users can view answers in their relationship" ON "public"."qa_answers" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships"
-  WHERE (("relationships"."id" = "qa_answers"."relationship_id") AND (("relationships"."user_id" = "auth"."uid"()) OR ("relationships"."partner_id" = "auth"."uid"()))))));
-
 
 
 CREATE POLICY "Users can view assignments in their relationship" ON "public"."qa_assignments" FOR SELECT USING ((EXISTS ( SELECT 1
@@ -757,15 +675,11 @@ CREATE POLICY "Users can view categories" ON "public"."qa_categories" FOR SELECT
 
 
 
-CREATE POLICY "Users can view own audit logs" ON "public"."audit_logs" FOR SELECT USING (("auth"."uid"() = "user_id"));
-
 
 
 CREATE POLICY "Users can view own profile" ON "public"."profiles" FOR SELECT USING (("auth"."uid"() = "id"));
 
 
-
-CREATE POLICY "Users can view own refresh tokens" ON "public"."refresh_tokens" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -773,47 +687,19 @@ CREATE POLICY "Users can view questions" ON "public"."qa_questions" FOR SELECT U
 
 
 
-CREATE POLICY "Users can view their own assignments" ON "public"."qa_assignments" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships"
-  WHERE (("relationships"."id" = "qa_assignments"."relationship_id") AND (("relationships"."user_id" = "auth"."uid"()) OR ("relationships"."partner_id" = "auth"."uid"()))))));
 
 
 
-ALTER TABLE "public"."audit_logs" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE POLICY "audit_logs_insert_own" ON "public"."audit_logs" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
-
-
-
-CREATE POLICY "audit_logs_select_own" ON "public"."audit_logs" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
 ALTER TABLE "public"."cravings" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "cravings_couple_access" ON "public"."cravings" USING ((("auth"."uid"() = "user_id") OR ("auth"."uid"() = "partner_id")));
 
 
 
-CREATE POLICY "cravings_insert_own_relationship" ON "public"."cravings" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "cravings"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
 
-
-
-CREATE POLICY "cravings_select_own_relationship" ON "public"."cravings" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "cravings"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
-
-
-
-CREATE POLICY "cravings_update_own_relationship" ON "public"."cravings" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "cravings"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"())))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "cravings"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
 
 
 
@@ -830,41 +716,16 @@ CREATE POLICY "Signed-in users can read tips" ON "public"."cycle_tips" FOR SELEC
 ALTER TABLE "public"."daily_symptom_logs" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."daily_usage" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE POLICY "daily_usage_insert_own" ON "public"."daily_usage" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "daily_usage_own" ON "public"."daily_usage" USING (("user_id" = "auth"."uid"()));
 
 
 
-CREATE POLICY "daily_usage_select_own" ON "public"."daily_usage" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "daily_usage_update_own" ON "public"."daily_usage" FOR UPDATE USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
-
-
-ALTER TABLE "public"."letters" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE POLICY "letters_couple_access" ON "public"."letters" USING ((("auth"."uid"() = "sender_id") OR ("auth"."uid"() = "recipient_id")));
-
-
-
-CREATE POLICY "letters_insert_own_relationship" ON "public"."letters" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "letters"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
-
-
-
-CREATE POLICY "letters_select_own_relationship" ON "public"."letters" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."relationships" "r"
-  WHERE (("r"."id" = "letters"."relationship_id") AND (("r"."user_id" = "auth"."uid"()) OR ("r"."partner_id" = "auth"."uid"()))))));
 
 
 
@@ -874,11 +735,6 @@ ALTER TABLE "public"."love_letters" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "profiles_select_own" ON "public"."profiles" FOR SELECT USING (("id" = "auth"."uid"()));
-
-
-
-CREATE POLICY "profiles_update_own" ON "public"."profiles" FOR UPDATE USING (("id" = "auth"."uid"()));
 
 
 
@@ -894,25 +750,12 @@ ALTER TABLE "public"."qa_categories" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."qa_questions" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."refresh_tokens" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "refresh_tokens_insert_own" ON "public"."refresh_tokens" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
-
-
-
-CREATE POLICY "refresh_tokens_select_own" ON "public"."refresh_tokens" FOR SELECT USING (("auth"."uid"() = "user_id"));
-
-
-
-CREATE POLICY "refresh_tokens_update_own" ON "public"."refresh_tokens" FOR UPDATE USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
 ALTER TABLE "public"."relationships" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE POLICY "relationships_insert_own" ON "public"."relationships" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -920,11 +763,7 @@ CREATE POLICY "relationships_select_own" ON "public"."relationships" FOR SELECT 
 
 
 
-CREATE POLICY "relationships_select_pair" ON "public"."relationships" FOR SELECT USING ((("auth"."uid"() = "user_id") OR ("auth"."uid"() = "partner_id")));
 
-
-
-CREATE POLICY "relationships_update_own" ON "public"."relationships" FOR UPDATE USING ((("auth"."uid"() = "user_id") OR ("auth"."uid"() = "partner_id"))) WITH CHECK ((("auth"."uid"() = "user_id") OR ("auth"."uid"() = "partner_id")));
 
 
 
@@ -940,10 +779,6 @@ GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."audit_logs" TO "anon";
-GRANT ALL ON TABLE "public"."audit_logs" TO "authenticated";
-GRANT ALL ON TABLE "public"."audit_logs" TO "service_role";
 
 
 
@@ -977,15 +812,7 @@ GRANT ALL ON TABLE "public"."daily_symptom_logs" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."daily_usage" TO "anon";
-GRANT ALL ON TABLE "public"."daily_usage" TO "authenticated";
-GRANT ALL ON TABLE "public"."daily_usage" TO "service_role";
 
-
-
-GRANT ALL ON TABLE "public"."letters" TO "anon";
-GRANT ALL ON TABLE "public"."letters" TO "authenticated";
-GRANT ALL ON TABLE "public"."letters" TO "service_role";
 
 
 
@@ -1024,10 +851,6 @@ GRANT ALL ON TABLE "public"."qa_questions" TO "authenticated";
 GRANT ALL ON TABLE "public"."qa_questions" TO "service_role";
 
 
-
-GRANT ALL ON TABLE "public"."refresh_tokens" TO "anon";
-GRANT ALL ON TABLE "public"."refresh_tokens" TO "authenticated";
-GRANT ALL ON TABLE "public"."refresh_tokens" TO "service_role";
 
 
 
