@@ -3,6 +3,25 @@ import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import { createSupabaseClients } from "../_shared/supabase.ts";
 import { getUserId } from "../_shared/auth.ts";
 
+// ---------- Pairing helpers ----------
+// deno-lint-ignore no-explicit-any
+async function isPaired(admin: any, userId: string): Promise<boolean> {
+  const { data } = await admin
+    .from("relationships")
+    .select("id")
+    .eq("status", "active")
+    .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+    .limit(1);
+  return (data?.length ?? 0) > 0;
+}
+
+function alreadyPaired(message: string): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status: 409,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 // ---------- Duration helpers ----------
 function formatDuration(startDate: Date, endDate: Date): string {
   let diffMs = endDate.getTime() - startDate.getTime();
@@ -286,6 +305,9 @@ serve(async (req) => {
 
   // POST /relationships/invite
   if (path === "/invite" && req.method === "POST") {
+    if (await isPaired(admin, userId)) {
+      return alreadyPaired("You're already paired");
+    }
     const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     const { data, error } = await admin
       .from("relationships")
@@ -319,12 +341,39 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { data } = await admin
+    if (pending.user_id === userId) {
+      return new Response(JSON.stringify({ error: "You can't join your own invite" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (await isPaired(admin, userId)) {
+      return alreadyPaired("You're already paired");
+    }
+    if (await isPaired(admin, pending.user_id)) {
+      return alreadyPaired("This invite is no longer available");
+    }
+    const { data, error } = await admin
       .from("relationships")
       .update({ partner_id: userId, status: "active", paired_at: new Date().toISOString() })
       .eq("id", pending.id)
+      .eq("status", "pending")
       .select()
       .single();
+    if (error) {
+      // The database trigger blocks a second active relationship (23505).
+      if (error.code === "23505") return alreadyPaired("You're already paired");
+      return new Response(JSON.stringify({ error: "Couldn't join this invite" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Remove the joiner's own unused invite so it can't pull in someone else later.
+    await admin
+      .from("relationships")
+      .delete()
+      .eq("user_id", userId)
+      .eq("status", "pending");
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
