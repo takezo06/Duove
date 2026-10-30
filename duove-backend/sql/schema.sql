@@ -186,7 +186,8 @@ CREATE TABLE IF NOT EXISTS "public"."love_letters" (
     "recipient_name" "text" DEFAULT 'My love'::"text" NOT NULL,
     "sender_name" "text",
     "opened_at" timestamp with time zone,
-    "bouquet" "jsonb"
+    "bouquet" "jsonb",
+    "photo_path" "text"
 );
 
 
@@ -913,3 +914,17 @@ DROP POLICY IF EXISTS "Users can delete their own avatar" ON "storage"."objects"
 
 CREATE POLICY "Users can upload their own avatar" ON "storage"."objects" FOR INSERT TO "authenticated"
   WITH CHECK ((("bucket_id" = 'avatars'::"text") AND (("storage"."foldername"("name"))[1] = (( SELECT "auth"."uid"() AS "uid"))::"text")));
+
+-- Storage: the letter-images bucket is private. Photos are only read through links the love-letters function signs
+-- for the two people in the letter's relationship. Browsers may only add new photos to their own folder.
+INSERT INTO "storage"."buckets" ("id", "name", "public", "file_size_limit", "allowed_mime_types")
+  VALUES ('letter-images', 'letter-images', false, 2097152, ARRAY['image/webp', 'image/jpeg', 'image/gif'])
+  ON CONFLICT ("id") DO UPDATE
+    SET "public" = false,
+        "file_size_limit" = 2097152,
+        "allowed_mime_types" = ARRAY['image/webp', 'image/jpeg', 'image/gif'];
+
+DROP POLICY IF EXISTS "Users can upload their own letter photos" ON "storage"."objects";
+
+CREATE POLICY "Users can upload their own letter photos" ON "storage"."objects" FOR INSERT TO "authenticated"
+  WITH CHECK ((("bucket_id" = 'letter-images'::"text") AND (("storage"."foldername"("name"))[1] = (( SELECT "auth"."uid"() AS "uid"))::"text")));

@@ -49,3 +49,24 @@
   .photo-ring { transition: none; }
   .animate-photo-pop, .animate-photo-check, .animate-photo-reveal { animation: none; }
 }
+
+/* The photo tucked into a letter's flowers breathes a soft rose light until it's taken out
+   (LetterReader only, see DESIGN.md section 10). The light is a layer that fades, so only opacity animates. */
+.polaroid-glow {
+  position: relative;
+}
+.polaroid-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px rgb(251 113 133 / 0.8), 0 0 18px 5px rgb(251 113 133 / 0.55);
+  animation: polaroid-glow 2400ms ease-in-out infinite;
+}
+@keyframes polaroid-glow {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .polaroid-glow::after { animation: none; opacity: 0.8; }
+}

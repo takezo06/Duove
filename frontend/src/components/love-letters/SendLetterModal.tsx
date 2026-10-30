@@ -10,6 +10,7 @@ import { BouquetBuilder } from '../flowers/BouquetBuilder';
 import { listStems, wrapOf, type Bouquet as BouquetValue } from '../../lib/bouquet';
 import { plural } from '../../lib/plural';
 import { useOffline } from '../../hooks/useOffline';
+import { uploadLetterPhoto, type LetterPhoto } from '../../lib/photo';
 
 interface Track {
   id: string;
@@ -41,6 +42,10 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
   // Flowers are built in a second view of this modal; the letter keeps everything typed meanwhile
   const [view, setView] = useState<'letter' | 'flowers'>('letter');
   const [bouquet, setBouquet] = useState<BouquetValue | null>(null);
+  // A photo tucked into the flowers. It uploads on send, and a retry after a failed send reuses that upload.
+  const [photo, setPhoto] = useState<LetterPhoto | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const uploaded = useRef<{ blob: Blob; path: string } | null>(null);
   const flowersButton = useRef<HTMLButtonElement>(null);
   const returning = useRef(false);
   const canSend = heading.trim() !== '' && body.trim() !== '' && !sending;
@@ -75,8 +80,24 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
     if (!canSend) return;
     setSending(true);
     setSendError('');
+    let step: 'photo' | 'letter' = 'letter';
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      let photoPath: string | undefined;
+      if (bouquet && photo) {
+        let done = uploaded.current?.blob === photo.blob ? uploaded.current : null;
+        if (!done) {
+          step = 'photo';
+          if (!session) throw new Error('Signed out');
+          setUploadProgress(0);
+          done = { blob: photo.blob, path: await uploadLetterPhoto(photo.blob, session.user.id, session.access_token, setUploadProgress) };
+          uploaded.current = done;
+          step = 'letter';
+          setUploadProgress(null);
+        }
+        photoPath = done.path;
+      }
       const res = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/love-letters`,
         {
@@ -89,15 +110,19 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
           spotify_artist_name: selectedSong?.artist,
           spotify_album_art: selectedSong?.albumArt,
           bouquet: bouquet ?? undefined,
+          photo_path: photoPath,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       onSent(res.data);
       onClose();
     } catch (err) {
-      setSendError(apiError(err, "Your letter didn't send. Try again."));
+      setSendError(
+        step === 'photo' ? "Your photo didn't upload. Try again." : apiError(err, "Your letter didn't send. Try again."),
+      );
     } finally {
       setSending(false);
+      setUploadProgress(null);
     }
   };
 
@@ -106,10 +131,11 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
       <Modal label={`Flowers for ${partnerName}`} onClose={onClose} wide>
         <BouquetBuilder
           initial={bouquet}
+          initialPhoto={photo}
           partnerName={partnerName}
           to={recipientName.trim()}
           from={senderName.trim()}
-          onUse={(b) => { setBouquet(b); setView('letter'); }}
+          onUse={(b, p) => { setBouquet(b); setPhoto(p); setView('letter'); }}
           onBack={() => setView('letter')}
         />
       </Modal>
@@ -165,13 +191,13 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium line-clamp-2 break-words">{listStems(bouquet.stems)}</p>
                 <p className="text-neutral-400 text-xs">
-                  {plural(bouquet.stems.length, 'stem')} in {wrapOf(bouquet.wrap).phrase}
+                  {plural(bouquet.stems.length, 'stem')} in {wrapOf(bouquet.wrap).phrase}{photo && ', with a photo'}
                 </p>
               </div>
               <button ref={flowersButton} type="button" onClick={() => setView('flowers')} aria-describedby="letter-flowers" className={`${secondaryButton} shrink-0`}>
                 Change
               </button>
-              <button type="button" onClick={() => setBouquet(null)} aria-label="Remove flowers" className={iconButton}>
+              <button type="button" onClick={() => { setBouquet(null); setPhoto(null); }} aria-label="Remove flowers" className={iconButton}>
                 <X className="w-4 h-4" aria-hidden />
               </button>
             </div>
@@ -241,7 +267,7 @@ export function SendLetterModal({ myName, partnerName, onClose, onSent }: SendLe
 
         <button type="submit" disabled={!canSend || offline} className={`${primaryButton} w-full`}>
           {sending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
-          {sending ? 'Sending...' : 'Send letter'}
+          {uploadProgress !== null ? `Adding your photo... ${Math.round(uploadProgress * 100)}%` : sending ? 'Sending...' : 'Send letter'}
         </button>
       </form>
     </Modal>

@@ -1,4 +1,5 @@
 import { addDays, today } from '../../src/lib/cycle';
+import letterPhoto from './letter-photo.svg';
 // Fake data for the mock preview. Pick a scenario with ?scenario=<name> on first load:
 //   (default) paired couple with activity
 //   empty     paired today, nothing logged yet
@@ -66,7 +67,9 @@ export let letters = empty
   ? []
   : [
       { id: 'l1', heading: 'For the rainy Tuesday you made better', message: 'You showed up with soup and a terrible umbrella, and somehow the whole week turned around.\n\nI keep thinking about how you laughed when the umbrella flipped inside out on the steps. I want more Tuesdays like that one.', sender_id: partner.id, sender_name: 'Mika', recipient_name: 'Jed', recipient_id: me.id, created_at: ago(20), opened_at: null, spotify_track_id: '4iV5W9uYEdYUVa79Axb7Rh', spotify_track_name: 'Here Comes the Sun', spotify_artist_name: 'The Beatles',
-        bouquet: { v: 1, stems: ['garden-rose', 'tulip', 'garden-rose', 'babys-breath', 'ranunculus', 'tulip', 'anemone'], wrap: 'wine', seed: 20261026 } },
+        bouquet: { v: 1, stems: ['garden-rose', 'tulip', 'garden-rose', 'babys-breath', 'ranunculus', 'tulip', 'anemone'], wrap: 'wine', seed: 20261026 },
+        // the real function returns a link it signed for an hour
+        photo_url: letterPhoto as string | null },
       { id: 'l3', heading: 'Thank you for the playlist', message: 'I listened to it on the whole train ride home. Track four made me miss you.', sender_id: me.id, sender_name: 'Jed', recipient_name: 'My love', recipient_id: partner.id, created_at: ago(120), opened_at: null },
       { id: 'l4', heading: 'Things I noticed about you this week', message: 'You hum when you cook. You always leave the last dumpling for me. You fall asleep mid-sentence.', sender_id: partner.id, sender_name: 'Mika', recipient_name: 'Jed', recipient_id: me.id, created_at: ago(300), opened_at: ago(299) },
       { id: 'l2', heading: 'Six months of you', message: 'Still my favourite person to sit in silence with.', sender_id: me.id, sender_name: 'Jed', recipient_name: 'Mika', recipient_id: partner.id, created_at: ago(900), opened_at: ago(899), spotify_track_id: '3n3Ppam7vgaVa1iaRUc9Lp', spotify_track_name: 'Mr. Brightside', spotify_artist_name: 'The Killers',

@@ -1,25 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, Minus, Plus, Shuffle } from 'lucide-react';
-import { Chip, focusRing, iconButton, primaryButton, secondaryButton, toggleRowOn } from '../Card';
+import { ArrowLeft, Check, ImagePlus, Loader2, Minus, Plus, Shuffle, X } from 'lucide-react';
+import { Chip, focusRing, iconButton, inset, primaryButton, secondaryButton, toggleRowOn } from '../Card';
 import { FLOWERS, MAX_STEMS, WRAPS, addStem, emptyBouquet, rearrange, removeStem, type Bouquet as BouquetValue, type FlowerId } from '../../lib/bouquet';
 import { Bouquet } from './Bouquet';
 import { FlowerIcon } from './FlowerArt';
+import { Polaroid } from './Polaroid';
+import { PhotoError, prepareLetterPhoto, type LetterPhoto } from '../../lib/photo';
 
 interface BouquetBuilderProps {
   // the flowers already on the letter, if any; the builder works on a copy until you use it
   initial: BouquetValue | null;
+  // the photo already tucked in, if any
+  initialPhoto: LetterPhoto | null;
   partnerName: string;
   // the names from the letter, for the tag
   to: string;
   from: string;
-  onUse: (bouquet: BouquetValue) => void;
+  onUse: (bouquet: BouquetValue, photo: LetterPhoto | null) => void;
   onBack: () => void;
 }
 
 // The builder view inside the letter modal: the bouquet stays in view at the top while you pick
-// stems and a wrap underneath, and "Use these flowers" puts it on the letter.
-export function BouquetBuilder({ initial, partnerName, to, from, onUse, onBack }: BouquetBuilderProps) {
+// stems, a wrap and a photo underneath, and "Use these flowers" puts it on the letter.
+export function BouquetBuilder({ initial, initialPhoto, partnerName, to, from, onUse, onBack }: BouquetBuilderProps) {
   const [bouquet, setBouquet] = useState<BouquetValue>(() => initial ?? emptyBouquet());
+  // Shrunk and shown right away; it only uploads when the letter is sent
+  const [photo, setPhoto] = useState<LetterPhoto | null>(initialPhoto);
+  const [preparing, setPreparing] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
   // the stem just added settles in; nothing else moves
   const [settle, setSettle] = useState<number>();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -43,6 +52,22 @@ export function BouquetBuilder({ initial, partnerName, to, from, onUse, onBack }
     setBouquet((b) => removeStem(b, id));
   };
 
+  const pickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setSettle(undefined);
+    setPhotoError('');
+    setPreparing(true);
+    try {
+      setPhoto(await prepareLetterPhoto(file));
+    } catch (err) {
+      setPhotoError(err instanceof PhotoError ? err.message : "That photo couldn't be opened. Try a JPG or PNG.");
+    } finally {
+      setPreparing(false);
+    }
+  };
+
   return (
     <div>
       <button
@@ -61,7 +86,14 @@ export function BouquetBuilder({ initial, partnerName, to, from, onUse, onBack }
       {/* Stays in view while the list scrolls under it, so every tap shows in the bouquet.
           The bottom border is DESIGN.md's divider and shows where the list slides under. */}
       <div className="sticky -top-6 z-10 -mx-6 mt-4 px-6 pt-4 pb-4 bg-neutral-900 border-b border-neutral-800">{/* taste-skill-ignore */}
-        <Bouquet bouquet={bouquet} to={to} from={from} settle={settle} className="mx-auto h-52 sm:h-64 aspect-square" />
+        <Bouquet
+          bouquet={bouquet}
+          to={to}
+          from={from}
+          settle={settle}
+          tucked={photo ? <Polaroid src={photo.src} alt="" compact /> : undefined}
+          className="mx-auto h-52 sm:h-64 aspect-square"
+        />
         <div className="mt-3 flex items-center justify-between gap-3">
           <p aria-live="polite" className="text-sm text-neutral-400">
             {total === 0 ? (
@@ -147,7 +179,34 @@ export function BouquetBuilder({ initial, partnerName, to, from, onUse, onBack }
         </div>
       </section>
 
-      <button type="button" onClick={() => onUse(bouquet)} disabled={total === 0} className={`${primaryButton} w-full mt-6`}>
+      <section aria-labelledby="bouquet-photo" className="mt-6">
+        <h3 id="bouquet-photo" className="flex items-baseline justify-between text-sm px-1 mb-2">
+          <span className="font-semibold text-white">Photo</span>
+          <span className="text-neutral-400">Optional</span>
+        </h3>
+        <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic" onChange={pickPhoto} className="hidden" aria-label="Photo to tuck in" />
+        {photo ? (
+          <div className={`${inset} flex items-center gap-3`}>
+            <Polaroid src={photo.src} alt="" compact className="w-10 shrink-0 -rotate-3" />
+            <p className="flex-1 min-w-0 text-sm text-neutral-200">Tucked into the flowers for {partnerName}</p>
+            <button type="button" onClick={() => fileInput.current?.click()} disabled={preparing} className={`${secondaryButton} shrink-0`}>
+              {preparing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+              Change
+            </button>
+            <button type="button" onClick={() => setPhoto(null)} aria-label="Remove photo" className={iconButton}>
+              <X className="w-4 h-4" aria-hidden />
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => fileInput.current?.click()} disabled={preparing} className={secondaryButton}>
+            {preparing ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <ImagePlus className="w-4 h-4" aria-hidden />}
+            Add a photo
+          </button>
+        )}
+        {photoError && <p role="alert" className="mt-2 text-sm text-rose-300">{photoError}</p>}
+      </section>
+
+      <button type="button" onClick={() => onUse(bouquet, photo)} disabled={total === 0} className={`${primaryButton} w-full mt-6`}>
         <Check className="w-4 h-4" aria-hidden />
         Use these flowers
       </button>

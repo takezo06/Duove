@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import { createSupabaseClients } from "../_shared/supabase.ts";
 import { getUserId } from "../_shared/auth.ts";
+import { removeLetterPhotos } from "../_shared/letterPhotos.ts";
 
 // ---------- Pairing helpers ----------
 // deno-lint-ignore no-explicit-any
@@ -426,6 +427,10 @@ serve(async (req) => {
   // DELETE /relationships
   if (path === "/" && req.method === "DELETE") {
     const relationship = await getActiveRelationship();
+    // The letters go with the relationship, and their photos live in Storage, outside that cascade
+    if (relationship && !(await removeLetterPhotos(admin, [relationship.id], userId))) {
+      return serverError("leave photos", "letter photos couldn't be deleted");
+    }
     const { error } = await admin
       .from("relationships")
       .delete()

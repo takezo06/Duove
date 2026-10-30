@@ -98,7 +98,8 @@ async function uploadPhoto(path: string, blob: Blob, onUploadProgress?: (e: { lo
 
 async function post(url: string, body: Record<string, string> = {}, config: { onUploadProgress?: (e: { loaded: number; total: number }) => void } = {}): Promise<Res> {
   const path = pathOf(url);
-  if (path.startsWith('/storage/v1/object/avatars/')) return uploadPhoto(path, body as unknown as Blob, config.onUploadProgress);
+  if (path.startsWith('/storage/v1/object/avatars/') || path.startsWith('/storage/v1/object/letter-images/'))
+    return uploadPhoto(path, body as unknown as Blob, config.onUploadProgress);
   if (path === '/cravings')
     d.setCravings([{ id: crypto.randomUUID(), content: body.content, category: body.category, fulfilled: false, user_id: d.me.id, created_at: new Date().toISOString() }, ...d.cravings]);
   const opening = path.match(/^\/love-letters\/(.+)\/open$/);
@@ -108,7 +109,10 @@ async function post(url: string, body: Record<string, string> = {}, config: { on
     return ok({ id: opening[1], opened_at });
   }
   if (path === '/love-letters') {
-    const letter = { id: crypto.randomUUID(), ...body, sender_id: d.me.id, created_at: new Date().toISOString(), opened_at: null };
+    // like the function: the photo's path becomes a link to read it, and the path itself isn't returned
+    const { photo_path, ...fields } = body;
+    const photo_url = photo_path ? photos.get(`/storage/v1/object/public/letter-images/${photo_path}`) ?? null : null;
+    const letter = { id: crypto.randomUUID(), ...fields, photo_url, sender_id: d.me.id, created_at: new Date().toISOString(), opened_at: null };
     d.setLetters([letter as (typeof d.letters)[number], ...d.letters]);
     return ok(letter);
   }

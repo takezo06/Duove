@@ -49,7 +49,10 @@ export function PrivacyPolicy() {
           <li>
             <Term>What you write.</Term> Love letters: the heading, the message, the names you sign with, any song you attach
             (saved as its Spotify ID, title, artist and cover link), any flowers you add (which ones, their order and the
-            wrap) and when each letter was opened. Cravings, with their
+            wrap), a photo if you tuck one into the flowers, and when each letter was opened. A letter's photo is cropped
+            and shrunk on your device like a profile photo, which removes its location and camera details. Unlike a profile
+            photo it's private: it can only be opened through a link that Duove makes for the two of you when you open the
+            letter, and that link stops working after an hour. Cravings, with their
             category and whether they're done. Your daily answers and the questions you skip. When you last read your
             notifications.
           </li>
@@ -190,12 +193,12 @@ export function PrivacyPolicy() {
             leaving the relationship or deleting your account removes them, or you can ask us.
           </li>
           <li>
-            <Term>Leaving your relationship</Term> deletes it and everything in it for both of you: letters, cravings,
-            answers, and cycle and day logs.
+            <Term>Leaving your relationship</Term> deletes it and everything in it for both of you: letters and their
+            photos, cravings, answers, and cycle and day logs.
           </li>
           <li>
             <Term>Deleting your account</Term> deletes your account, profile and photo, and your relationship with everything
-            in it for both of you, right away.
+            in it for both of you, letter photos included, right away.
           </li>
         </Bullets>
         <p>

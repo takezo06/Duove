@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { NECK, arrange, describe, greenery, wrapOf, type Bouquet as BouquetValue } from '../../lib/bouquet';
 import { Bloom, Sprig } from './FlowerArt';
 
@@ -9,6 +10,8 @@ interface BouquetProps {
   size?: 'full' | 'thumb';
   // the stem just added, which settles into place
   settle?: number;
+  // a photo tucked into the wrap (a Polaroid), drawn in front of the blooms and behind the front of the wrap
+  tucked?: ReactNode;
   className?: string;
 }
 
@@ -16,19 +19,18 @@ interface BouquetProps {
 // the two front flaps, the ribbon, and the tag on its string. Drawn from the stems, wrap and seed alone,
 // so it looks the same to both of you. The drawing is 240 x 300; the full size leaves room on the right
 // for the tag, which is HTML so its type stays on Duove's scale.
-export function Bouquet({ bouquet, to, from, size = 'full', settle, className = '' }: BouquetProps) {
+export function Bouquet({ bouquet, to, from, size = 'full', settle, tucked, className = '' }: BouquetProps) {
   const wrap = wrapOf(bouquet.wrap);
   const placed = arrange(bouquet.stems, bouquet.seed);
   const drawOrder = [...placed].sort((a, b) => b.depth - a.depth || a.y - b.y);
   const thumb = size === 'thumb';
   const tagged = !thumb && (to || from);
 
-  const art = (
-    <svg
-      viewBox={thumb ? '0 0 240 300' : '-30 0 300 300'}
-      className="w-full h-full overflow-visible"
-      {...(thumb ? { 'aria-hidden': true } : { role: 'img', 'aria-label': placed.length ? `Bouquet: ${describe(bouquet)}` : 'An empty bouquet wrap' })}
-    >
+  const viewBox = thumb ? '0 0 240 300' : '-30 0 300 300';
+  const label = thumb ? { 'aria-hidden': true } : { role: 'img', 'aria-label': placed.length ? `Bouquet: ${describe(bouquet)}` : 'An empty bouquet wrap' };
+
+  const back = (
+    <>
       <path d="M120 262L22 112Q46 84 76 98Q96 64 120 80Z" className={wrap.back} />
       <path d="M120 262L120 80Q144 64 164 98Q194 84 218 112Z" className={wrap.backShade} />
 
@@ -59,7 +61,11 @@ export function Bouquet({ bouquet, to, from, size = 'full', settle, className = 
           </g>
         </g>
       ))}
+    </>
+  );
 
+  const front = (
+    <>
       <path d="M34 156L160 180L120 296Z" className={wrap.lit} />
       <path d="M34 156L160 180L158 185L35 162Z" className={wrap.lip} />
       <path d="M206 156L80 180L120 296Z" className={wrap.shade} />
@@ -74,10 +80,26 @@ export function Bouquet({ bouquet, to, from, size = 'full', settle, className = 
       <circle cx={120} cy={256} r={4} className={wrap.ribbonShade} />
 
       {tagged && <path d="M123 259C134 274 148 278 164 270" className="fill-none stroke-neutral-300" strokeWidth={1.2} strokeLinecap="round" />}
+    </>
+  );
+
+  // With a photo the drawing comes in two layers and the photo goes between them, so the front of the wrap
+  // covers its bottom edge. It sits left of the middle at (50, 108) in the drawing, 66 wide, low enough that
+  // the front flaps hide its strip and both bottom corners; the tag balances it on the right.
+  const art = tucked && !thumb ? (
+    <>
+      <svg viewBox={viewBox} className="w-full h-full overflow-visible" {...label}>{back}</svg>
+      <div className="absolute left-[26.7%] top-[36%] w-[22%] -rotate-[8deg]">{tucked}</div>
+      <svg viewBox={viewBox} className="absolute inset-0 w-full h-full overflow-visible pointer-events-none" aria-hidden>{front}</svg>
+    </>
+  ) : (
+    <svg viewBox={viewBox} className="w-full h-full overflow-visible" {...label}>
+      {back}
+      {front}
     </svg>
   );
 
-  if (!tagged) return <div className={className}>{art}</div>;
+  if (!tagged) return <div className={`relative ${className}`}>{art}</div>;
 
   return (
     <div className={`relative ${className}`}>

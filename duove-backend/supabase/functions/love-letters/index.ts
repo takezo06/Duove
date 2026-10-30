@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import { createSupabaseClients } from "../_shared/supabase.ts";
 import { getUserId } from "../_shared/auth.ts";
+import { isOwnPhotoPath, signPhoto, signPhotos } from "../_shared/letterPhotos.ts";
 
 // The flowers and wraps a letter's bouquet can use. A copy of the ids in frontend/src/lib/bouquet.ts;
 // frontend/scripts/bouquet.check.ts fails when the two lists differ.
@@ -77,7 +78,7 @@ serve(async (req) => {
     }
     const { data, error } = await query;
     if (error) return failed(error);
-    return json(data || []);
+    return json(await signPhotos(admin, data || []));
   }
 
   // POST /love-letters
@@ -89,6 +90,14 @@ serve(async (req) => {
     if (!heading || !message) return json({ error: "A letter needs a heading and a message" }, 400);
     const bouquet = cleanBouquet(body.bouquet);
     if (!bouquet.ok) return json({ error: "Those flowers didn't come through. Pick them again." }, 400);
+    // A photo is tucked into the flowers, so it needs them, and it must be one this sender uploaded
+    const photoPath = typeof body.photo_path === "string" && body.photo_path !== "" ? body.photo_path : null;
+    let photoUrl: string | null = null;
+    if (photoPath) {
+      if (!bouquet.value) return json({ error: "A photo goes with flowers. Pick some flowers too." }, 400);
+      photoUrl = isOwnPhotoPath(photoPath, userId) ? await signPhoto(admin, photoPath) : null;
+      if (!photoUrl) return json({ error: "Your photo didn't upload. Add it again." }, 400);
+    }
     const relationship = await getActiveRelationship();
     if (!relationship) return json({ error: "Pair with your partner before sending letters" }, 400);
     // Only known columns: spreading the body let unknown keys fail the whole insert.
@@ -106,10 +115,12 @@ serve(async (req) => {
         spotify_artist_name: text(body.spotify_artist_name, 200) || null,
         spotify_album_art: text(body.spotify_album_art, 500) || null,
         bouquet: bouquet.value,
+        photo_path: photoPath,
       })
       .select().single();
     if (error) return failed(error);
-    return json(data, 201);
+    const { photo_path: _path, ...letter } = data;
+    return json({ ...letter, photo_url: photoUrl }, 201);
   }
 
   // POST /love-letters/:id/open: the recipient breaks the seal. Safe to call twice.
