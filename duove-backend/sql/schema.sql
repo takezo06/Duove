@@ -644,8 +644,6 @@ CREATE POLICY "Sender can insert love letters" ON "public"."love_letters" FOR IN
 
 
 
-CREATE POLICY "Users can insert own profile" ON "public"."profiles" FOR INSERT WITH CHECK (("auth"."uid"() = "id"));
-
 
 
 
@@ -659,8 +657,6 @@ CREATE POLICY "Users can manage own cycle logs" ON "public"."cycle_logs" USING (
 CREATE POLICY "Users can manage own symptom logs" ON "public"."daily_symptom_logs" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
-
-CREATE POLICY "Users can update own profile" ON "public"."profiles" FOR UPDATE USING (("auth"."uid"() = "id")) WITH CHECK (("auth"."uid"() = "id"));
 
 
 
