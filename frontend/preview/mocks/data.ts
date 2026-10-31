@@ -184,3 +184,34 @@ export const notifications = empty ? [] : [
       : { id: `nx${i}`, type: 'craving_added', message: `Mika added a craving: "${OLDER_CRAVINGS[(i / 2) % OLDER_CRAVINGS.length]}"`, created_at: ago(100 + i * 40), link: '/cravings', reference_id: `cx${i}`, read: true },
   ),
 ];
+
+// Contraception per person. default: Mika is 13 days into a combination pill pack (21+7), shared, with one missed
+// pill and one day not logged; today's pill isn't in yet. returning: Jed tracks, with a hormonal IUD. Add
+// &contra=<method id> (or none) to give Jed another method in returning, e.g. contra=pill_combined, patch, shot.
+type ContraMethod = { id: string; method: string; details: Record<string, unknown>; started_on: string; ended_on: string | null; shared: boolean };
+type ContraEvent = { id: string; method_id: string | null; kind: string; on_date: string; at_time: string | null; detail: Record<string, unknown> | null };
+const contraParam = new URLSearchParams(location.search).get('contra');
+const pillFor = (owner: string): { methods: ContraMethod[]; events: ContraEvent[] } => {
+  const id = `${owner}-pill`;
+  return {
+    methods: [{ id, method: 'pill_combined', details: { pill: 'combined_mono', pack: '21_7', usual_time: '08:00' }, started_on: local(-40), ended_on: null, shared: true }],
+    events: Array.from({ length: 12 }, (_, i) => -12 + i)
+      .filter((o) => o !== -3)
+      .map((o) => ({ id: `${owner}-e${o}`, method_id: id, kind: o === -5 ? 'missed' : 'taken', on_date: local(o), at_time: o === -5 ? null : `08:0${(o + 12) % 10}`, detail: null })),
+  };
+};
+function jedMethod(): { methods: ContraMethod[]; events: ContraEvent[] } {
+  const m = contraParam ?? 'iud_hormonal';
+  if (m === 'none') return { methods: [], events: [] };
+  if (m === 'pill_combined') return pillFor(me.id);
+  const id = `${me.id}-${m}`;
+  const base = { id, method: m, ended_on: null, shared: false };
+  if (m === 'iud_hormonal') return { methods: [{ ...base, details: { brand: 'kyleena', years: 5 }, started_on: local(-400) }], events: [] };
+  if (m === 'patch') return { methods: [{ ...base, details: {}, started_on: local(-9) }], events: [-9, -2].map((o) => ({ id: `pe${o}`, method_id: id, kind: 'changed', on_date: local(o), at_time: '09:00', detail: null })) };
+  if (m === 'shot') return { methods: [{ ...base, details: { shot: 'im' }, started_on: local(-85) }], events: [] };
+  return { methods: [{ ...base, details: {}, started_on: local(-30) }], events: [-20, -6].map((o) => ({ id: `ue${o}`, method_id: id, kind: 'used', on_date: local(o), at_time: '22:00', detail: null })) };
+}
+export const contraception: Record<string, { methods: ContraMethod[]; events: ContraEvent[] }> = {
+  [me.id]: returning ? jedMethod() : { methods: [], events: [] },
+  [partner.id]: empty || returning ? { methods: [], events: [] } : pillFor(partner.id),
+};

@@ -62,6 +62,11 @@ export function PrivacyPolicy() {
             sleep, stress and alcohol.
           </li>
           <li>
+            <Term>Your contraception, if you track it.</Term> The method you use and its details (like the pill type,
+            pack and usual time, or an IUD's brand), when you started it, and what you log for it: pills taken or
+            missed, patch and ring changes, shots, uses and emergency contraception.
+          </li>
+          <li>
             <Term>Requests and sign-ins.</Term> Like any website, the services Duove runs on record your IP address, your
             browser and the time of each request and sign-in, to run the service and protect it.
           </li>
@@ -90,6 +95,13 @@ export function PrivacyPolicy() {
           To stop, choose "Stop tracking my cycle" in your profile. Your partner stops seeing your cycle at once. What you
           logged before stays saved, in case you start again, until you remove it: delete a period or clear a day in the
           tracker, leave your relationship, delete your account, or ask us to erase it.
+        </p>
+        <p>
+          Contraception is tracked only by someone who tracks a cycle, and it is private by default. Your partner sees
+          your method, today's status and the dates to keep in mind only while "Share with your partner" is on, and
+          never your history, the uses you log or emergency contraception. Turning sharing off hides it from them at
+          once. Stop tracking from the contraception page; your history stays saved until you delete a log, leave your
+          relationship, delete your account, or ask us to erase it.
         </p>
         <p>
           Predictions are estimates. They aren't medical advice and they aren't birth control, as the{' '}
@@ -145,6 +157,7 @@ export function PrivacyPolicy() {
           <li>Your daily answers. Yours stays face down until they've sent theirs.</li>
           <li>Your anniversary date.</li>
           <li>Your cycle and day logs, while you track them.</li>
+          <li>Your contraception method and what's due, only while you share it.</li>
         </Bullets>
         <p>
           They never see your email address, and nobody else on Duove sees any of it. If either of you leaves the

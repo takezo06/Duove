@@ -1,36 +1,16 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Pencil, Plus } from 'lucide-react';
+import { ArrowRight, Pencil, Plus } from 'lucide-react';
 import { Chip, InlineBar, focusRing, primaryButton, secondaryButton, surface, textLink } from '../Card';
-import { apiError } from '../../lib/apiError';
 import { plural } from '../../lib/plural';
 import { parseDay, type CycleModel, type CycleSummary, type Phase } from '../../lib/cycle';
 import type { Who } from '../../hooks/useCycle';
 import { phaseColors, relativeDay, shortDay } from './constants';
 import { useOffline } from '../../hooks/useOffline';
+import { useAction } from '../../hooks/useAction';
 
 const aroundDay = (day: string) => parseDay(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const value = (v: ReactNode) => <span className="text-white font-medium tabular-nums">{v}</span>;
-
-// A button that shows a spinner while its action runs and reports a failure under the row
-function useAction() {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const run = (key: string, fn: () => Promise<void>, fallback = "That didn't save. Try again.") => async () => {
-    setBusy(key);
-    setError(null);
-    try {
-      await fn();
-    } catch (err) {
-      setError(apiError(err, fallback));
-    } finally {
-      setBusy(null);
-    }
-  };
-  const spin = (key: string) => busy === key && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />;
-  const alert = error && <p role="alert" className="mt-4 text-sm text-rose-300">{error}</p>;
-  return { busy, run, spin, alert };
-}
 
 // The cycle on one line: each phase as a segment (the current one lit) and a marker on today
 function Track({ s }: { s: CycleSummary }) {
@@ -193,6 +173,13 @@ export function CycleHeader({ who, options, setWho, partnerName, model, todayIso
               Have periods too? Track your cycle
             </button>
           )}
+          <Link
+            to="/cycle/contraception"
+            className={`group mt-5 flex w-fit items-center gap-2 text-sm font-medium text-neutral-400 hover:text-rose-400 transition rounded ${focusRing}`}
+          >
+            {mine ? 'Your contraception' : `${partnerName}'s contraception`}
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden />
+          </Link>
           {alert}
         </div>
       )}

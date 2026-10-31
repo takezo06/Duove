@@ -6,6 +6,9 @@ import { showsCycle } from '../../src/lib/cycle';
 type Res = { data: unknown };
 const ok = (data: unknown): Res => ({ data });
 const notFound = () => Promise.reject({ response: { status: 404, data: { error: 'No active relationship' } } });
+const forbidden = () => Promise.reject({ response: { status: 403, data: { error: 'Only the partner with periods sets contraception here.' } } });
+const tracksCycle = (p: typeof d.me | typeof d.partner) => showsCycle(p.has_periods, d.periods[p.id].length);
+const contraOf = () => d.contraception[d.me.id];
 const pathOf = (url: string) => new URL(url, location.origin).pathname.replace(/^.*\/functions\/v1/, '');
 
 // ?slow: every GET waits a random 1-3s so loading states can be checked
@@ -16,7 +19,7 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
   if (slow) await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
   const q = { ...Object.fromEntries(new URL(url, location.origin).searchParams), ...config.params };
   if (path.startsWith('/relationships/pending')) return ok(d.paired ? null : { invite_code: 'K7Q2M9XD' });
-  if (!d.paired && /^\/(relationships|cycles|cravings|qa|love-letters)/.test(path)) return notFound();
+  if (!d.paired && /^\/(relationships|cycles|contraception|cravings|qa|love-letters)/.test(path)) return notFound();
   if (path === '/relationships/stats') return ok(d.stats);
   if (path === '/relationships/me') return ok({ relationship: d.relationship, partner: d.partner });
   if (path === '/cravings') return ok(d.cravings);
@@ -56,6 +59,17 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
     if (owner === d.partner && !showsCycle(d.partner.has_periods, d.periods[d.partner.id].length)) return ok([]);
     return ok(d.symptomLogs[owner.id].filter((l) => (!q.from || l.log_date >= String(q.from)) && (!q.to || l.log_date <= String(q.to))));
   }
+  if (path === '/contraception/overview') {
+    const mine = d.contraception[d.me.id];
+    const theirs = d.contraception[d.partner.id];
+    const current = theirs.methods.find((m) => !m.ended_on);
+    // same rules as the function: the partner's method only while shared and they track; never uses or emergency contraception
+    const shared = !!current?.shared && tracksCycle(d.partner);
+    return ok(structuredClone({
+      me: { method: mine.methods.find((m) => !m.ended_on) ?? null, past: mine.methods.filter((m) => m.ended_on), events: mine.events },
+      partner: shared ? { shared, method: current, events: theirs.events.filter((e) => e.method_id === current!.id && !['used', 'emergency'].includes(e.kind)) } : { shared: false },
+    }));
+  }
   if (path === '/notifications/unread-count') return ok({ count: d.notifications.filter((n) => !n.read).length });
   if (path === '/notifications') {
     if (!d.paired) return notFound();
@@ -68,6 +82,14 @@ async function get(url: string, config: { params?: Record<string, unknown> } = {
 }
 
 async function patch(url: string, body: Record<string, string | null> = {}): Promise<Res> {
+  const contraMethod = pathOf(url).match(/^\/contraception\/method\/(.+)$/);
+  if (contraMethod) {
+    const v = body as unknown as Record<string, unknown>;
+    if (('details' in v || 'started_on' in v || v.shared === true) && !tracksCycle(d.me)) return forbidden();
+    const m = contraOf().methods.find((x) => x.id === contraMethod[1])!;
+    Object.assign(m, v);
+    return ok({ ...m });
+  }
   const period = pathOf(url).match(/^\/cycles\/log\/(.+)$/);
   if (period) {
     const mine = d.periods[d.me.id];
@@ -125,6 +147,24 @@ async function post(url: string, body: Record<string, string> = {}, config: { on
   }
   if (path === '/qa/skip' && d.question)
     d.question.question = { id: 'q2', question_text: 'If we could spend one whole day doing nothing together, what would it look like?', category_id: 'cat-dreams' };
+  if (path === '/contraception/method' || path === '/contraception/events') {
+    if (!tracksCycle(d.me)) return forbidden();
+    const c = contraOf();
+    const current = c.methods.find((m) => !m.ended_on);
+    const v = body as unknown as Record<string, unknown>;
+    if (path === '/contraception/method') {
+      if (current) current.ended_on = [current.started_on, String(v.started_on)].sort()[1];
+      const row = { id: crypto.randomUUID(), method: String(v.method), details: (v.details ?? {}) as Record<string, unknown>, started_on: String(v.started_on), ended_on: null, shared: current?.shared ?? false };
+      c.methods.push(row);
+      return ok({ method: { ...row }, ended: current?.id ?? null });
+    }
+    const method_id = v.kind === 'emergency' ? current?.id ?? null : current!.id;
+    const pillDay = ['taken', 'missed'];
+    if (pillDay.includes(String(v.kind))) c.events = c.events.filter((e) => !(e.method_id === method_id && e.on_date === v.on_date && pillDay.includes(e.kind)));
+    const row = { id: crypto.randomUUID(), method_id, kind: String(v.kind), on_date: String(v.on_date), at_time: (v.at_time as string) ?? null, detail: (v.detail as Record<string, unknown>) ?? null };
+    c.events.push(row);
+    return ok({ ...row });
+  }
   if (path === '/relationships/invite') return ok({ invite_code: 'K7Q2M9XD' });
   if (path === '/cycles/log') {
     const row = { id: crypto.randomUUID(), start_date: body.start_date, end_date: body.end_date ?? null };
@@ -145,6 +185,11 @@ async function post(url: string, body: Record<string, string> = {}, config: { on
 }
 
 async function del(url: string): Promise<Res> {
+  const contraEvent = pathOf(url).match(/^\/contraception\/events\/(.+)$/);
+  if (contraEvent) {
+    contraOf().events = contraOf().events.filter((e) => e.id !== contraEvent[1]);
+    return ok({ id: contraEvent[1] });
+  }
   const period = pathOf(url).match(/^\/cycles\/log\/(.+)$/);
   if (period) d.periods[d.me.id] = d.periods[d.me.id].filter((p) => p.id !== period[1]);
   const m = pathOf(url).match(/^\/cravings\/(.+)$/);
