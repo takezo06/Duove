@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock } from 'lucide-react';
+import { Info, Lock } from 'lucide-react';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useOverview } from '../hooks/useShared';
@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase';
 import { apiError } from '../lib/apiError';
 import { today } from '../lib/cycle';
 import { contraceptionModel, type Method } from '../lib/contraception';
-import { Avatar, Modal, primaryButton, secondaryButton, surface } from '../components/Card';
+import { Avatar, Modal, inset, primaryButton, secondaryButton, surface } from '../components/Card';
 import { HeaderShell, HeaderSkeleton, TrackingQuestion } from '../components/cycle/CycleHeader';
 import { BackToCycle, ContraHeader, WhoChips } from '../components/contraception/ContraHeader';
 import { MethodForm } from '../components/contraception/MethodForm';
@@ -144,11 +144,15 @@ export function Contraception() {
       )}
 
       {/* One footnote for the whole page: every rule, date and fact on it */}
-      <p className="px-1 text-xs text-neutral-400 leading-relaxed">
-        Everything on this page is general information, not medical advice. The dates, rules and facts are worked out
-        automatically from published contraception guidance and what you log, and can be wrong for you. Check your
-        method's leaflet, or ask a pharmacist or doctor before acting on them.
-      </p>
+      <aside aria-label="Not medical advice" className={`${inset} flex items-start gap-3`}>
+        <Info className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" aria-hidden />
+        <p className="text-sm text-neutral-200 leading-relaxed">
+          <span className="font-semibold text-white">Not medical advice.</span> Everything on this page is general
+          information. The dates, rules and facts are worked out automatically from published contraception guidance and
+          what you log, and can be wrong for you. Check your method's leaflet, or ask a pharmacist or doctor before
+          acting on them.
+        </p>
+      </aside>
 
       {changing && mine && method && (
         <Modal label="Change your method" wide onClose={() => setChanging(false)}>
