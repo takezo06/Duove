@@ -39,7 +39,6 @@ export function Insights({ model, method, todayIso }: { model: Model; method: Me
         <ul className="mt-3 space-y-2 list-disc pl-5 marker:text-neutral-600">
           {facts.map((f) => <li key={f} className="text-neutral-200">{f}</li>)}
         </ul>
-        <p className="mt-4 text-xs text-neutral-400">General information, not medical advice. Check your leaflet or ask a pharmacist or doctor.</p>
       </div>
     </section>
   );

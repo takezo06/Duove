@@ -143,6 +143,13 @@ export function Contraception() {
         </>
       )}
 
+      {/* One footnote for the whole page: every rule, date and fact on it */}
+      <p className="px-1 text-xs text-neutral-400 leading-relaxed">
+        Everything on this page is general information, not medical advice. The dates, rules and facts are worked out
+        automatically from published contraception guidance and what you log, and can be wrong for you. Check your
+        method's leaflet, or ask a pharmacist or doctor before acting on them.
+      </p>
+
       {changing && mine && method && (
         <Modal label="Change your method" wide onClose={() => setChanging(false)}>
           <MethodForm current={method} onSave={async (m, d, s) => { await c.start(m, d, s); setChanging(false); }} onCancel={() => setChanging(false)} />
