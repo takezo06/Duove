@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Info, Lock } from 'lucide-react';
 import axios from 'axios';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -11,11 +11,10 @@ import { apiError } from '../lib/apiError';
 import { today } from '../lib/cycle';
 import { contraceptionModel, type Method } from '../lib/contraception';
 import { Avatar, Modal, inset, primaryButton, secondaryButton, surface } from '../components/Card';
-import { HeaderShell, HeaderSkeleton, TrackingQuestion } from '../components/cycle/CycleHeader';
-import { BackToCycle, ContraHeader, WhoChips } from '../components/contraception/ContraHeader';
+import { HeaderShell, TrackingQuestion } from '../components/cycle/CycleHeader';
+import { BackToCycle, ContraHero, HeroSkeleton, WhoChips } from '../components/contraception/Hero';
 import { MethodForm } from '../components/contraception/MethodForm';
-import { PackCard } from '../components/contraception/PackCard';
-import { EmergencyModal, HistoryCard, Insights, MissedCard } from '../components/contraception/ContraCards';
+import { ComingUp, EmergencyModal, GuideCard, HistoryCard, SettingsCard } from '../components/contraception/ContraCards';
 
 const api = import.meta.env.VITE_BACKEND_URL;
 const minutesNow = () => {
@@ -25,7 +24,6 @@ const minutesNow = () => {
 
 export function Contraception() {
   usePageTitle('Contraception');
-  const navigate = useNavigate();
   const todayIso = today();
   const { data: overview, error: overviewError, reload, set: setOverview } = useOverview();
   const c = useContraception();
@@ -58,7 +56,7 @@ export function Contraception() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Contraception lives with your cycle</h1>
           <p className="text-neutral-400 max-w-md mx-auto">Connect with your partner to track your cycle and contraception.</p>
-          <button onClick={() => navigate('/partner')} className={`${primaryButton} mt-6`}>Connect with your partner</button>
+          <Link to="/partner" className={`${primaryButton} mt-6`}>Connect with your partner</Link>
         </div>
       </div>
     );
@@ -69,8 +67,11 @@ export function Contraception() {
   const chips = who && options.length > 1 ? <WhoChips who={who} options={options} partnerName={partnerName} setWho={setPick} /> : undefined;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <BackToCycle />
+    <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 min-h-10">
+        <BackToCycle />
+        {chips}
+      </div>
       {error ? (
         <HeaderShell title="Contraception" subtitle="Your method, what's due and the dates to keep in mind.">
           <div className="mt-6 pt-6 border-t border-neutral-800">
@@ -79,10 +80,7 @@ export function Contraception() {
           </div>
         </HeaderShell>
       ) : loading ? (
-        <>
-          <HeaderSkeleton />
-          <div className={`${surface} h-72 animate-pulse`} aria-busy="true" />
-        </>
+        <HeroSkeleton />
       ) : askMe ? (
         <HeaderShell title="Contraception" subtitle="One question first: contraception is tracked by whoever has periods.">
           <TrackingQuestion partnerName={partnerName} partnerTracks={tracks(overview.partner)} onAnswer={answerTracks} />
@@ -92,18 +90,18 @@ export function Contraception() {
           <div className="mt-6 pt-6 border-t border-neutral-800">
             <p className="text-neutral-200">Neither of you tracks a cycle here yet.</p>
             <p className="text-sm text-neutral-400 mt-1">Once one of you turns cycle tracking on, the contraception tracker opens for them.</p>
-            <button onClick={() => navigate('/cycle')} className={`${secondaryButton} mt-5`}>Go to the cycle tracker</button>
+            <Link to="/cycle" className={`${secondaryButton} mt-5`}>Go to the cycle tracker</Link>
           </div>
         </HeaderShell>
       ) : !method ? (
         mine ? (
-          <HeaderShell title="Your contraception" subtitle={`Keep track of your method and what's due. Private unless you share it with ${partnerName}.`} aside={chips}>
+          <HeaderShell title="Your contraception" subtitle={`Keep track of your method and what's due. Private unless you share it with ${partnerName}.`}>
             <div className="mt-6 pt-6 border-t border-neutral-800">
               <MethodForm current={null} onSave={c.start} />
             </div>
           </HeaderShell>
         ) : (
-          <HeaderShell title={<><span className="text-rose-400">{partnerName}</span>'s contraception</>} subtitle="Shared only if they choose to." aside={chips}>
+          <HeaderShell title={<><span className="text-rose-400">{partnerName}</span>'s contraception</>} subtitle="Shared only if they choose to.">
             <div className="mt-6 pt-6 border-t border-neutral-800 flex items-start gap-3">
               <Lock className="w-4 h-4 text-neutral-400 mt-1 shrink-0" aria-hidden />
               <div>
@@ -115,21 +113,27 @@ export function Contraception() {
         )
       ) : model && (
         <>
-          <ContraHeader
+          <ContraHero
             model={model}
             method={method}
             mine={mine}
             partnerName={partnerName}
-            aside={chips}
             todayIso={todayIso}
-            onLog={mine ? (kind, day) => c.log(kind, day) : undefined}
-            onChange={() => setChanging(true)}
-            onShare={mine ? (shared) => c.update({ shared }) : undefined}
-            onStop={mine ? () => c.update({ ended_on: todayIso }) : undefined}
+            events={events}
+            onLog={(kind, day) => c.log(kind, day)}
+            onRemove={c.remove}
           />
-          <PackCard key={method.id} model={model} events={events} methodId={method.id} editable={mine} onLog={(kind, day) => c.log(kind, day)} onRemove={c.remove} />
-          {mine && <MissedCard model={model} onEmergency={() => setEmergency(true)} />}
-          <Insights model={model} method={method} todayIso={todayIso} />
+          <ComingUp model={model} todayIso={todayIso} />
+          <GuideCard model={model} method={method} mine={mine} onEmergency={() => setEmergency(true)} />
+          {mine && (
+            <SettingsCard
+              method={method}
+              partnerName={partnerName}
+              onChange={() => setChanging(true)}
+              onShare={(shared) => c.update({ shared })}
+              onStop={() => c.update({ ended_on: todayIso })}
+            />
+          )}
           {mine && c.data && (
             <HistoryCard
               events={c.data.me.events}

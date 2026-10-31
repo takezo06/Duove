@@ -132,7 +132,7 @@ export function MethodForm({ current, onSave, onCancel }: {
               </div>
               <div>
                 <label htmlFor="years" className={label}>Good for (years)</label>
-                <input id="years" type="number" inputMode="numeric" min={1} max={12} required value={details.years ?? ''}
+                <input id="years" name="years" type="number" inputMode="numeric" min={1} max={12} required value={details.years ?? ''}
                   onChange={(e) => set({ years: e.target.value ? Math.max(1, Math.min(12, Math.round(+e.target.value))) : undefined })}
                   className={`${field} tabular-nums`} aria-describedby="years-hint" />
                 <p id="years-hint" className="text-xs text-neutral-400 mt-2">From your clinic's card</p>
@@ -146,13 +146,13 @@ export function MethodForm({ current, onSave, onCancel }: {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="started" className={label}>{info.starts}</label>
-              <input id="started" type="date" required value={start} max={PILL_METHODS.includes(method) || method === 'patch' || method.startsWith('ring') ? undefined : today()}
+              <input id="started" name="started_on" type="date" required value={start} max={PILL_METHODS.includes(method) || method === 'patch' || method.startsWith('ring') ? undefined : today()}
                 onChange={(e) => setStart(e.target.value)} className={`${field} [color-scheme:dark]`} />
             </div>
             {PILL_METHODS.includes(method) && (
               <div>
                 <label htmlFor="usual" className={label}>Usual time</label>
-                <input id="usual" type="time" value={details.usual_time ?? ''} onChange={(e) => set({ usual_time: e.target.value || undefined })}
+                <input id="usual" name="usual_time" type="time" value={details.usual_time ?? ''} onChange={(e) => set({ usual_time: e.target.value || undefined })}
                   className={`${field} [color-scheme:dark]`} aria-describedby="usual-hint" />
                 <p id="usual-hint" className="text-xs text-neutral-400 mt-2">Used to tell when a pill is late</p>
               </div>

@@ -468,7 +468,7 @@ function untilModel(m: Method, todayIso: string): Partial<Model> {
   const since = daysBetween(m.started_on, todayIso);
   if (!lam && m.method !== 'implant' && since < 70) dates.push({ date: addDays(m.started_on, 42), label: 'Check-up, about 6 weeks after it went in' });
   dates.push({ date: until, label: lam ? 'Stops counting (6 months)' : 'Replace or remove by', tone: tone(left, lam ? 14 : 90) });
-  const years = Math.floor(left / 365);
+  const years = Math.round(left / 365); // rounded like the countdown beside it
   const line = lam ? `Breastfeeding · baby is ${plural(Math.max(0, Math.floor(since / 7)), 'week')} old` : `${name} · in for ${since >= 365 ? plural(Math.floor(since / 365), 'year') : plural(Math.max(0, Math.floor(since / 30)), 'month')}`;
   const base: Partial<Model> = { line, track, dates, action: null };
   if (left < 0) return { ...base, badge: { tone: 'rose', text: lam ? 'Over 6 months' : 'Past its date' }, sentence: lam ? `Breastfeeding stopped counting as birth control on ${dayLabel(until)}.` : `It reached its date on ${longLabel(until)}.`, hint: lam ? 'Start another method.' : 'Book a replacement or removal, and use condoms meanwhile.' };
